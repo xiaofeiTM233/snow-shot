@@ -174,7 +174,7 @@ export const CaptureHistoryPage = () => {
 					hideSelectAll: false,
 				}}
 				tableAlertOptionRender={tableAlertOptionRender}
-				itemLayout="horizontal"
+				itemLayout="vertical"
 				split
 				cardProps={{
 					styles: {
