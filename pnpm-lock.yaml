@@ -30,10 +30,10 @@ importers:
         specifier: ^2.9.0
         version: 2.11.1
       '@tauri-apps/plugin-autostart':
-        specifier: ~2.5.1
+        specifier: ^2.5.1
         version: 2.5.1
       '@tauri-apps/plugin-clipboard-manager':
-        specifier: ~2.3.2
+        specifier: ^2.3.2
         version: 2.3.2
       '@tauri-apps/plugin-dialog':
         specifier: ^2.4.2
@@ -45,7 +45,7 @@ importers:
         specifier: ^2.3.1
         version: 2.3.2
       '@tauri-apps/plugin-http':
-        specifier: ~2.5.4
+        specifier: ^2.5.4
         version: 2.5.9
       '@tauri-apps/plugin-log':
         specifier: ^2.7.1
@@ -66,10 +66,10 @@ importers:
         specifier: ^2.4.1
         version: 2.4.3
       '@tauri-apps/plugin-updater':
-        specifier: ~2.9.0
+        specifier: ^2.9.0
         version: 2.9.0
       '@tauri-apps/plugin-window-state':
-        specifier: ~2.4.1
+        specifier: ^2.4.1
         version: 2.4.1
       '@tweenjs/tween.js':
         specifier: ^25.0.0
