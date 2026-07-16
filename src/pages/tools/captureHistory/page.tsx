@@ -408,10 +408,12 @@ export const CaptureHistoryPage = () => {
 					},
 				}}
 			/>
-			<style>
-				{`.ant-pro-list.ant-pro-list-vertical .ant-pro-list-row-header {
+			<style jsx>
+				{`
+				:global(.ant-pro-list.ant-pro-list-vertical .ant-pro-list-row-header) {
     			flex-direction: row;
-				}`}
+				}
+			`}
 			</style>
 		</>
 	);

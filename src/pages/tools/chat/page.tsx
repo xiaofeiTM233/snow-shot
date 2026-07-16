@@ -1663,6 +1663,9 @@ export const ChatPage = () => {
                         color: var(--antd-color-text);
                         padding: 8px;
                     }
+                    :global(.ant-sender-input.ant-input-borderless) {
+                        outline: none;
+                    }
                 `}</style>
 			</div>
 		</Suspense>
