@@ -3,21 +3,21 @@
 import { CopyOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import {
 	Bubble,
-	Conversations,
-	Sender,
-	Welcome,
 	type BubbleItemType,
 	type ConversationItemType,
+	Conversations,
+	Sender,
 	type SenderRef,
+	Welcome,
 } from "@ant-design/x";
 import {
 	AbstractChatProvider,
-	XRequest,
-	useXChat,
 	type AbstractXRequestClass,
 	type MessageInfo,
 	type SSEOutput,
 	type TransformMessage,
+	useXChat,
+	XRequest,
 	type XRequestOptions,
 } from "@ant-design/x-sdk";
 import { useSearch } from "@tanstack/react-router";
@@ -47,7 +47,7 @@ import {
 	useState,
 } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
-import { FormattedMessage, useIntl, type IntlShape } from "react-intl";
+import { FormattedMessage, type IntlShape, useIntl } from "react-intl";
 import Markdown, { type ExtraProps } from "react-markdown";
 import RSC, { type Scrollbar } from "react-scrollbars-custom";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -505,7 +505,8 @@ class SnowShotChatProvider extends AbstractChatProvider<any, any, any> {
 					if (choiceDelta) {
 						if (choiceDelta?.reasoning_content) {
 							messageContent.reasoning_content =
-								messageContent.reasoning_content + choiceDelta?.reasoning_content;
+								messageContent.reasoning_content +
+								choiceDelta?.reasoning_content;
 						} else {
 							messageContent.content += choiceDelta?.content ?? "";
 						}
@@ -654,15 +655,15 @@ const Chat = () => {
 				return undefined;
 			}
 
-		const baseURL = urlJoin(customConfig.api_uri, "chat/completions");
-		return {
-			request: XRequest(baseURL, {
-				headers: { Authorization: `Bearer ${customConfig.api_key}` },
-				fetch: appFetch,
-				manual: true,
-			}),
-			config: customConfig,
-		};
+			const baseURL = urlJoin(customConfig.api_uri, "chat/completions");
+			return {
+				request: XRequest(baseURL, {
+					headers: { Authorization: `Bearer ${customConfig.api_key}` },
+					fetch: appFetch,
+					manual: true,
+				}),
+				config: customConfig,
+			};
 		},
 		[supportedModelsRef],
 	);
@@ -881,9 +882,7 @@ const Chat = () => {
 							// In future versions, the sessionId capability will be added to resolve this problem.
 							setTimeout(() => {
 								setCurSession(val);
-								setMessages(
-									(messageHistory?.[val] || []) as MessageInfo[],
-								);
+								setMessages((messageHistory?.[val] || []) as MessageInfo[]);
 							}, 100);
 
 							autoScrollRef.current = true;
@@ -1060,10 +1059,7 @@ const Chat = () => {
 				return b[1].session.key.localeCompare(a[1].session.key);
 			});
 			const sessionList = [];
-			const messageHistory = {} as Record<
-				string,
-				MessageInfo[]
-			>;
+			const messageHistory = {} as Record<string, MessageInfo[]>;
 			for (const [key, value] of chatHistory) {
 				sessionList.push({
 					...value.session,
@@ -1113,23 +1109,23 @@ const Chat = () => {
 			>
 				{bubbleItems ? (
 					/** 消息列表 */
-				<Bubble.List
-					style={{ height: "100%", paddingInline: 16 }}
-					items={bubbleItems}
-					key={curSession}
-					role={{
-						assistant: {
-							placement: "start",
-							loadingRender: () => (
-								<Space>
-									<Spin size="small" />
-									<FormattedMessage id="tools.chat.agentPlaceholder" />
-								</Space>
-							),
-						},
-						user: { placement: "end" },
-					}}
-				/>
+					<Bubble.List
+						style={{ height: "100%", paddingInline: 16 }}
+						items={bubbleItems}
+						key={curSession}
+						role={{
+							assistant: {
+								placement: "start",
+								loadingRender: () => (
+									<Space>
+										<Spin size="small" />
+										<FormattedMessage id="tools.chat.agentPlaceholder" />
+									</Space>
+								),
+							},
+							user: { placement: "end" },
+						}}
+					/>
 				) : (
 					<div className="chatWelcomeWrap">
 						<Welcome
@@ -1152,11 +1148,15 @@ const Chat = () => {
 
 	const onCopy = useCallback(() => {
 		const lastMessage = last(messagesRef.current);
-		copyText(lastMessage ? getMessageContent(lastMessage.message as ChatMessage) : "");
+		copyText(
+			lastMessage ? getMessageContent(lastMessage.message as ChatMessage) : "",
+		);
 	}, []);
 	const onCopyAndHide = useCallback(() => {
 		const lastMessage = last(messagesRef.current);
-		copyTextAndHide(lastMessage ? getMessageContent(lastMessage.message as ChatMessage) : "");
+		copyTextAndHide(
+			lastMessage ? getMessageContent(lastMessage.message as ChatMessage) : "",
+		);
 	}, []);
 
 	useHotkeys(
@@ -1192,14 +1192,14 @@ const Chat = () => {
 
 	const handleUserSubmit = useCallback(
 		(val: string, flowConfig?: ChatMessageFlowConfig) => {
-		onRequest({
-			stream: true,
-			message: {
-				content: val,
-				role: "user",
-				flow_config: flowConfig,
-			},
-		});
+			onRequest({
+				stream: true,
+				message: {
+					content: val,
+					role: "user",
+					flow_config: flowConfig,
+				},
+			});
 
 			if (
 				sessionListRef.current.find((i) => i.key === curSessionRef.current)
@@ -1338,62 +1338,61 @@ const Chat = () => {
 					}}
 				/>
 			</div>
-		{/** 输入框 */}
-		<Sender
-			ref={senderRef}
-			loading={senderLoading}
-			value={inputValue}
-			styles={{ input: { outline: "none" } }}
-			onChange={(v) => {
-				if (v.length > 10000) {
-					setInputValue(v.substring(0, 10000));
-				} else {
-					setInputValue(v);
-				}
-			}}
-			disabled={sessionStoreLoading}
-			onSubmit={async (message) => {
-				if (!curSessionRef.current) {
-					await createNewSession();
-				}
+			{/** 输入框 */}
+			<Sender
+				ref={senderRef}
+				loading={senderLoading}
+				value={inputValue}
+				onChange={(v) => {
+					if (v.length > 10000) {
+						setInputValue(v.substring(0, 10000));
+					} else {
+						setInputValue(v);
+					}
+				}}
+				disabled={sessionStoreLoading}
+				onSubmit={async (message) => {
+					if (!curSessionRef.current) {
+						await createNewSession();
+					}
 
-				onSenderSubmit(message);
-			}}
-			onCancel={abortChat}
-			placeholder={intl.formatMessage({ id: "tools.chat.placeholder" })}
-			onKeyDown={(e) => {
-				if (e.key === "Enter" && (senderLoading || userSendingRef.current)) {
-					setSendQueueMessages((prev) =>
-						prev.concat({
-							content: inputValue,
-							title: intl.formatMessage({
-								id: "tools.chat.sendQueue.userMessage",
+					onSenderSubmit(message);
+				}}
+				onCancel={abortChat}
+				placeholder={intl.formatMessage({ id: "tools.chat.placeholder" })}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" && (senderLoading || userSendingRef.current)) {
+						setSendQueueMessages((prev) =>
+							prev.concat({
+								content: inputValue,
+								title: intl.formatMessage({
+									id: "tools.chat.sendQueue.userMessage",
+								}),
 							}),
-						}),
+						);
+						setInputValue("");
+					}
+				}}
+				suffix={(_, info) => {
+					const { SendButton, LoadingButton } = info.components;
+					return (
+						<div
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: token.marginXS,
+							}}
+						>
+							<SendQueueMessageList queue={sendQueueMessages} />
+							{loading ? (
+								<LoadingButton type="default" />
+							) : (
+								<SendButton type="primary" />
+							)}
+						</div>
 					);
-					setInputValue("");
-				}
-			}}
-			suffix={(_, info) => {
-				const { SendButton, LoadingButton } = info.components;
-				return (
-					<div
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: token.marginXS,
-						}}
-					>
-						<SendQueueMessageList queue={sendQueueMessages} />
-						{loading ? (
-							<LoadingButton type="default" />
-						) : (
-							<SendButton type="primary" />
-						)}
-					</div>
-				);
-			}}
-		/>
+				}}
+			/>
 		</div>
 	);
 
