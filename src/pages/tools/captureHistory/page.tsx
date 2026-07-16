@@ -409,7 +409,7 @@ export const CaptureHistoryPage = () => {
 				}}
 			/>
 			<style>
-				{`.ant-pro-list-row-header {
+				{`.ant-pro-list.ant-pro-list-vertical .ant-pro-list-row-header {
     			flex-direction: row;
 				}`}
 			</style>
