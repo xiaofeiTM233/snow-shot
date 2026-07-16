@@ -1343,7 +1343,7 @@ const Chat = () => {
 			ref={senderRef}
 			loading={senderLoading}
 			value={inputValue}
-			inputProps={{ style: { outline: "none" } }}
+			styles={{ input: { outline: "none" } }}
 			onChange={(v) => {
 				if (v.length > 10000) {
 					setInputValue(v.substring(0, 10000));
