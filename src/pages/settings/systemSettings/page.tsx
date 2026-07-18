@@ -1106,6 +1106,40 @@ export const SystemSettingsPage = () => {
 									</Button>
 								</Space>
 							</ProForm.Item>
+					</Col>
+					<Col span={24}>
+						<ProForm.Item
+							label={
+								<IconLabel
+									label={
+										<FormattedMessage id="settings.systemSettings.appLogFilePath" />
+									}
+								/>
+							}
+						>
+								<Space wrap>
+									<Typography.Text
+										copyable={{
+											text: appLogPath,
+										}}
+									>
+										{appLogPath}
+									</Typography.Text>
+									<Button
+										onClick={async () => {
+											try {
+												await openPath(appLogPath);
+											} catch {
+												message.error(
+													<FormattedMessage id="settings.systemSettings.appLogFilePath.open.failed" />,
+												);
+											}
+										}}
+									>
+										<FormattedMessage id="settings.systemSettings.appLogFilePath.open" />
+									</Button>
+								</Space>
+							</ProForm.Item>
 						</Col>
 						<Col span={12}>
 							<ProForm.Item
@@ -1143,40 +1177,6 @@ export const SystemSettingsPage = () => {
 								>
 									<FormattedMessage id="settings.systemSettings.dataFile.clearAll" />
 								</Button>
-							</ProForm.Item>
-						</Col>
-						<Col span={24}>
-							<ProForm.Item
-								label={
-									<IconLabel
-										label={
-											<FormattedMessage id="settings.systemSettings.appLogFilePath" />
-										}
-									/>
-								}
-							>
-								<Space wrap>
-									<Typography.Text
-										copyable={{
-											text: appLogPath,
-										}}
-									>
-										{appLogPath}
-									</Typography.Text>
-									<Button
-										onClick={async () => {
-											try {
-												await openPath(appLogPath);
-											} catch {
-												message.error(
-													<FormattedMessage id="settings.systemSettings.appLogFilePath.open.failed" />,
-												);
-											}
-										}}
-									>
-										<FormattedMessage id="settings.systemSettings.appLogFilePath.open" />
-									</Button>
-								</Space>
 							</ProForm.Item>
 						</Col>
 					</Row>
