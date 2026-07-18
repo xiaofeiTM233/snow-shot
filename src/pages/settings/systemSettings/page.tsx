@@ -321,9 +321,10 @@ export const SystemSettingsPage = () => {
 								<Switch />
 							</ProForm.Item>
 						</Col>
-						{currentPlatform === "windows" && (
+					{currentPlatform === "windows" && (
+						<>
 							<Col span={12}>
-								<ProForm.Item
+							<ProForm.Item
 									label={
 										<IconLabel
 											label={
@@ -366,8 +367,9 @@ export const SystemSettingsPage = () => {
 									name="boostProcessPriority"
 								/>
 							</Col>
-						)}
-					</Row>
+						</>
+					)}
+				</Row>
 				</ProForm>
 			</Spin>
 
@@ -429,61 +431,76 @@ export const SystemSettingsPage = () => {
 								valuePropName="checked"
 							/>
 						</Col>
-					</Row>
 
-					{currentPlatform === "windows" && (
-						<Row gutter={token.marginLG}>
-							<Col span={24}>
-								<ProFormSwitch
-									label={
-										<IconLabel
-											label={
-												<FormattedMessage id="settings.systemSettings.screenshotSettings.correctColorFilter" />
-											}
-											tooltipTitle={
-												<FormattedMessage id="settings.systemSettings.screenshotSettings.correctColorFilter.tip" />
-											}
-										/>
-									}
-									name="correctColorFilter"
-									valuePropName="checked"
-								/>
-							</Col>
+						{currentPlatform === "windows" && (
+							<>
+								<Col span={12}>
+									<ProFormSwitch
+										label={
+											<IconLabel
+												label={
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.tryWriteBitmapImageToClipboard" />
+												}
+												tooltipTitle={
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.tryWriteBitmapImageToClipboard.tip" />
+												}
+											/>
+										}
+										name="tryWriteBitmapImageToClipboard"
+										valuePropName="checked"
+									/>
+								</Col>
 
-							<Col span={12}>
-								<ProFormSwitch
-									label={
-										<IconLabel
-											label={
-												<FormattedMessage id="settings.systemSettings.screenshotSettings.enableCorrectHdrColor" />
-											}
-											tooltipTitle={
-												<FormattedMessage id="settings.systemSettings.screenshotSettings.enableCorrectHdrColor.tip" />
-											}
-										/>
-									}
-									name="correctHdrColor"
-									valuePropName="checked"
-								/>
-							</Col>
+								<Col span={24}>
+									<ProFormSwitch
+										label={
+											<IconLabel
+												label={
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.correctColorFilter" />
+												}
+												tooltipTitle={
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.correctColorFilter.tip" />
+												}
+											/>
+										}
+										name="correctColorFilter"
+										valuePropName="checked"
+									/>
+								</Col>
 
-							<Col span={12}>
-								<ProFormSelect
-									label={
-										<IconLabel
-											label={
-												<FormattedMessage id="settings.systemSettings.screenshotSettings.enableCorrectHdrColor.algorithm" />
-											}
-										/>
-									}
-									name="correctHdrColorAlgorithm"
-									options={hdrColorAlgorithmOptions}
-								/>
-							</Col>
-						</Row>
-					)}
+								<Col span={12}>
+									<ProFormSwitch
+										label={
+											<IconLabel
+												label={
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.enableCorrectHdrColor" />
+												}
+												tooltipTitle={
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.enableCorrectHdrColor.tip" />
+												}
+											/>
+										}
+										name="correctHdrColor"
+										valuePropName="checked"
+									/>
+								</Col>
 
-					<Row gutter={token.marginLG}>
+								<Col span={12}>
+									<ProFormSelect
+										label={
+											<IconLabel
+												label={
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.enableCorrectHdrColor.algorithm" />
+												}
+											/>
+										}
+										name="correctHdrColorAlgorithm"
+										options={hdrColorAlgorithmOptions}
+									/>
+								</Col>
+							</>
+						)}
+
 						<Col span={12}>
 							<ProFormSwitch
 								label={
@@ -526,77 +543,57 @@ export const SystemSettingsPage = () => {
 								valuePropName="checked"
 							/>
 						</Col>
-					</Row>
 
-					{isReadyStatus?.(PLUGIN_ID_RAPID_OCR) && (
-						<Row gutter={token.marginLG}>
-							<Col span={12}>
-								<ProFormSwitch
-									label={
-										<IconLabel
-											label={
-												<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrHotStart" />
-											}
-											tooltipTitle={
-												<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrHotStart.tip" />
-											}
-										/>
-									}
-									name="ocrHotStart"
-									valuePropName="checked"
-								/>
-							</Col>
+						{isReadyStatus?.(PLUGIN_ID_RAPID_OCR) && (
+							<>
+								<Col span={12}>
+									<ProFormSwitch
+										label={
+											<IconLabel
+												label={
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrHotStart" />
+												}
+												tooltipTitle={
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrHotStart.tip" />
+												}
+											/>
+										}
+										name="ocrHotStart"
+										valuePropName="checked"
+									/>
+								</Col>
 
-							<Col span={12}>
-								<ProFormSwitch
-									label={
-										<IconLabel
-											label={
-												<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrModelWriteToMemory" />
-											}
-											tooltipTitle={
-												<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrModelWriteToMemory.tip" />
-											}
-										/>
-									}
-									name="ocrModelWriteToMemory"
-									valuePropName="checked"
-								/>
-							</Col>
+								<Col span={12}>
+									<ProFormSwitch
+										label={
+											<IconLabel
+												label={
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrModelWriteToMemory" />
+												}
+												tooltipTitle={
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrModelWriteToMemory.tip" />
+												}
+											/>
+										}
+										name="ocrModelWriteToMemory"
+										valuePropName="checked"
+									/>
+								</Col>
 
-							<Col span={12}>
-								<ProFormSwitch
-									label={
-										<IconLabel
-											label={
-												<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrDetectAngle" />
-											}
-										/>
-									}
-									name="ocrDetectAngle"
-									valuePropName="checked"
-								/>
-							</Col>
-						</Row>
-					)}
-					<Row gutter={token.marginLG}>
-						{currentPlatform === "windows" && (
-							<Col span={12}>
-								<ProFormSwitch
-									label={
-										<IconLabel
-											label={
-												<FormattedMessage id="settings.systemSettings.screenshotSettings.tryWriteBitmapImageToClipboard" />
-											}
-											tooltipTitle={
-												<FormattedMessage id="settings.systemSettings.screenshotSettings.tryWriteBitmapImageToClipboard.tip" />
-											}
-										/>
-									}
-									name="tryWriteBitmapImageToClipboard"
-									valuePropName="checked"
-								/>
-							</Col>
+								<Col span={12}>
+									<ProFormSwitch
+										label={
+											<IconLabel
+												label={
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrDetectAngle" />
+												}
+											/>
+										}
+										name="ocrDetectAngle"
+										valuePropName="checked"
+									/>
+								</Col>
+							</>
 						)}
 					</Row>
 				</ProForm>
