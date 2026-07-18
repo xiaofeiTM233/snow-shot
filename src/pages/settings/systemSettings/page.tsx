@@ -714,25 +714,7 @@ export const SystemSettingsPage = () => {
 					submitter={false}
 					layout="vertical"
 				>
-					<Row gutter={token.marginLG}>
-						<Col span={12}>
-							<ProFormSwitch
-								label={
-									<IconLabel
-										label={
-											<FormattedMessage id="settings.systemSettings.scrollScreenshotSettings.tryRollback" />
-										}
-										tooltipTitle={
-											<FormattedMessage id="settings.systemSettings.scrollScreenshotSettings.tryRollback.tip" />
-										}
-									/>
-								}
-								name="tryRollback"
-							/>
-						</Col>
-					</Row>
-
-					<Row gutter={token.marginLG}>
+				<Row gutter={token.marginLG}>
 						<Col span={12}>
 							<ProFormSlider
 								label={
@@ -837,18 +819,33 @@ export const SystemSettingsPage = () => {
 										}
 									/>
 								}
-								name="imageFeatureDescriptionLength"
-								min={8}
-								max={128}
-								step={1}
-								marks={{
-									8: "8",
-									128: "128",
-								}}
-								layout="vertical"
-							/>
-						</Col>
-					</Row>
+							name="imageFeatureDescriptionLength"
+							min={8}
+							max={128}
+							step={1}
+							marks={{
+								8: "8",
+								128: "128",
+							}}
+							layout="vertical"
+						/>
+					</Col>
+					<Col span={12}>
+						<ProFormSwitch
+							label={
+								<IconLabel
+									label={
+										<FormattedMessage id="settings.systemSettings.scrollScreenshotSettings.tryRollback" />
+									}
+									tooltipTitle={
+										<FormattedMessage id="settings.systemSettings.scrollScreenshotSettings.tryRollback.tip" />
+									}
+								/>
+							}
+							name="tryRollback"
+						/>
+					</Col>
+				</Row>
 				</ProForm>
 			</Spin>
 
