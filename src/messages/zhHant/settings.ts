@@ -628,6 +628,30 @@ export const settings = {
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.detModel": "檢測(det)",
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.recModel": "識別(rec)",
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.clsModel": "方向(cls)",
+	"settings.functionSettings.ocrSettings.localRecognition": "本地辨識",
+	"settings.functionSettings.ocrSettings.onlineRecognition": "線上辨識",
+	"settings.functionSettings.ocrSettings.modelName.tip":
+		"模型名稱用於 Snow Shot 的展示",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig": "線上 OCR 配置",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.add": "新增線上 OCR 配置",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.provider": "服務提供商",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.provider.youdao":
+		"網易有道",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.provider.tencent":
+		"騰訊雲",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.modelName": "模型名稱",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType": "服務類型",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.general":
+		"通用文字辨識",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.generalHigh":
+		"通用文字辨識(高精度版)",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.handwriting":
+		"手寫文字辨識",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.tencent.basic":
+		"通用印刷體辨識",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.tencent.accurate":
+		"通用文字辨識（高精度版）",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.language": "辨識語言",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.default": "預設",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.default.tip":
 		"預設使用首個支援視覺理解的模型",

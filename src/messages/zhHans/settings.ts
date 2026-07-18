@@ -616,10 +616,12 @@ export const settings = {
 	"settings.systemSettings.coreSettings.hotLoadPageCount.tip":
 		"通过热加载页面，实现贴图、视频录制、全屏画布等功能的快速加载，但同时提高了内存的占用",
 	"settings.functionSettings.ocrSettings": "文本识别",
+	"settings.functionSettings.ocrSettings.localRecognition": "本地识别",
+	"settings.functionSettings.ocrSettings.onlineRecognition": "在线识别",
 	"settings.functionSettings.ocrSettings.htmlVisionModel": "视觉理解模型",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.tip":
 		"将图片转为 HTML 的视觉理解模型",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig": "文本识别模型配置",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig": "本地 OCR 配置",
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.tip":
 		"从 {link} 下载 ONNX 模型文件放置到插件数据目录后，可在此配置文本识别模型",
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.tip.link": "此仓库",
@@ -628,6 +630,28 @@ export const settings = {
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.detModel": "检测(det)",
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.recModel": "识别(rec)",
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.clsModel": "方向(cls)",
+	"settings.functionSettings.ocrSettings.modelName.tip":
+		"模型名称用于 Snow Shot 的展示",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig": "在线 OCR 配置",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.add": "添加在线 OCR 配置",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.provider": "服务提供商",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.provider.youdao":
+		"网易有道",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.provider.tencent":
+		"腾讯云",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.modelName": "模型名称",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType": "服务类型",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.general":
+		"通用文字识别",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.generalHigh":
+		"通用文字识别(高精度版)",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.handwriting":
+		"手写文字识别",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.tencent.basic":
+		"通用印刷体识别",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.tencent.accurate":
+		"通用文字识别（高精度版）",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.language": "识别语言",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.default": "默认",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.default.tip":
 		"默认使用首个支持视觉理解的模型",

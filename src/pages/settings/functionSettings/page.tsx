@@ -75,6 +75,8 @@ import {
 	OcrDetectAfterAction,
 	OcrModel,
 	type CustomOcrModelConfig,
+	OnlineOcrProvider,
+	type OnlineOcrConfig,
 	TranslationApiType,
 	TrayIconClickAction,
 	VideoMaxSize,
@@ -655,6 +657,63 @@ export const FunctionSettingsPage = () => {
 					id: "settings.systemSettings.screenshotSettings.ocrModel.paddleOcrV4",
 				}),
 				value: OcrModel.RapidOcrV4,
+			},
+		];
+	}, [intl]);
+
+	const onlineOcrProviderOptions = useMemo(() => {
+		return [
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.provider.youdao",
+				}),
+				value: OnlineOcrProvider.Youdao,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.provider.tencent",
+				}),
+				value: OnlineOcrProvider.Tencent,
+			},
+		];
+	}, [intl]);
+
+	const youdaoServiceTypeOptions = useMemo(() => {
+		return [
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.general",
+				}),
+				value: "general",
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.generalHigh",
+				}),
+				value: "general_high",
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.handwriting",
+				}),
+				value: "handwriting",
+			},
+		];
+	}, [intl]);
+
+	const tencentServiceTypeOptions = useMemo(() => {
+		return [
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.tencent.basic",
+				}),
+				value: "general_basic",
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.tencent.accurate",
+				}),
+				value: "general_accurate",
 			},
 		];
 	}, [intl]);
@@ -1420,245 +1479,475 @@ export const FunctionSettingsPage = () => {
 				</ProForm>
 			</Spin>
 
-			{isReadyStatus?.(PLUGIN_ID_RAPID_OCR) && (
-				<>
-					<Divider />
+			<>
+				<Divider />
 
-					<GroupTitle
-						id="ocrSettings"
-						extra={
-							<ResetSettingsButton
-								title={
-									<FormattedMessage id="settings.functionSettings.ocrSettings" />
-								}
-								appSettingsGroup={AppSettingsGroup.FunctionOcr}
-							/>
-						}
+				<GroupTitle
+					id="ocrSettings"
+					extra={
+						<ResetSettingsButton
+							title={
+								<FormattedMessage id="settings.functionSettings.ocrSettings" />
+							}
+							appSettingsGroup={AppSettingsGroup.FunctionOcr}
+						/>
+					}
+				>
+					<FormattedMessage id="settings.functionSettings.ocrSettings" />
+				</GroupTitle>
+
+				<Spin spinning={appSettingsLoading}>
+					<ProForm
+						form={functionOcrForm}
+						onValuesChange={(_, values) => {
+							updateAppSettings(
+								AppSettingsGroup.FunctionOcr,
+								values,
+								true,
+								true,
+								true,
+								true,
+								false,
+							);
+						}}
+						submitter={false}
+						layout="vertical"
 					>
-						<FormattedMessage id="settings.functionSettings.ocrSettings" />
-					</GroupTitle>
+					<>
+								<SubGroupTitle>
+									<FormattedMessage id="settings.functionSettings.ocrSettings.localRecognition" />
+								</SubGroupTitle>
 
-					<Spin spinning={appSettingsLoading}>
-						<ProForm
-							form={functionOcrForm}
-							onValuesChange={(_, values) => {
-								updateAppSettings(
-									AppSettingsGroup.FunctionOcr,
-									values,
-									true,
-									true,
-									true,
-									true,
-									false,
-								);
-							}}
-							submitter={false}
-							layout="vertical"
-						>
-							<Row gutter={token.marginLG}>
-								<Col span={12}>
-									<ProFormDependency name={["customOcrModelConfigList"]}>
-										{({ customOcrModelConfigList }) => {
-											const allOptions = [
-												...ocrModelOptions,
-												...(customOcrModelConfigList || [])
-													.filter((c: CustomOcrModelConfig) => c.model_name)
-													.map((c: CustomOcrModelConfig) => ({
+
+								<Row gutter={token.marginLG}>
+									<Col span={12}>
+										<ProFormDependency
+											name={[
+												"customOcrModelConfigList",
+												"onlineOcrConfigList",
+											]}
+										>
+											{({
+												customOcrModelConfigList,
+												onlineOcrConfigList,
+											}) => {
+												const localOptions = [
+													...ocrModelOptions,
+													...(customOcrModelConfigList || [])
+														.filter((c: CustomOcrModelConfig) => c.model_name)
+														.map((c: CustomOcrModelConfig) => ({
+															label: c.model_name,
+															value: c.model_name,
+														})),
+												];
+												const onlineOptions = (
+													onlineOcrConfigList || []
+												)
+													.filter((c: OnlineOcrConfig) => c.model_name)
+													.map((c: OnlineOcrConfig) => ({
 														label: c.model_name,
 														value: c.model_name,
-													})),
-											];
-											return (
-												<ProFormSelect
-													label={
-														<IconLabel
-															label={
-																<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrModel" />
-															}
-														/>
-													}
-													name="ocrModel"
-													options={allOptions}
-												/>
-											);
-										}}
-									</ProFormDependency>
-								</Col>
+													}));
+												const allOptions = [
+													...(localOptions.length > 0
+														? [
+																{
+																	label: intl.formatMessage({
+																		id: "settings.functionSettings.ocrSettings.localRecognition",
+																	}),
+																	options: localOptions,
+																},
+															]
+														: []),
+													...(onlineOptions.length > 0
+														? [
+																{
+																	label: intl.formatMessage({
+																		id: "settings.functionSettings.ocrSettings.onlineRecognition",
+																	}),
+																	options: onlineOptions,
+																},
+															]
+														: []),
+												];
+												return (
+													<ProFormSelect
+														label={
+															<IconLabel
+																label={
+																	<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrModel" />
+																}
+															/>
+														}
+														name="ocrModel"
+														options={allOptions}
+													/>
+												);
+											}}
+										</ProFormDependency>
+									</Col>
 
-								{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
-									<Col span={12}>
-										<ProFormSelect
-											name="htmlVisionModel"
+									{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
+										<Col span={12}>
+											<ProFormSelect
+												name="htmlVisionModel"
+												label={
+													<IconLabel
+														label={
+															<FormattedMessage id="settings.functionSettings.ocrSettings.htmlVisionModel" />
+														}
+														tooltipTitle={
+															<FormattedMessage id="settings.functionSettings.ocrSettings.htmlVisionModel.tip" />
+														}
+													/>
+												}
+												layout="vertical"
+												options={htmlVisionModelOptions}
+												allowClear={false}
+											/>
+										</Col>
+									)}
+								</Row>
+
+								{isReadyStatus?.(PLUGIN_ID_RAPID_OCR) && (
+								<Row gutter={token.marginLG}>
+									<Col span={24}>
+										<ProFormList
+											name="customOcrModelConfigList"
 											label={
 												<IconLabel
 													label={
-														<FormattedMessage id="settings.functionSettings.ocrSettings.htmlVisionModel" />
+														<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig" />
 													}
 													tooltipTitle={
-														<FormattedMessage id="settings.functionSettings.ocrSettings.htmlVisionModel.tip" />
+														<FormattedMessage
+															id="settings.functionSettings.ocrSettings.customOcrModelConfig.tip"
+															values={{
+																link: (
+																	<a
+																		onClick={(event) => {
+																			event.preventDefault();
+																			openUrl(
+																				"https://www.modelscope.cn/models/RapidAI/RapidOCR/tree/master/onnx",
+																			);
+																		}}
+																	>
+																		<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig.tip.link" />
+																	</a>
+																),
+															}}
+														/>
 													}
 												/>
 											}
-											layout="vertical"
-											options={htmlVisionModelOptions}
-											allowClear={false}
+											creatorButtonProps={{
+												creatorButtonText: intl.formatMessage({
+													id: "settings.functionSettings.ocrSettings.customOcrModelConfig.add",
+												}),
+											}}
+											className="api-config-list"
+											min={0}
+											itemRender={({ listDom, action }) => (
+												<Flex align="end" justify="space-between">
+													{listDom}
+													<div>{action}</div>
+												</Flex>
+											)}
+											creatorRecord={() => ({
+												model_name: "",
+												det_model: "ch_PP-OCRv4_det_infer.onnx",
+												rec_model: "ch_PP-OCRv4_rec_infer.onnx",
+												cls_model: "ch_ppocr_mobile_v2.0_cls_infer.onnx",
+											})}
+										>
+											<Row gutter={token.marginLG} style={{ width: "100%" }}>
+												<Col span={12}>
+													<ProFormText
+														name="model_name"
+														label={
+															<IconLabel
+																label={
+																	<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig.modelName" />
+																}
+																tooltipTitle={
+																	<FormattedMessage id="settings.functionSettings.ocrSettings.modelName.tip" />
+																}
+															/>
+														}
+													/>
+												</Col>
+												<Col span={12}>
+													<ProFormSelect
+														name="det_model"
+														label={
+															<IconLabel
+																label={
+																	<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig.detModel" />
+																}
+															/>
+														}
+														allowClear={false}
+														options={ocrModelFileOptions}
+													/>
+												</Col>
+												<Col span={12}>
+													<ProFormSelect
+														name="cls_model"
+														label={
+															<IconLabel
+																label={
+																	<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig.clsModel" />
+																}
+															/>
+														}
+														allowClear={false}
+														options={ocrModelFileOptions}
+													/>
+												</Col>
+												<Col span={12}>
+													<ProFormSelect
+														name="rec_model"
+														label={
+															<IconLabel
+																label={
+																	<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig.recModel" />
+																}
+															/>
+														}
+														allowClear={false}
+														options={ocrModelFileOptions}
+													/>
+												</Col>
+											</Row>
+										</ProFormList>
+									</Col>
+								</Row>
+						)}
+
+						<SubGroupTitle>
+							<FormattedMessage id="settings.functionSettings.ocrSettings.onlineRecognition" />
+						</SubGroupTitle>
+
+						<Row gutter={token.marginLG}>
+							<Col span={24}>
+								<ProFormList
+									name="onlineOcrConfigList"
+									label={
+										<IconLabel
+											label={
+												<FormattedMessage id="settings.functionSettings.ocrSettings.onlineOcrConfig" />
+											}
+										/>
+									}
+									creatorButtonProps={{
+										creatorButtonText: intl.formatMessage({
+											id: "settings.functionSettings.ocrSettings.onlineOcrConfig.add",
+										}),
+									}}
+									className="api-config-list"
+									min={0}
+									itemRender={({ listDom, action }) => (
+										<Flex align="end" justify="space-between">
+											{listDom}
+											<div>{action}</div>
+										</Flex>
+									)}
+									creatorRecord={() => ({
+										model_name: "",
+										provider: OnlineOcrProvider.Youdao,
+										service_type: "general",
+										language: "auto",
+										youdao_app_key: "",
+										youdao_app_secret: "",
+										tencent_secret_id: "",
+										tencent_secret_key: "",
+										tencent_region: "",
+									})}
+								>
+									<Row gutter={token.marginLG} style={{ width: "100%" }}>
+										<Col span={12}>
+											<ProFormSelect
+												name="provider"
+												label={
+													<IconLabel
+														label={
+															<FormattedMessage id="settings.functionSettings.ocrSettings.onlineOcrConfig.provider" />
+														}
+													/>
+												}
+												allowClear={false}
+												options={onlineOcrProviderOptions}
+											/>
+										</Col>
+										<Col span={12}>
+											<ProFormText
+												name="model_name"
+												label={
+													<IconLabel
+														label={
+															<FormattedMessage id="settings.functionSettings.ocrSettings.onlineOcrConfig.modelName" />
+														}
+														tooltipTitle={
+															<FormattedMessage id="settings.functionSettings.ocrSettings.modelName.tip" />
+														}
+													/>
+												}
+											/>
+										</Col>
+
+										<ProFormDependency name={["provider"]}>
+											{({ provider }) => (
+												<>
+													<Col span={12}>
+														<ProFormSelect
+															name="service_type"
+															label={
+																<IconLabel
+																	label={
+																		<FormattedMessage id="settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType" />
+																	}
+																/>
+															}
+															allowClear={false}
+															options={
+																provider === OnlineOcrProvider.Tencent
+																	? tencentServiceTypeOptions
+																	: youdaoServiceTypeOptions
+															}
+														/>
+													</Col>
+													<Col span={12}>
+														<ProFormText
+															name="language"
+															initialValue="auto"
+															label={
+																<IconLabel
+																	label={"language"}
+																/>
+															}
+														/>
+													</Col>
+
+													{provider === OnlineOcrProvider.Youdao && (
+														<>
+															<Col span={12}>
+																<ProFormText
+																	name="youdao_app_key"
+																	label={
+																		<IconLabel
+																			label={
+																				"appKey"
+																			}
+																		/>
+																	}
+																/>
+															</Col>
+															<Col span={12}>
+																<ProFormText.Password
+																	name="youdao_app_secret"
+																	label={
+																		<IconLabel
+																			label={
+																				"appSecret"
+																			}
+																		/>
+																	}
+																/>
+															</Col>
+														</>
+													)}
+
+													{provider === OnlineOcrProvider.Tencent && (
+														<>
+															<Col span={12}>
+																<ProFormText
+																	name="tencent_secret_id"
+																	label={
+																		<IconLabel
+																			label={
+																				"SecretId"
+																			}
+																		/>
+																	}
+																/>
+															</Col>
+															<Col span={12}>
+																<ProFormText.Password
+																	name="tencent_secret_key"
+																	label={
+																		<IconLabel
+																			label={
+																				"SecretKey"
+																			}
+																		/>
+																	}
+																/>
+															</Col>
+															<Col span={12}>
+																<ProFormText
+																	name="tencent_region"
+																	label={
+																		<IconLabel
+																			label={
+																				"Region"
+																			}
+																		/>
+																	}
+																/>
+															</Col>
+														</>
+													)}
+												</>
+											)}
+										</ProFormDependency>
+									</Row>
+								</ProFormList>
+							</Col>
+						</Row>
+
+						</>
+
+						{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
+							<>
+								<Row gutter={token.marginLG}>
+									<Col span={24}>
+										<ProFormTextArea
+											name="htmlVisionModelSystemPrompt"
+											label={
+												<IconLabel
+													label={
+														<FormattedMessage id="settings.functionSettings.ocrSettings.htmlVisionModelSystemPrompt" />
+													}
+												/>
+											}
+											fieldProps={{
+												rows: 1,
+												style: { resize: "vertical" },
+											}}
 										/>
 									</Col>
-								)}
-							</Row>
-
-							<Row gutter={token.marginLG}>
-								<Col span={24}>
-									<ProFormList
-										name="customOcrModelConfigList"
-										label={
-											<IconLabel
-												label={
-													<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig" />
-												}
-												tooltipTitle={
-													<FormattedMessage
-														id="settings.functionSettings.ocrSettings.customOcrModelConfig.tip"
-														values={{
-															link: (
-																<a
-																	onClick={(event) => {
-																		event.preventDefault();
-																		openUrl(
-																			"https://www.modelscope.cn/models/RapidAI/RapidOCR/tree/master/onnx",
-																		);
-																	}}
-																>
-																	<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig.tip.link" />
-																</a>
-															),
-														}}
-													/>
-												}
-											/>
-										}
-										creatorButtonProps={{
-											creatorButtonText: intl.formatMessage({
-												id: "settings.functionSettings.ocrSettings.customOcrModelConfig.add",
-											}),
-										}}
-										className="api-config-list"
-										min={0}
-										itemRender={({ listDom, action }) => (
-											<Flex align="end" justify="space-between">
-												{listDom}
-												<div>{action}</div>
-											</Flex>
-										)}
-										creatorRecord={() => ({
-											model_name: "",
-											det_model: "ch_PP-OCRv4_det_infer.onnx",
-											rec_model: "ch_PP-OCRv4_rec_infer.onnx",
-											cls_model: "ch_ppocr_mobile_v2.0_cls_infer.onnx",
-										})}
-									>
-										<Row gutter={token.marginLG} style={{ width: "100%" }}>
-											<Col span={12}>
-												<ProFormText
-													name="model_name"
+									<Col span={24}>
+										<ProFormTextArea
+											name="markdownVisionModelSystemPrompt"
+											label={
+												<IconLabel
 													label={
-														<IconLabel
-															label={
-																<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig.modelName" />
-															}
-														/>
+														<FormattedMessage id="settings.functionSettings.ocrSettings.markdownVisionModelSystemPrompt" />
 													}
 												/>
-											</Col>
-											<Col span={12}>
-												<ProFormSelect
-													name="det_model"
-													label={
-														<IconLabel
-															label={
-																<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig.detModel" />
-															}
-														/>
-													}
-													allowClear={false}
-													options={ocrModelFileOptions}
-												/>
-											</Col>
-											<Col span={12}>
-												<ProFormSelect
-													name="cls_model"
-													label={
-														<IconLabel
-															label={
-																<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig.clsModel" />
-															}
-														/>
-													}
-													allowClear={false}
-													options={ocrModelFileOptions}
-												/>
-											</Col>
-											<Col span={12}>
-												<ProFormSelect
-													name="rec_model"
-													label={
-														<IconLabel
-															label={
-																<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig.recModel" />
-															}
-														/>
-													}
-													allowClear={false}
-													options={ocrModelFileOptions}
-												/>
-											</Col>
-										</Row>
-									</ProFormList>
-								</Col>
-							</Row>
-
-							{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
-								<>
-									<Row gutter={token.marginLG}>
-										<Col span={24}>
-											<ProFormTextArea
-												name="htmlVisionModelSystemPrompt"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.ocrSettings.htmlVisionModelSystemPrompt" />
-														}
-													/>
-												}
-												fieldProps={{
-													rows: 1,
-													style: { resize: "vertical" },
-												}}
-											/>
-										</Col>
-										<Col span={24}>
-											<ProFormTextArea
-												name="markdownVisionModelSystemPrompt"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.ocrSettings.markdownVisionModelSystemPrompt" />
-														}
-													/>
-												}
-												fieldProps={{
-													rows: 1,
-													style: { resize: "vertical" },
-												}}
-											/>
-										</Col>
-									</Row>
-								</>
-							)}
-						</ProForm>
-					</Spin>
-				</>
-			)}
+											}
+											fieldProps={{
+												rows: 1,
+												style: { resize: "vertical" },
+											}}
+										/>
+									</Col>
+								</Row>
+						</>
+					)}
+					</ProForm>
+				</Spin>
+			</>
 
 			{isReadyStatus?.(PLUGIN_ID_TRANSLATE) && (
 				<>

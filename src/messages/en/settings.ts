@@ -662,6 +662,31 @@ export const settings = {
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.detModel": "Detection(det)",
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.recModel": "Recognition(rec)",
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.clsModel": "Orientation(cls)",
+	"settings.functionSettings.ocrSettings.localRecognition": "Local Recognition",
+	"settings.functionSettings.ocrSettings.onlineRecognition": "Online Recognition",
+	"settings.functionSettings.ocrSettings.modelName.tip":
+		"Model name is used for display in Snow Shot",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig": "Online OCR Configuration",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.add": "Add Online OCR Configuration",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.provider": "Provider",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.provider.youdao":
+		"Youdao",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.provider.tencent":
+		"Tencent Cloud",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.modelName": "Model Name",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType":
+		"Service Type",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.general":
+		"General Text Recognition",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.generalHigh":
+		"General Text Recognition (High Precision)",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.handwriting":
+		"Handwriting Recognition",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.tencent.basic":
+		"General Printed Text Recognition",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.tencent.accurate":
+		"General Text Recognition (High Precision)",
+	"settings.functionSettings.ocrSettings.onlineOcrConfig.language": "Recognition Language",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.default": "Default",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.default.tip":
 		"Use the first vision model by default",
