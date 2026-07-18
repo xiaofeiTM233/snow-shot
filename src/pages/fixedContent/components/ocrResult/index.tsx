@@ -13,7 +13,11 @@ import {
 	useState,
 } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
-import { ocrDetect, ocrDetectWithSharedBuffer } from "@/commands/ocr";
+import {
+	ocrDetect,
+	ocrDetectWithSharedBuffer,
+	onlineOcrDetect,
+} from "@/commands/ocr";
 import { createWebViewSharedBufferChannel } from "@/commands/webview";
 import { PLUGIN_ID_RAPID_OCR } from "@/constants/pluginService";
 import { AntdContext } from "@/contexts/antdContext";
@@ -33,7 +37,11 @@ import {
 import { CUSTOM_MODEL_PREFIX, MarkdownContent } from "@/pages/tools/chat/page";
 import { appFetch, getUrl } from "@/services/tools";
 import { getChatModelsWithCache } from "@/services/tools/chat";
-import { AppSettingsGroup, type ChatApiConfig } from "@/types/appSettings";
+import {
+	AppSettingsGroup,
+	type ChatApiConfig,
+	type OnlineOcrConfig,
+} from "@/types/appSettings";
 import type { OcrDetectResult } from "@/types/commands/ocr";
 import type { ElementRect } from "@/types/commands/screenshot";
 import { writeHtmlToClipboard, writeTextToClipboard } from "@/utils/clipboard";
@@ -521,12 +529,35 @@ export const OcrResult: React.FC<{
 		[],
 	);
 
-	const ocrDetectByCanvas = useCallback(
+		const ocrDetectByCanvas = useCallback(
 		async (
 			canvas: HTMLCanvasElement,
 			scaleFactor: number,
 			detectAngle: boolean,
 		): Promise<OcrDetectResult | undefined> => {
+			const settings = getAppSettings();
+			if (settings) {
+				const ocrSettings = settings[AppSettingsGroup.FunctionOcr];
+				const onlineConfig = (ocrSettings.onlineOcrConfigList || []).find(
+					(c) => c.model_name === ocrSettings.ocrModel,
+				) as OnlineOcrConfig | undefined;
+
+				if (onlineConfig) {
+					const imageBlob = await new Promise<Blob | null>((resolve) => {
+						canvas.toBlob(resolve, "image/png", 1);
+					});
+
+					if (!imageBlob) {
+						return undefined;
+					}
+
+					return await onlineOcrDetect(
+						await imageBlob.arrayBuffer(),
+						onlineConfig,
+					);
+				}
+			}
+
 			const ocrResultWithSharedBuffer = await ocrDetectWithSharedBufferAction(
 				canvas,
 				scaleFactor,

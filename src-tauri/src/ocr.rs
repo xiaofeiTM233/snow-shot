@@ -64,3 +64,10 @@ pub async fn ocr_release(ocr_instance: tauri::State<'_, Mutex<OcrService>>) -> R
 pub async fn list_ocr_model_files(dir_path: PathBuf) -> Result<Vec<String>, String> {
     snow_shot_tauri_commands_ocr::list_ocr_model_files(dir_path).await
 }
+
+#[command]
+pub async fn online_ocr_detect(
+    request: tauri::ipc::Request<'_>,
+) -> Result<snow_shot_tauri_commands_ocr::OnlineOcrDetectResult, String> {
+    snow_shot_tauri_commands_ocr::online_ocr_detect(request).await
+}

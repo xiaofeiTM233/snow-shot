@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { OcrDetectResult } from "@/types/commands/ocr";
+import type { OnlineOcrConfig } from "@/types/appSettings";
 
 export const ocrDetect = async (
 	data: ArrayBuffer | Uint8Array,
@@ -50,4 +51,15 @@ export const ocrRelease = async (): Promise<void> => {
 
 export const listOcrModelFiles = async (dirPath: string): Promise<string[]> => {
 	return await invoke<string[]>("list_ocr_model_files", { dirPath });
+};
+
+export const onlineOcrDetect = async (
+	data: ArrayBuffer | Uint8Array,
+	config: OnlineOcrConfig,
+): Promise<OcrDetectResult> => {
+	return await invoke<OcrDetectResult>("online_ocr_detect", data, {
+		headers: {
+			"x-online-ocr-config": JSON.stringify(config),
+		},
+	});
 };

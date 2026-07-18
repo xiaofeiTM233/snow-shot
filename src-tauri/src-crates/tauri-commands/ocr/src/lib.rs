@@ -9,6 +9,9 @@ use std::io::Cursor;
 use std::path::PathBuf;
 use tokio::sync::Mutex;
 
+mod online_ocr;
+pub use online_ocr::{online_ocr_detect, OnlineOcrConfig, OnlineOcrDetectResult};
+
 pub async fn ocr_init(
     orc_plugin_path: PathBuf,
     ocr_service: tauri::State<'_, Mutex<OcrService>>,

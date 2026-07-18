@@ -261,6 +261,7 @@ pub fn run() {
             ocr::ocr_init,
             ocr::ocr_release,
             ocr::list_ocr_model_files,
+            ocr::online_ocr_detect,
             core::exit_app,
             core::start_free_drag,
             core::start_resize_window,

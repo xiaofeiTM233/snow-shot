@@ -1514,11 +1514,6 @@ export const FunctionSettingsPage = () => {
 						layout="vertical"
 					>
 					<>
-								<SubGroupTitle>
-									<FormattedMessage id="settings.functionSettings.ocrSettings.localRecognition" />
-								</SubGroupTitle>
-
-
 								<Row gutter={token.marginLG}>
 									<Col span={12}>
 										<ProFormDependency
@@ -1723,10 +1718,6 @@ export const FunctionSettingsPage = () => {
 									</Col>
 								</Row>
 						)}
-
-						<SubGroupTitle>
-							<FormattedMessage id="settings.functionSettings.ocrSettings.onlineRecognition" />
-						</SubGroupTitle>
 
 						<Row gutter={token.marginLG}>
 							<Col span={24}>

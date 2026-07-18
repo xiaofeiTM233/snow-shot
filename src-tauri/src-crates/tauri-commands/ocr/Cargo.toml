@@ -7,9 +7,16 @@ edition = "2024"
 tauri = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 image = { workspace = true }
 log = { workspace = true }
 rayon = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+base64 = { workspace = true }
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+chrono = { version = "0.4", features = ["clock"] }
 
 snow-shot-app-services = { workspace = true }
 
