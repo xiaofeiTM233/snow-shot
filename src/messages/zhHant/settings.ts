@@ -228,7 +228,7 @@ export const settings = {
 	"settings.functionSettings.screenshotSettings.ocrCopyText":
 		"文字辨識複製時複製文字",
 	"settings.functionSettings.screenshotSettings.focusedWindowCopyToClipboard":
-		"擷取目前具有焦點的視窗時複製到剪貼簿",
+		"擷取焦點視窗時複製到剪貼簿",
 	"settings.functionSettings.screenshotSettings.fullScreenCopyToClipboard":
 		"擷取全螢幕時複製到剪貼簿",
 	"settings.functionSettings.screenshotSettings.saveToCloud": "儲存到雲端按鈕",
@@ -288,11 +288,11 @@ export const settings = {
 	"settings.functionSettings.outputSettings.fastSaveFileNameFormatPreview":
 		"快速儲存檔案名稱預覽",
 	"settings.functionSettings.outputSettings.focusedWindowFileNameFormat":
-		"擷取目前具有焦點的視窗檔案名稱格式",
+		"擷取焦點視窗檔案名稱格式",
 	"settings.functionSettings.outputSettings.fullScreenFileNameFormat":
 		"擷取全螢幕檔案名稱格式",
 	"settings.functionSettings.outputSettings.focusedWindowFileNameFormatPreview":
-		"擷取目前具有焦點的視窗檔案名稱預覽",
+		"擷取焦點視窗檔案名稱預覽",
 	"settings.functionSettings.outputSettings.uploadToCloudSaveUrlFormat":
 		"上傳到雲端檔案名稱格式",
 	"settings.functionSettings.outputSettings.uploadToCloudSaveUrlFormatPreview":
