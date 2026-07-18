@@ -4,6 +4,7 @@ import {
 	autoStartDisable,
 	autoStartEnable,
 	setEnableProxy,
+	setProcessPriority,
 	setRunLog,
 } from "@/commands/core";
 import { hotLoadPageInit } from "@/commands/hotLoadPage";
@@ -15,6 +16,7 @@ import {
 } from "@/constants/pluginService";
 import { usePluginServiceContext } from "@/contexts/pluginServiceContext";
 import { useAppSettingsLoad } from "@/hooks/useAppSettingsLoad";
+import { usePlatform } from "@/hooks/usePlatform";
 import { type AppSettingsData, AppSettingsGroup, OcrModel } from "@/types/appSettings";
 import { CaptureHistory } from "@/utils/captureHistory";
 import { appWarn } from "@/utils/log";
@@ -35,6 +37,7 @@ export const InitService = () => {
 	const hasInitAutoStart = useRef(false);
 	const hasInitEnableProxy = useRef(false);
 	const hasInitRunLog = useRef(false);
+	const hasInitBoostProcessPriority = useRef(false);
 	const hasInitHotLoadPage = useRef(false);
 
 	const [appSettings, setAppSettings] = useState<AppSettingsData | undefined>(
@@ -45,6 +48,8 @@ export const InitService = () => {
 	>(undefined);
 
 	const { isReadyStatus, pluginConfigRef } = usePluginServiceContext();
+
+	const [currentPlatform] = usePlatform();
 
 	const initServices = useCallback(async () => {
 		if (!appSettings || !isReadyStatus) {
@@ -141,6 +146,20 @@ export const InitService = () => {
 		}
 
 		if (
+			currentPlatform === "windows" &&
+			(!hasInitBoostProcessPriority.current ||
+				(prevAppSettings &&
+					appSettings[AppSettingsGroup.SystemCommon].boostProcessPriority !==
+						prevAppSettings[AppSettingsGroup.SystemCommon].boostProcessPriority))
+		) {
+			hasInitBoostProcessPriority.current = true;
+
+			setProcessPriority(
+				appSettings[AppSettingsGroup.SystemCommon].boostProcessPriority,
+			);
+		}
+
+		if (
 			!hasInitHotLoadPage.current ||
 			(prevAppSettings &&
 				appSettings[AppSettingsGroup.SystemCore].hotLoadPageCount !==
@@ -158,6 +177,7 @@ export const InitService = () => {
 		pluginConfigRef,
 		isReadyStatus,
 		prevAppSettings,
+		currentPlatform,
 	]);
 
 	useAppSettingsLoad(

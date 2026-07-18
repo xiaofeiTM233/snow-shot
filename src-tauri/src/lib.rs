@@ -292,6 +292,8 @@ pub fn run() {
             core::retain_dir_files,
             core::is_admin,
             core::set_run_log,
+            #[cfg(target_os = "windows")]
+            core::set_process_priority,
             core::set_exclude_from_capture,
             core::show_main_window,
             core::set_window_rect,

@@ -429,6 +429,12 @@ pub async fn is_admin() -> Result<bool, String> {
     snow_shot_tauri_commands_core::is_admin().await
 }
 
+#[cfg(target_os = "windows")]
+#[command]
+pub async fn set_process_priority(enable: bool) -> Result<(), String> {
+    snow_shot_tauri_commands_core::set_process_priority(enable).await
+}
+
 #[command]
 pub async fn set_run_log(
     enable_run_log: tauri::State<'_, std::sync::Arc<std::sync::atomic::AtomicBool>>,

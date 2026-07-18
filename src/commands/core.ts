@@ -235,6 +235,13 @@ export const setRunLog = async (enable: boolean) => {
 	return result;
 };
 
+export const setProcessPriority = async (enable: boolean) => {
+	const result = await invoke<void>("set_process_priority", {
+		enable,
+	});
+	return result;
+};
+
 export const writeImagePixelsToClipboardWithSharedBuffer = async (
 	channelId: string,
 ) => {

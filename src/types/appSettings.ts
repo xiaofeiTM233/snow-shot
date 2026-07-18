@@ -405,6 +405,8 @@ export type AppSettingsData = {
 		autoStart: boolean;
 		autoCheckVersion: boolean;
 		runLog: boolean;
+		/** 提升进程优先级（高于正常） */
+		boostProcessPriority: boolean;
 	};
 	[AppSettingsGroup.SystemChat]: {
 		maxTokens: number;

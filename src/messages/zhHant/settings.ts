@@ -112,6 +112,9 @@ export const settings = {
 	"settings.systemSettings.commonSettings.runLog": "執行日誌",
 	"settings.systemSettings.commonSettings.runLog.tip":
 		"將記錄輸出到記錄檔案中，用於問題回報",
+	"settings.systemSettings.commonSettings.boostProcessPriority": "提升程序優先級",
+	"settings.systemSettings.commonSettings.boostProcessPriority.tip":
+		"將應用程式程序優先級提升為「高於正常」，使截圖與全域快捷鍵的回應更及時（僅 Windows）",
 	"settings.hotKeySettings.translation": "翻譯",
 	"settings.hotKeySettings.chat": "AI 對話",
 	"settings.hotKeySettings.keyEventTooltip": "{message}（{key}）",

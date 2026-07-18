@@ -351,6 +351,21 @@ export const SystemSettingsPage = () => {
 									)}
 								</ProForm.Item>
 							</Col>
+							<Col span={12}>
+								<ProFormSwitch
+									label={
+										<IconLabel
+											label={
+												<FormattedMessage id="settings.systemSettings.commonSettings.boostProcessPriority" />
+											}
+											tooltipTitle={
+												<FormattedMessage id="settings.systemSettings.commonSettings.boostProcessPriority.tip" />
+											}
+										/>
+									}
+									name="boostProcessPriority"
+								/>
+							</Col>
 						)}
 					</Row>
 				</ProForm>

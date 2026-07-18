@@ -855,6 +855,10 @@ pub async fn is_admin() -> Result<bool, String> {
     Ok(snow_shot_app_os::utils::is_admin())
 }
 
+pub async fn set_process_priority(enable: bool) -> Result<(), String> {
+    snow_shot_app_os::utils::set_process_priority(enable)
+}
+
 pub async fn write_bitmap_image_to_clipboard(
     request: tauri::ipc::Request<'_>,
 ) -> Result<(), String> {

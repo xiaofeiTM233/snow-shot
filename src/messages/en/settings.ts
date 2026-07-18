@@ -120,6 +120,10 @@ export const settings = {
 	"settings.systemSettings.commonSettings.runLog": "Run Log",
 	"settings.systemSettings.commonSettings.runLog.tip":
 		"Output logs to a log file for troubleshooting",
+	"settings.systemSettings.commonSettings.boostProcessPriority":
+		"Boost Process Priority",
+	"settings.systemSettings.commonSettings.boostProcessPriority.tip":
+		"Raise the app process priority to 'Above Normal' so screenshots and global hotkeys respond faster (Windows only)",
 	"settings.hotKeySettings.translation": "Translation Hotkey",
 	"settings.hotKeySettings.chat": "AI Chat Hotkey",
 	"settings.hotKeySettings.keyEventTooltip": "{message} ({key})",

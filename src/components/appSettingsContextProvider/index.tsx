@@ -749,6 +749,11 @@ const AppSettingsContextProviderCore: React.FC<{
 						typeof newSettings?.runLog === "boolean"
 							? newSettings.runLog
 							: (prevSettings?.runLog ?? defaultAppSettingsData[group].runLog),
+					boostProcessPriority:
+						typeof newSettings?.boostProcessPriority === "boolean"
+							? newSettings.boostProcessPriority
+							: (prevSettings?.boostProcessPriority ??
+								defaultAppSettingsData[group].boostProcessPriority),
 				};
 			} else if (group === AppSettingsGroup.SystemChat) {
 				newSettings = newSettings as AppSettingsData[typeof group];
@@ -834,13 +839,13 @@ const AppSettingsContextProviderCore: React.FC<{
 								defaultAppSettingsData[group].autoCreateNewSession),
 					chatApiConfigList: Array.isArray(newSettings?.chatApiConfigList)
 						? newSettings.chatApiConfigList.map((item) => ({
-							api_uri: `${item.api_uri ?? ""}`,
-							api_key: `${item.api_key ?? ""}`,
-							api_model: `${item.api_model ?? ""}`,
-							model_name: `${item.model_name ?? ""}`,
-							support_thinking: !!item.support_thinking,
-							support_vision: !!item.support_vision,
-						}))
+								api_uri: `${item.api_uri ?? ""}`,
+								api_key: `${item.api_key ?? ""}`,
+								api_model: `${item.api_model ?? ""}`,
+								model_name: `${item.model_name ?? ""}`,
+								support_thinking: !!item.support_thinking,
+								support_vision: !!item.support_vision,
+							}))
 						: (prevSettings?.chatApiConfigList ??
 							defaultAppSettingsData[group].chatApiConfigList),
 					autoCreateNewSessionOnCloseWindow:
@@ -900,15 +905,15 @@ const AppSettingsContextProviderCore: React.FC<{
 						newSettings?.translationApiConfigList,
 					)
 						? newSettings.translationApiConfigList.map((item) => ({
-							api_uri: `${item.api_uri ?? ""}`,
-							api_key: `${item.api_key ?? ""}`,
-							api_type: item.api_type,
-							deepl_prefer_quality_optimized:
-								"deepl_prefer_quality_optimized" in item &&
+								api_uri: `${item.api_uri ?? ""}`,
+								api_key: `${item.api_key ?? ""}`,
+								api_type: item.api_type,
+								deepl_prefer_quality_optimized:
+									"deepl_prefer_quality_optimized" in item &&
 									typeof item.deepl_prefer_quality_optimized === "boolean"
-									? item.deepl_prefer_quality_optimized
-									: false,
-						}))
+										? item.deepl_prefer_quality_optimized
+										: false,
+							}))
 						: (prevSettings?.translationApiConfigList ??
 							defaultAppSettingsData[group].translationApiConfigList),
 					sourceLanguage:
@@ -928,7 +933,7 @@ const AppSettingsContextProviderCore: React.FC<{
 								defaultAppSettingsData[group].translationDomain),
 					translationType:
 						typeof newSettings?.translationType === "number" ||
-							typeof newSettings?.translationType === "string"
+						typeof newSettings?.translationType === "string"
 							? newSettings.translationType
 							: (prevSettings?.translationType ??
 								defaultAppSettingsData[group].translationType),
@@ -1438,13 +1443,13 @@ const AppSettingsContextProviderCore: React.FC<{
 				ignorePublisher,
 			);
 
-		if (saveToFile) {
-			if (debounce) {
-				writeAppSettingsDebounce(group, settings, syncAllWindow, val);
-			} else {
-				writeAppSettings(group, settings, syncAllWindow, val);
+			if (saveToFile) {
+				if (debounce) {
+					writeAppSettingsDebounce(group, settings, syncAllWindow, val);
+				} else {
+					writeAppSettings(group, settings, syncAllWindow, val);
+				}
 			}
-		}
 
 			return settings;
 		},

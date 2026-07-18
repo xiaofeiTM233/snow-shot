@@ -124,6 +124,7 @@ export const defaultAppSettingsData: AppSettingsData = {
 		autoStart: true,
 		autoCheckVersion: true,
 		runLog: false,
+		boostProcessPriority: false,
 	},
 	[AppSettingsGroup.SystemChat]: {
 		maxTokens: 4096,

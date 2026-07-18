@@ -12,7 +12,10 @@ use windows::Win32::System::TaskScheduler::{
     IRegistrationInfo, ITaskDefinition, ITaskFolder, ITaskService, ITaskSettings, ITrigger,
     ITriggerCollection, TASK_ACTION_EXEC, TASK_LOGON_GROUP, TASK_TRIGGER_LOGON,
 };
-use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+use windows::Win32::System::Threading::{
+    ABOVE_NORMAL_PRIORITY_CLASS, GetCurrentProcess, NORMAL_PRIORITY_CLASS, OpenProcessToken,
+    SetPriorityClass,
+};
 use windows::Win32::System::Variant::VARIANT;
 use windows::Win32::UI::Shell::{SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW, ShellExecuteExW};
 use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
@@ -608,4 +611,26 @@ pub fn restart() -> Result<(), String> {
         // 退出当前进程，让单实例锁释放
         std::process::exit(0);
     }
+}
+
+/// 设置当前进程优先级（仅 Windows 有效）
+///
+/// enable 为 true 时设置为「高于正常」(ABOVE_NORMAL_PRIORITY_CLASS)，
+/// 否则恢复为「正常」(NORMAL_PRIORITY_CLASS)。
+/// 无需管理员权限。
+pub fn set_process_priority(enable: bool) -> Result<(), String> {
+    unsafe {
+        let process = GetCurrentProcess();
+        let priority_class = if enable {
+            ABOVE_NORMAL_PRIORITY_CLASS
+        } else {
+            NORMAL_PRIORITY_CLASS
+        };
+
+        if SetPriorityClass(process, priority_class).is_err() {
+            return Err("[set_process_priority] SetPriorityClass failed".into());
+        }
+    }
+
+    Ok(())
 }
