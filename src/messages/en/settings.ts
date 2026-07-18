@@ -672,7 +672,7 @@ export const settings = {
 	"settings.functionSettings.globalShortcutSettings":
 		"Global Shortcut Settings",
 	"settings.functionSettings.globalShortcutSettings.disableOnFocusedFullScreenWindow":
-		"Auto disable when focused fullscreen window exists",
+		"Auto disable when the focused window is fullscreen",
 	"settings.functionSettings.globalShortcutSettings.disableOnFocusedFullScreenWindow.tip":
-		"When enabled, will auto disable global hotkeys when a focused fullscreen window exists",
+		"When enabled, will auto disable global hotkeys when the focused window is fullscreen",
 };

@@ -637,7 +637,7 @@ export const settings = {
 		"圖片轉為 Markdown 的 System 提示詞",
 	"settings.functionSettings.globalShortcutSettings": "全域快捷鍵",
 	"settings.functionSettings.globalShortcutSettings.disableOnFocusedFullScreenWindow":
-		"存在被聚焦的全螢幕視窗時自動停用",
+		"焦點在全螢幕視窗上時自動停用",
 	"settings.functionSettings.globalShortcutSettings.disableOnFocusedFullScreenWindow.tip":
-		"開啟後，當存在被聚焦的全螢幕視窗時，將自動停用全域快捷鍵",
+		"開啟後，當焦點在全螢幕視窗上時，將自動停用全域快捷鍵",
 };
