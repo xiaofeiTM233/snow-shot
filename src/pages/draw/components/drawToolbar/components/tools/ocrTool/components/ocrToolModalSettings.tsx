@@ -1,5 +1,5 @@
 import { SettingOutlined } from "@ant-design/icons";
-import { ModalForm } from "@ant-design/pro-form";
+import { ModalForm } from "@ant-design/pro-components";
 import { Button } from "antd";
 import { FormattedMessage, useIntl } from "react-intl";
 import { TranslationConfig } from "@/pages/settings/functionSettings/components/translationConfig";

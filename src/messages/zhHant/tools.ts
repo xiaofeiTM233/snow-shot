@@ -93,6 +93,7 @@ export const tools = {
 	"tools.captureHistory.delete.confirm": "確定要刪除該截圖嗎？",
 	"tools.captureHistory.switchImage.tip":
 		"右鍵切換「螢幕畫面」/「截圖結果」預覽",
+	"tools.captureHistory.preview": "預覽",
 	"tools.captureHistory.source": "來源",
 	"tools.captureHistory.source.scrollScreenshotCopy": "捲動截圖-複製",
 	"tools.captureHistory.source.scrollScreenshotSave": "捲動截圖-儲存",

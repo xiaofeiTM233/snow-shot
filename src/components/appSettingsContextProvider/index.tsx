@@ -1659,7 +1659,13 @@ const AppSettingsContextProviderCore: React.FC<{
 
 	return (
 		<AppSettingsActionContext.Provider value={appSettingsContextValue}>
-			<ConfigProvider theme={antdTheme} locale={antdLocale}>
+			<ConfigProvider
+				theme={antdTheme}
+				locale={antdLocale}
+				modal={{ mask: { blur: false } }}
+				drawer={{ mask: { blur: false } }}
+				tag={{ styles: { root: { marginInlineEnd: 8 } } }}
+			>
 				<IntlProvider
 					locale={appSettings[AppSettingsGroup.Common].language}
 					messages={messages[appSettings[AppSettingsGroup.Common].language]}

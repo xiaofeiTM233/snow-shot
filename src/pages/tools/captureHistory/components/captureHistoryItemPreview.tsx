@@ -1,3 +1,4 @@
+import { EyeOutlined } from "@ant-design/icons";
 import { Image, Tooltip } from "antd";
 import { useState } from "react";
 import { FormattedMessage } from "react-intl";
@@ -20,6 +21,14 @@ export const CaptureHistoryItemPreview: React.FC<{
 				alt="preview"
 				loading="lazy"
 				key={item.id}
+				preview={{
+					mask: (
+						<span>
+							<EyeOutlined />
+							<FormattedMessage id="tools.captureHistory.preview" />
+						</span>
+					),
+				}}
 				src={
 					showCaptureResult
 						? (item.capture_result_file_url ?? item.file_url)

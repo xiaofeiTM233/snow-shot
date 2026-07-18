@@ -1,6 +1,7 @@
 "use client";
 
-import ProForm, {
+import {
+	ProForm,
 	ProFormDependency,
 	ProFormDigit,
 	ProFormList,
@@ -8,7 +9,7 @@ import ProForm, {
 	ProFormSwitch,
 	ProFormText,
 	ProFormTextArea,
-} from "@ant-design/pro-form";
+} from "@ant-design/pro-components";
 import {
 	Alert,
 	Col,
@@ -1303,7 +1304,7 @@ export const FunctionSettingsPage = () => {
 										}
 									/>
 								}
-								mode="multiple"
+								fieldProps={{ mode: "multiple" }}
 								options={disableQuickSelectElementToolListOptions}
 							/>
 						</Col>

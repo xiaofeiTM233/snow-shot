@@ -1,11 +1,12 @@
 "use client";
 
-import ProForm, {
+import {
+	ProForm,
 	ProFormRadio,
 	ProFormSelect,
 	ProFormSlider,
 	ProFormSwitch,
-} from "@ant-design/pro-form";
+} from "@ant-design/pro-components";
 import { resourceDir } from "@tauri-apps/api/path";
 import {
 	type CheckboxOptionType,
@@ -683,7 +684,7 @@ export const GeneralSettingsPage = () => {
 								name="toolbarHiddenToolList"
 								label={<FormattedMessage id="settings.customToolbarToolList" />}
 								options={customToolbarToolListOptions}
-								mode="multiple"
+								fieldProps={{ mode: "multiple" }}
 							/>
 						</Col>
 					</Row>

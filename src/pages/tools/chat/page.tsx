@@ -3,21 +3,27 @@
 import { CopyOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import {
 	Bubble,
+	type BubbleItemType,
+	type ConversationItemType,
 	Conversations,
 	Sender,
-	Suggestion,
-	useXAgent,
-	useXChat,
+	type SenderRef,
 	Welcome,
-	XRequest,
 } from "@ant-design/x";
-import type { BubbleDataType as AntdBubbleDataType } from "@ant-design/x/es/bubble/BubbleList";
-import type { Conversation } from "@ant-design/x/es/conversations";
-import type { SenderRef } from "@ant-design/x/es/sender";
-import type { MessageInfo } from "@ant-design/x/es/use-x-chat";
+import {
+	AbstractChatProvider,
+	type AbstractXRequestClass,
+	type MessageInfo,
+	type SSEOutput,
+	type TransformMessage,
+	useXChat,
+	XRequest,
+	type XRequestOptions,
+} from "@ant-design/x-sdk";
 import { useSearch } from "@tanstack/react-router";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
+	Avatar,
 	Button,
 	Card,
 	Drawer,
@@ -41,7 +47,7 @@ import {
 	useState,
 } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
-import { FormattedMessage, useIntl } from "react-intl";
+import { FormattedMessage, type IntlShape, useIntl } from "react-intl";
 import Markdown, { type ExtraProps } from "react-markdown";
 import RSC, { type Scrollbar } from "react-scrollbars-custom";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -96,15 +102,11 @@ import type {
 	SendQueueMessage,
 } from "./types";
 
-type BubbleDataType = AntdBubbleDataType & {
-	flow_config?: ChatMessageFlowConfig;
-};
-
 const getMessageContent = (
-	msg: ChatMessage | BubbleDataType,
+	msg: ChatMessage,
 	ignoreReasoningContent = false,
 ) => {
-	const message = msg as ChatMessage;
+	const message = msg;
 
 	if (!message.content) {
 		return "";
@@ -237,16 +239,16 @@ export const MarkdownContent: React.FC<{
 	);
 };
 
-const modelRequest = XRequest({
-	baseURL: getUrl("/api/v1/chat/completions"),
+const modelRequest = XRequest(getUrl("/api/v1/chat/completions"), {
 	fetch: appFetch,
+	manual: true,
 });
 
 type ChatModelConfig = ChatModel & {
 	customConfig?: ChatApiConfig;
 };
 
-const fliterErrorMessages = (messages: BubbleDataType[] | undefined) => {
+const fliterErrorMessages = (messages: ChatMessage[] | undefined) => {
 	if (!messages) {
 		return [];
 	}
@@ -301,6 +303,233 @@ const fliterErrorMessages = (messages: BubbleDataType[] | undefined) => {
 
 	return finalMessages;
 };
+
+type ChatRequestBody = {
+	messages: { role: string; content: string }[];
+	model: string;
+	temperature?: number;
+	max_tokens?: number;
+	enable_thinking?: boolean;
+	stream_options: { include_usage: boolean };
+	thinking_budget?: number;
+	reasoning?: { effort: string };
+	stream: boolean;
+};
+
+class SnowShotChatProvider extends AbstractChatProvider<any, any, any> {
+	private selectedModelRef: { current: string | undefined };
+	private getAppSettings: () => AppSettingsData;
+	private enableThinkingRef: { current: boolean };
+	private getCustomModelRequest: (
+		model: string,
+	) => { request: AbstractXRequestClass; config: ChatApiConfig } | undefined;
+	private intl: IntlShape;
+	private messageApi: { error: (content: React.ReactNode) => void };
+	private newestMessageRef: { current: ChatMessage | undefined };
+
+	constructor(params: {
+		request: AbstractXRequestClass | (() => AbstractXRequestClass);
+		selectedModelRef: { current: string | undefined };
+		getAppSettings: () => AppSettingsData;
+		enableThinkingRef: { current: boolean };
+		getCustomModelRequest: (
+			model: string,
+		) => { request: AbstractXRequestClass; config: ChatApiConfig } | undefined;
+		intl: IntlShape;
+		messageApi: { error: (content: React.ReactNode) => void };
+		newestMessageRef: { current: ChatMessage | undefined };
+	}) {
+		super({ request: params.request });
+		this.selectedModelRef = params.selectedModelRef;
+		this.getAppSettings = params.getAppSettings;
+		this.enableThinkingRef = params.enableThinkingRef;
+		this.getCustomModelRequest = params.getCustomModelRequest;
+		this.intl = params.intl;
+		this.messageApi = params.messageApi;
+		this.newestMessageRef = params.newestMessageRef;
+	}
+
+	transformParams(
+		requestParams: Partial<ChatRequestBody>,
+		options: XRequestOptions,
+	): ChatRequestBody {
+		const inputMessages = this.getMessages().slice(-20);
+		let newInputMessages = fliterErrorMessages(inputMessages);
+
+		// 处理消息变量
+		const variables: Map<string, string> = new Map();
+		for (let i = 0; i < newInputMessages.length; i++) {
+			const message = newInputMessages[i];
+			if (message.role === "user" && "flow_config" in message) {
+				const flowConfig = message.flow_config as ChatMessageFlowConfig;
+				if (!flowConfig) {
+					continue;
+				}
+
+				if (flowConfig.globalVariable) {
+					flowConfig.globalVariable.forEach((value, key) => {
+						variables.set(key, value);
+					});
+				}
+
+				if (flowConfig.flow.variable_name && newInputMessages[i + 1]) {
+					variables.set(
+						`{{${flowConfig.flow.variable_name}}}`,
+						getMessageContent(newInputMessages[i + 1], true),
+					);
+				}
+			}
+		}
+
+		const userInput = last(newInputMessages);
+		if (!userInput) {
+			appError("[SnowShotChatProvider] userInput is undefined");
+			return {
+				messages: [],
+				model: "",
+				stream_options: { include_usage: true },
+				stream: true,
+			};
+		}
+
+		if (userInput.flow_config?.flow.ignore_context) {
+			// 忽略上下文
+			newInputMessages = newInputMessages.slice(-1);
+		}
+
+		const messages = newInputMessages.map((item) => {
+			let content = getMessageContent(item, true);
+
+			variables.forEach((value, key) => {
+				content = content.replace(new RegExp(key, "g"), value);
+			});
+
+			return {
+				role: item.role ?? "",
+				content,
+			};
+		});
+
+		const customModelRequest = this.getCustomModelRequest(
+			this.selectedModelRef.current ?? "",
+		);
+		const settings = this.getAppSettings()[AppSettingsGroup.SystemChat];
+
+		return {
+			messages,
+			model: customModelRequest
+				? (this.selectedModelRef.current ?? "")
+						.substring(CUSTOM_MODEL_PREFIX.length)
+						.replace("_thinking", "")
+				: (this.selectedModelRef.current ?? ""),
+			temperature: settings.temperature,
+			max_tokens: settings.maxTokens,
+			enable_thinking: this.enableThinkingRef.current ? true : undefined,
+			stream_options: {
+				include_usage: true,
+			},
+			thinking_budget: settings.thinkingBudgetTokens,
+			reasoning: customModelRequest?.config?.support_thinking
+				? { effort: "medium" }
+				: undefined,
+			stream: true,
+		};
+	}
+
+	transformLocalMessage(requestParams: Partial<ChatRequestBody>): ChatMessage {
+		const { message } = requestParams as { message?: ChatMessage };
+		return (message ?? { content: "", role: "user" }) as ChatMessage;
+	}
+
+	transformMessage(info: TransformMessage): ChatMessage {
+		const { originMessage, chunk } = info;
+		if (chunk && "code" in chunk && "message" in chunk) {
+			const chatResponse = ServiceResponse.serviceError(
+				{ status: 200, statusText: "Service Error" } as Response,
+				(chunk as unknown as { code: number }).code,
+				(chunk as unknown as { message: string }).message,
+			);
+			chatResponse.success();
+			return {
+				content: {
+					reasoning_content: "",
+					content: chatResponse.message ?? "Service Error",
+					response_error: true,
+				},
+				role: "assistant",
+			};
+		}
+
+		if (typeof originMessage?.content === "string") {
+			return {
+				content: {
+					reasoning_content: "",
+					content: originMessage.content,
+					response_error: false,
+				},
+				role: originMessage.role as ChatMessage["role"],
+			};
+		}
+
+		const messageContent = (
+			originMessage?.content
+				? { ...originMessage.content }
+				: {
+						reasoning_content: "",
+						content: "",
+						response_error: false,
+					}
+		) as ChatMessage["content"];
+		if (typeof messageContent === "string") {
+			throw new Error("messageContent is string");
+		}
+
+		try {
+			if (chunk?.data && !chunk?.data.includes("DONE")) {
+				const message = JSON.parse(chunk?.data);
+
+				if (
+					"type" in message &&
+					message.type === "content_block_delta" &&
+					"delta" in message
+				) {
+					// Claude 格式的响应
+					if (message.delta.type === "text_delta") {
+						messageContent.content += message.delta.text ?? "";
+					} else if (message.delta.type === "thinking_delta") {
+						messageContent.reasoning_content += message.delta.thinking ?? "";
+					}
+				} else {
+					// OpenAI 格式的响应
+					const choiceDelta = message?.choices?.[0]?.delta;
+					if (choiceDelta) {
+						if (choiceDelta?.reasoning_content) {
+							messageContent.reasoning_content =
+								messageContent.reasoning_content +
+								choiceDelta?.reasoning_content;
+						} else {
+							messageContent.content += choiceDelta?.content ?? "";
+						}
+					}
+				}
+			}
+		} catch (error) {
+			appError("[SnowShotChatProvider] transformMessage error", error);
+		}
+
+		this.newestMessageRef.current = {
+			content: messageContent,
+			role: "assistant",
+		};
+
+		return {
+			content: {
+				...messageContent,
+			},
+			role: "assistant",
+		};
+	}
+}
 
 export const CUSTOM_MODEL_PREFIX = "snow_shot_custom_";
 
@@ -396,14 +625,14 @@ const Chat = () => {
 		]);
 	}, [onlineModelConfigList, setSupportedModels, customModelConfigList]);
 
-	const abortController = useRef<AbortController>(null);
+	const newestMessage = useRef<ChatMessage>(undefined);
 
 	const [messageHistory, setMessageHistory, messageHistoryRef] = useStateRef<
-		Record<string, MessageInfo<BubbleDataType>[]>
+		Record<string, MessageInfo[]>
 	>({});
 
 	const [sessionList, setSessionList, sessionListRef] = useStateRef<
-		(Conversation & { isDefaultSession: boolean })[]
+		(ConversationItemType & { isDefaultSession: boolean })[]
 	>([]);
 	const [curSession, setCurSession, curSessionRef] = useStateRef<
 		string | undefined
@@ -428,138 +657,46 @@ const Chat = () => {
 
 			const baseURL = urlJoin(customConfig.api_uri, "chat/completions");
 			return {
-				request: XRequest({
-					baseURL,
-					dangerouslyApiKey: `Bearer ${customConfig.api_key}`,
+				request: XRequest(baseURL, {
+					headers: { Authorization: `Bearer ${customConfig.api_key}` },
 					fetch: appFetch,
+					manual: true,
 				}),
 				config: customConfig,
 			};
 		},
 		[supportedModelsRef],
 	);
-	const modelAgentConfig: Parameters<typeof useXAgent<BubbleDataType>>[0] =
-		useMemo(() => {
-			return {
-				request: (input, callbacks) => {
-					if (!selectedModelRef.current) {
-						message.error(
-							intl.formatMessage({ id: "tools.chat.noSelectedModel" }),
-						);
-						return;
-					}
-
-					const inputMessages = input.messages?.slice(-20);
-					let newInputMessages = fliterErrorMessages(inputMessages);
-
-					// 处理消息变量
-					const variables: Map<string, string> = new Map();
-					// 遍历消息，如果用户消息指定了变量，那么将对应的输出变量添加到变量列表中
-					for (let i = 0; i < newInputMessages.length; i++) {
-						const message = newInputMessages[i];
-						if (message.role === "user" && "flow_config" in message) {
-							const flowConfig = message.flow_config as ChatMessageFlowConfig;
-							if (!flowConfig) {
-								continue;
-							}
-
-							if (flowConfig.globalVariable) {
-								flowConfig.globalVariable.forEach((value, key) => {
-									variables.set(key, value);
-								});
-							}
-
-							if (flowConfig.flow.variable_name && newInputMessages[i + 1]) {
-								variables.set(
-									`{{${flowConfig.flow.variable_name}}}`,
-									getMessageContent(newInputMessages[i + 1], true),
-								);
-							}
-						}
-					}
-
-					const userInput = last(newInputMessages);
-					if (!userInput) {
-						appError("[modelAgentConfig] userInput is undefined");
-						return;
-					}
-
-					if (userInput.flow_config) {
-						if (userInput.flow_config.flow.ignore_context) {
-							// 忽略上下文
-							newInputMessages = newInputMessages.slice(-1);
-						}
-					}
-
-					newInputMessages.forEach((item) => {
-						let content = getMessageContent(item, true);
-
-						variables.forEach((value, key) => {
-							content = content.replace(new RegExp(key, "g"), value);
-						});
-
-						if (typeof item.content === "string") {
-							item.content = content;
-						} else if (
-							item.content &&
-							typeof item.content === "object" &&
-							"content" in item.content
-						) {
-							item.content.content = content;
-						}
-					});
-
-					const customModelRequest = getCustomModelRequest(
-						selectedModelRef.current,
-					);
-
-					return (customModelRequest?.request ?? modelRequest).create(
-						{
-							messages: newInputMessages?.map((item) => ({
-								role: item.role ?? "",
-								content: getMessageContent(item, true),
-							})),
-							model: customModelRequest
-								? selectedModelRef.current
-										.substring(CUSTOM_MODEL_PREFIX.length)
-										.replace("_thinking", "")
-								: selectedModelRef.current,
-							temperature:
-								getAppSettings()[AppSettingsGroup.SystemChat].temperature,
-							max_tokens:
-								getAppSettings()[AppSettingsGroup.SystemChat].maxTokens,
-							enable_thinking: enableThinkingRef.current ? true : undefined,
-							stream_options: {
-								include_usage: true,
-							},
-							thinking_budget:
-								getAppSettings()[AppSettingsGroup.SystemChat]
-									.thinkingBudgetTokens,
-							reasoning: customModelRequest?.config?.support_thinking
-								? { effort: "medium" }
-								: undefined,
-							stream: true,
-						},
-						callbacks,
-					);
-				},
-			};
-		}, [
-			getAppSettings,
-			getCustomModelRequest,
+	const provider = useMemo(() => {
+		return new SnowShotChatProvider({
+			request:
+				getCustomModelRequest(selectedModel ?? "")?.request ?? modelRequest,
 			selectedModelRef,
+			getAppSettings,
+			enableThinkingRef,
+			getCustomModelRequest,
 			intl,
-			message,
-			enableThinkingRef.current,
-		]);
-	const [agent] = useXAgent<BubbleDataType>(modelAgentConfig);
-	const loading = agent.isRequesting();
+			messageApi: message,
+			newestMessageRef: newestMessage,
+		});
+	}, [
+		selectedModel,
+		getCustomModelRequest,
+		intl,
+		message,
+		getAppSettings,
+		selectedModelRef,
+		enableThinkingRef,
+		newestMessage,
+	]);
 
-	const newestMessage = useRef<ChatMessage>(undefined);
-	const { messages, onRequest, setMessages } = useXChat({
-		agent,
-		requestFallback: (...params): ChatMessage => {
-			const [, { error }] = params;
+	const { messages, onRequest, setMessages, abort, isRequesting } = useXChat<
+		ChatMessage,
+		SSEOutput
+	>({
+		provider: provider as AbstractChatProvider,
+		requestFallback: (_requestParams, info): ChatMessage => {
+			const { error } = info;
 
 			if (error.name === "AbortError") {
 				return {
@@ -592,105 +729,27 @@ const Chat = () => {
 				role: "assistant",
 			};
 		},
-		transformMessage: (info): ChatMessage => {
-			const { originMessage, chunk } = info || {};
-			if (chunk && "code" in chunk && "message" in chunk) {
-				const chatResponse = ServiceResponse.serviceError(
-					{ status: 200, statusText: "Service Error" } as Response,
-					chunk.code as number,
-					chunk.message as string,
-				);
-				chatResponse.success();
-				return {
-					content: {
-						reasoning_content: "",
-						content: chatResponse.message ?? "Service Error",
-						response_error: true,
-					},
-					role: "assistant",
-				};
-			}
-
-			if (typeof originMessage?.content === "string") {
-				return {
-					content: {
-						reasoning_content: "",
-						content: originMessage.content,
-						response_error: false,
-					},
-					role: originMessage.role as ChatMessage["role"],
-				};
-			}
-
-			const messageContent = (
-				originMessage?.content
-					? {
-							...originMessage.content,
-						}
-					: {
-							reasoning_content: "",
-							content: "",
-							response_error: false,
-						}
-			) as ChatMessage["content"];
-			if (typeof messageContent === "string") {
-				throw new Error("messageContent is string");
-			}
-
-			try {
-				if (chunk?.data && !chunk?.data.includes("DONE")) {
-					const message = JSON.parse(chunk?.data);
-
-					if (
-						"type" in message &&
-						message.type === "content_block_delta" &&
-						"delta" in message
-					) {
-						// Claude 格式的响应
-						if (message.delta.type === "text_delta") {
-							messageContent.content += message.delta.text ?? "";
-						} else if (message.delta.type === "thinking_delta") {
-							messageContent.reasoning_content += message.delta.thinking ?? "";
-						}
-					} else {
-						// OpenAI 格式的响应
-						const choiceDelta = message?.choices?.[0]?.delta;
-						if (choiceDelta) {
-							if (choiceDelta?.reasoning_content) {
-								messageContent.reasoning_content =
-									messageContent.reasoning_content +
-									choiceDelta?.reasoning_content;
-							} else {
-								messageContent.content += choiceDelta?.content ?? "";
-							}
-						}
-					}
-				}
-			} catch (error) {
-				appError("[transformMessage] error", error);
-			}
-
-			newestMessage.current = {
-				content: messageContent,
-				role: "assistant",
-			};
-
-			return {
-				content: {
-					...messageContent,
-				},
-				role: "assistant",
-			};
-		},
-		resolveAbortController: (controller) => {
-			abortController.current = controller;
-		},
 	});
 
+	const loading = isRequesting;
+
+	// x-sdk 的 abort() 在无活动请求时会因内部 requestHandler 为 undefined 而抛错，
+	// 这里用 ref 记录最新请求状态，仅在确有请求时调用 abort，并对异常兜底。
+	const isRequestingRef = useRef(false);
+	useEffect(() => {
+		isRequestingRef.current = isRequesting;
+	}, [isRequesting]);
+
 	const abortChat = useCallback(() => {
-		abortController.current?.abort();
+		if (isRequestingRef.current) {
+			try {
+				abort();
+			} catch {
+				// 忽略无活动请求时的 abort 异常
+			}
+		}
 		setSendQueueMessages([]);
-	}, [setSendQueueMessages]);
+	}, [setSendQueueMessages, abort]);
 
 	const createNewSession = useCallback(async () => {
 		return new Promise<void>((resolve) => {
@@ -823,9 +882,7 @@ const Chat = () => {
 							// In future versions, the sessionId capability will be added to resolve this problem.
 							setTimeout(() => {
 								setCurSession(val);
-								setMessages(
-									(messageHistory?.[val] || []) as MessageInfo<ChatMessage>[],
-								);
+								setMessages((messageHistory?.[val] || []) as MessageInfo[]);
 							}, 100);
 
 							autoScrollRef.current = true;
@@ -916,36 +973,43 @@ const Chat = () => {
 		</div>
 	);
 
-	const bubbleItems = useMemo((): BubbleDataType[] | undefined => {
+	const bubbleItems = useMemo((): BubbleItemType[] | undefined => {
 		if (!messages || messages.length === 0) return undefined;
 
-		const botAvatar = {
-			icon: <BotIcon />,
-			style: {
-				color: token.colorPrimary,
-				backgroundColor: "transparent",
-				fontSize: "2em",
-			},
-		};
-		const list = messages.map((i): BubbleDataType => {
+		const botAvatar = (
+			<Avatar
+				icon={<BotIcon />}
+				style={{
+					color: token.colorPrimary,
+					backgroundColor: "transparent",
+					fontSize: "2em",
+				}}
+			/>
+		);
+		const list = messages.map((i): BubbleItemType => {
+			const msg = i.message as ChatMessage;
+			const key = i.id;
 			if (i.status === "loading") {
 				return {
+					key,
 					loading: true,
 					role: "assistant",
 					avatar: botAvatar,
 					variant: "borderless",
+					content: "",
 				};
 			}
 
-			const content = getMessageContent(i.message);
+			const content = getMessageContent(msg);
 
 			return {
-				role: i.message.role,
-				placement: i.message.role === "assistant" ? "start" : "end",
+				key,
+				role: msg.role,
+				placement: msg.role === "assistant" ? "start" : "end",
 				content,
-				variant: i.message.role === "assistant" ? "borderless" : "filled",
-				messageRender:
-					i.message.role === "assistant"
+				variant: msg.role === "assistant" ? "borderless" : "filled",
+				contentRender:
+					msg.role === "assistant"
 						? () => {
 								return (
 									<MarkdownContent
@@ -956,7 +1020,22 @@ const Chat = () => {
 								);
 							}
 						: undefined,
-				avatar: i.message.role === "assistant" ? botAvatar : undefined,
+				avatar: msg.role === "assistant" ? botAvatar : undefined,
+				footer:
+					msg.role === "assistant"
+						? () => (
+								<div style={{ display: "flex" }}>
+									<Button
+										type="text"
+										size="small"
+										icon={<CopyOutlined />}
+										onClick={() => {
+											writeTextToClipboard(content);
+										}}
+									/>
+								</div>
+							)
+						: undefined,
 				// typing: i.status === 'loading' ? { step: 2, interval: 50 } : false,
 			};
 		});
@@ -980,10 +1059,7 @@ const Chat = () => {
 				return b[1].session.key.localeCompare(a[1].session.key);
 			});
 			const sessionList = [];
-			const messageHistory = {} as Record<
-				string,
-				MessageInfo<BubbleDataType>[]
-			>;
+			const messageHistory = {} as Record<string, MessageInfo[]>;
 			for (const [key, value] of chatHistory) {
 				sessionList.push({
 					...value.session,
@@ -1037,7 +1113,7 @@ const Chat = () => {
 						style={{ height: "100%", paddingInline: 16 }}
 						items={bubbleItems}
 						key={curSession}
-						roles={{
+						role={{
 							assistant: {
 								placement: "start",
 								loadingRender: () => (
@@ -1045,31 +1121,6 @@ const Chat = () => {
 										<Spin size="small" />
 										<FormattedMessage id="tools.chat.agentPlaceholder" />
 									</Space>
-								),
-								footer: (content) => (
-									<div style={{ display: "flex" }}>
-										<Button
-											type="text"
-											size="small"
-											icon={<CopyOutlined />}
-											onClick={() => {
-												let textContent = "";
-												if (
-													content &&
-													typeof content === "object" &&
-													"props" in content
-												) {
-													textContent = content.props.clipboardContent;
-												} else if (typeof content === "string") {
-													textContent = content;
-												} else {
-													return;
-												}
-
-												writeTextToClipboard(textContent);
-											}}
-										/>
-									</div>
 								),
 							},
 							user: { placement: "end" },
@@ -1090,18 +1141,22 @@ const Chat = () => {
 		</div>
 	);
 
-	const messagesRef = useRef<MessageInfo<BubbleDataType>[]>([]);
+	const messagesRef = useRef<MessageInfo[]>([]);
 	useEffect(() => {
 		messagesRef.current = messages;
 	}, [messages]);
 
 	const onCopy = useCallback(() => {
 		const lastMessage = last(messagesRef.current);
-		copyText(lastMessage ? getMessageContent(lastMessage.message) : "");
+		copyText(
+			lastMessage ? getMessageContent(lastMessage.message as ChatMessage) : "",
+		);
 	}, []);
 	const onCopyAndHide = useCallback(() => {
 		const lastMessage = last(messagesRef.current);
-		copyTextAndHide(lastMessage ? getMessageContent(lastMessage.message) : "");
+		copyTextAndHide(
+			lastMessage ? getMessageContent(lastMessage.message as ChatMessage) : "",
+		);
 	}, []);
 
 	useHotkeys(
@@ -1284,77 +1339,65 @@ const Chat = () => {
 				/>
 			</div>
 			{/** 输入框 */}
-			<Suggestion
-				items={[]}
-				onSelect={(itemVal) => setInputValue(`[${itemVal}]:`)}
-			>
-				{({ onKeyDown }) => (
-					<Sender
-						ref={senderRef}
-						loading={senderLoading}
-						value={inputValue}
-						onChange={(v) => {
-							if (v.length > 10000) {
-								setInputValue(v.substring(0, 10000));
-							} else {
-								setInputValue(v);
-							}
-						}}
-						disabled={sessionStoreLoading}
-						onSubmit={async (message) => {
-							if (!curSessionRef.current) {
-								await createNewSession();
-							}
+			<Sender
+				ref={senderRef}
+				loading={senderLoading}
+				value={inputValue}
+				onChange={(v) => {
+					if (v.length > 10000) {
+						setInputValue(v.substring(0, 10000));
+					} else {
+						setInputValue(v);
+					}
+				}}
+				disabled={sessionStoreLoading}
+				onSubmit={async (message) => {
+					if (!curSessionRef.current) {
+						await createNewSession();
+					}
 
-							onSenderSubmit(message);
-						}}
-						onCancel={abortChat}
-						placeholder={intl.formatMessage({ id: "tools.chat.placeholder" })}
-						onKeyDown={(e) => {
-							if (
-								e.key === "Enter" &&
-								(senderLoading || userSendingRef.current)
-							) {
-								setSendQueueMessages((prev) =>
-									prev.concat({
-										content: inputValue,
-										title: intl.formatMessage({
-											id: "tools.chat.sendQueue.userMessage",
-										}),
-									}),
-								);
-								setInputValue("");
-							}
-
-							onKeyDown(e);
-						}}
-						actions={(_, info) => {
-							const { SendButton, LoadingButton } = info.components;
-							return (
-								<div
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: token.marginXS,
-									}}
-								>
-									<SendQueueMessageList queue={sendQueueMessages} />
-									{loading ? (
-										<LoadingButton type="default" />
-									) : (
-										<SendButton type="primary" />
-									)}
-								</div>
-							);
-						}}
-					/>
-				)}
-			</Suggestion>
+					onSenderSubmit(message);
+				}}
+				onCancel={abortChat}
+				placeholder={intl.formatMessage({ id: "tools.chat.placeholder" })}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" && (senderLoading || userSendingRef.current)) {
+						setSendQueueMessages((prev) =>
+							prev.concat({
+								content: inputValue,
+								title: intl.formatMessage({
+									id: "tools.chat.sendQueue.userMessage",
+								}),
+							}),
+						);
+						setInputValue("");
+					}
+				}}
+				suffix={(_, info) => {
+					const { SendButton, LoadingButton } = info.components;
+					return (
+						<div
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: token.marginXS,
+							}}
+						>
+							<SendQueueMessageList queue={sendQueueMessages} />
+							{loading ? (
+								<LoadingButton type="default" />
+							) : (
+								<SendButton type="primary" />
+							)}
+						</div>
+					);
+				}}
+			/>
 		</div>
 	);
 
 	const updateHistory = useCallback(
-		(msgList: MessageInfo<BubbleDataType>[] | undefined) => {
+		(msgList: MessageInfo[] | undefined) => {
 			const currentSession = curSessionRef.current;
 			if (msgList && msgList.length > 0 && currentSession) {
 				setMessageHistory((prev) => ({
@@ -1618,6 +1661,9 @@ export const ChatPage = () => {
                     :global(.bodyText) {
                         color: var(--antd-color-text);
                         padding: 8px;
+                    }
+                    :global(.ant-sender-input.ant-input-borderless) {
+                        outline: none;
                     }
                 `}</style>
 			</div>

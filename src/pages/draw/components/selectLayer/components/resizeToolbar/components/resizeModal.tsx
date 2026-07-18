@@ -1,12 +1,13 @@
 import { PlusOutlined } from "@ant-design/icons";
-import ProForm, {
+import {
+	ProForm,
 	ModalForm,
 	ProFormDigit,
 	ProFormList,
 	ProFormSelect,
 	ProFormSwitch,
 	ProFormText,
-} from "@ant-design/pro-form";
+} from "@ant-design/pro-components";
 import { Col, ColorPicker, Flex, Form, Row, Space, theme } from "antd";
 import type { AggregationColor } from "antd/es/color-picker/color";
 import {

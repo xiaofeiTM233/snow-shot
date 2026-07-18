@@ -6,7 +6,7 @@ import {
 	ProFormSwitch,
 	ProFormText,
 	ProFormTextArea,
-} from "@ant-design/pro-form";
+} from "@ant-design/pro-components";
 import { Alert, Col, Flex, Form, Row, Typography, theme } from "antd";
 import type React from "react";
 import { useImperativeHandle, useState } from "react";

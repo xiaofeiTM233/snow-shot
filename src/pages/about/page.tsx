@@ -107,9 +107,9 @@ export const AboutPage = () => {
 						{intl.formatMessage({ id: "about.subtitle" })}
 					</Text>
 				</div>
-				<div style={{ marginTop: token.margin }}>
+				<Space wrap gap={0} style={{ marginTop: token.margin }}>
 					<Tooltip title={commitSha ? `Commit SHA: ${commitSha}` : undefined}>
-						<Tag color="blue">
+						<Tag color="blue" variant="outlined">
 							<a
 								style={{ color: token.colorLink }}
 								onClick={() => openUrl("https://snowshot.top/")}
@@ -118,7 +118,7 @@ export const AboutPage = () => {
 							</a>
 						</Tag>
 					</Tooltip>
-					<Tag color="green">
+					<Tag color="green" variant="outlined">
 						<a
 							style={{ color: token.colorLink }}
 							onClick={() => openUrl("https://github.com/mg-chao")}
@@ -126,7 +126,7 @@ export const AboutPage = () => {
 							{intl.formatMessage({ id: "about.author" })}
 						</a>
 					</Tag>
-				</div>
+				</Space>
 			</div>
 
 			<Divider />
@@ -172,7 +172,7 @@ export const AboutPage = () => {
 				<Title level={3}>
 					{intl.formatMessage({ id: "about.contact.title" })}
 				</Title>
-				<Space direction="vertical" style={{ width: "100%" }}>
+				<Space orientation="vertical" style={{ width: "100%" }}>
 					<Button
 						type="primary"
 						icon={<GithubOutlined />}

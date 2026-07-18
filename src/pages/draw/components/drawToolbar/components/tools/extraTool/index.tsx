@@ -1,5 +1,5 @@
 import { ScanOutlined } from "@ant-design/icons";
-import { Button, Flex, message, theme } from "antd";
+import { Button, Flex, theme } from "antd";
 import { useCallback, useContext, useState } from "react";
 import { useIntl } from "react-intl";
 import { createVideoRecordWindow } from "@/commands/core";
@@ -11,6 +11,7 @@ import {
 	AppSettingsPublisher,
 } from "@/contexts/appSettingsActionContext";
 import { usePluginServiceContext } from "@/contexts/pluginServiceContext";
+import { AntdContext } from "@/contexts/antdContext";
 import { useStateSubscriber } from "@/hooks/useStateSubscriber";
 import { DrawContext } from "@/pages/draw/types";
 import {
@@ -28,6 +29,7 @@ export const ExtraTool: React.FC<{
 	disable: boolean;
 }> = ({ onToolClickAction, disable }) => {
 	const intl = useIntl();
+	const { message } = useContext(AntdContext);
 	const { token } = theme.useToken();
 
 	const { updateAppSettings } = useContext(AppSettingsActionContext);

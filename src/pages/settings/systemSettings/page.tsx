@@ -1,11 +1,12 @@
 "use client";
 
-import ProForm, {
+import {
+	ProForm,
 	ProFormDigit,
 	ProFormSelect,
 	ProFormSlider,
 	ProFormSwitch,
-} from "@ant-design/pro-form";
+} from "@ant-design/pro-components";
 import { appLogDir } from "@tauri-apps/api/path";
 import * as dialog from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";

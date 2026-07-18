@@ -1,6 +1,6 @@
 "use client";
 
-import ProForm from "@ant-design/pro-form";
+import { ProForm } from "@ant-design/pro-components";
 import {
 	Col,
 	ColorPicker,

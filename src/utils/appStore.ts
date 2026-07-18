@@ -1,6 +1,5 @@
-import type { BubbleDataType } from "@ant-design/x/es/bubble/BubbleList";
-import type { Conversation } from "@ant-design/x/es/conversations";
-import type { MessageInfo } from "@ant-design/x/es/use-x-chat";
+import type { ConversationItemType } from "@ant-design/x";
+import type { MessageInfo } from "@ant-design/x-sdk";
 import type {
 	NonDeletedExcalidrawElement,
 	Ordered,
@@ -84,8 +83,8 @@ class BaseStore<Value> {
 }
 
 export class ChatHistoryStore extends BaseStore<{
-	session: Conversation;
-	messages: MessageInfo<BubbleDataType>[];
+	session: ConversationItemType;
+	messages: MessageInfo[];
 }> {
 	constructor() {
 		super("chat-history", 1000);

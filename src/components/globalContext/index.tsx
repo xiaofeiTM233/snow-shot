@@ -2,7 +2,6 @@ import { App as AntdApp } from "antd";
 import type React from "react";
 import { useEffect } from "react";
 import { HotkeysProvider } from "react-hotkeys-hook";
-import "@ant-design/v5-patch-for-react-19";
 
 export const GlobalContext: React.FC<{
 	children: React.ReactNode;

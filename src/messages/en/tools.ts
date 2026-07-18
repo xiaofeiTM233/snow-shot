@@ -94,6 +94,7 @@ export const tools = {
 	"tools.captureHistory.delete.confirm": "Confirm to delete this screenshot?",
 	"tools.captureHistory.switchImage.tip":
 		"Right-click to switch between 'Monitor Screen' and 'Screenshot Result' preview",
+	"tools.captureHistory.preview": "Preview",
 	"tools.captureHistory.source": "Source",
 	"tools.captureHistory.source.scrollScreenshotCopy":
 		"Scroll Screenshot - Copy",

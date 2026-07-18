@@ -210,11 +210,11 @@ export const HomePage = () => {
 								key={`${group}`}
 								spinning={updateShortcutKeyStatusLoading || appSettingsLoading}
 							>
-								<Space
-									direction="vertical"
-									size="middle"
-									style={{ display: "flex" }}
-								>
+							<Space
+								orientation="vertical"
+								size="middle"
+								style={{ display: "flex" }}
+							>
 									{configs
 										.filter((config) => {
 											if (

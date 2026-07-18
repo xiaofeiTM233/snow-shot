@@ -2747,46 +2747,64 @@ const FixedContentCoreInner: React.FC<{
 									}
 									className={!enableSelectText ? "fixed-text-content-drag" : ""}
 								>
-									<Descriptions>
-										<Descriptions.Item
-											label={<FormattedMessage id="draw.color" />}
-											span={1}
-										>
-											<div
-												style={{
-													display: "inline-flex",
-													alignItems: "center",
-													height: "100%",
-												}}
-											>
-												<div
-													style={{
-														backgroundColor: textContent.colorText.color,
-														width: "16px",
-														height: "16px",
-														borderRadius: "2px",
-														boxShadow: token.boxShadowTertiary,
-													}}
-												/>
-											</div>
-										</Descriptions.Item>
-										<Descriptions.Item label="HEX" span={1}>
-											<Typography.Text copyable>
-												{textContent.colorText.hex}
-											</Typography.Text>
-										</Descriptions.Item>
-										<Descriptions.Item label="RGB" span={1}>
-											<Typography.Text copyable>
-												{textContent?.colorText.rgb}
-											</Typography.Text>
-										</Descriptions.Item>
-
-										<Descriptions.Item label="HSL" span={1}>
-											<Typography.Text copyable>
-												{textContent.colorText.hsl}
-											</Typography.Text>
-										</Descriptions.Item>
-									</Descriptions>
+									<Descriptions
+										items={[
+											{
+												key: "color",
+												label: <FormattedMessage id="draw.color" />,
+												span: 1,
+												children: (
+													<div
+														style={{
+															display: "inline-flex",
+															alignItems: "center",
+															height: "100%",
+														}}
+													>
+														<div
+															style={{
+																backgroundColor: textContent.colorText.color,
+																width: "16px",
+																height: "16px",
+																borderRadius: "2px",
+																boxShadow: token.boxShadowTertiary,
+															}}
+														/>
+													</div>
+												),
+											},
+											{
+												key: "hex",
+												label: "HEX",
+												span: 1,
+												children: (
+													<Typography.Text copyable>
+														{textContent.colorText.hex}
+													</Typography.Text>
+												),
+											},
+											{
+												key: "rgb",
+												label: "RGB",
+												span: 1,
+												children: (
+													<Typography.Text copyable>
+														{textContent?.colorText.rgb}
+													</Typography.Text>
+												),
+											},
+											{
+												key: "hsl",
+												label: "HSL",
+												span: 1,
+												children: (
+													<Typography.Text copyable>
+														{textContent.colorText.hsl}
+													</Typography.Text>
+												),
+											},
+										]}
+									/>
 								</div>
 							)}
 						</div>

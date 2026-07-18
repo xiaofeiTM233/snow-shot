@@ -93,6 +93,7 @@ export const tools = {
 	"tools.captureHistory.delete.confirm": "确定要删除该截图吗？",
 	"tools.captureHistory.switchImage.tip":
 		"右键切换「显示器画面」/「截图结果」预览",
+	"tools.captureHistory.preview": "预览",
 	"tools.captureHistory.source": "来源",
 	"tools.captureHistory.source.scrollScreenshotCopy": "滚动截图-复制",
 	"tools.captureHistory.source.scrollScreenshotSave": "滚动截图-保存",

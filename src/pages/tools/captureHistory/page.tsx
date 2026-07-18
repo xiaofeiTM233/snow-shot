@@ -175,6 +175,12 @@ export const CaptureHistoryPage = () => {
 				}}
 				tableAlertOptionRender={tableAlertOptionRender}
 				itemLayout="vertical"
+				split
+				cardProps={{
+					styles: {
+						body: { paddingInline: 0, paddingBlock: 0 },
+					},
+				}}
 				rowKey="id"
 				headerTitle={
 					<>
@@ -359,7 +365,7 @@ export const CaptureHistoryPage = () => {
 							const { selected_rect } = item;
 
 							return (
-								<>
+								<Space wrap gap={[token.marginXS, 0]}>
 									<Tag>
 										<FormattedMessage id="tools.captureHistory.position" />
 										{`: ${selected_rect.min_x} , ${selected_rect.min_y}`}
@@ -377,7 +383,7 @@ export const CaptureHistoryPage = () => {
 										{`: `}
 										{getSourceDesc(item.source)}
 									</Tag>
-								</>
+								</Space>
 							);
 						},
 					},
@@ -402,13 +408,13 @@ export const CaptureHistoryPage = () => {
 					},
 				}}
 			/>
-
-			<style jsx>{`
-                :global(.capture-history-list .ant-pro-card-body) {
-                    padding-inline: 0 !important;
-                    padding-block: 0 !important;
-                }
-            `}</style>
+			<style jsx>
+				{`
+				:global(.ant-pro-list.ant-pro-list-vertical .ant-pro-list-row-header) {
+    			flex-direction: row;
+				}
+			`}
+			</style>
 		</>
 	);
 };
