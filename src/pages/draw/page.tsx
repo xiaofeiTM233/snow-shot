@@ -1139,16 +1139,6 @@ const DrawPageCore: React.FC<{
 	}, []);
 
 	const onTranslateOcrToPage = useCallback(async () => {
-		// 已有 OCR 结果则直接跳转翻译页
-		const existingResult = ocrBlocksActionRef.current
-			?.getOcrResultAction()
-			?.getOcrResult();
-		if (existingResult?.result) {
-			executeTranslateOcrText(covertOcrResultToText(existingResult.result));
-			return;
-		}
-
-		// 否则先执行 OCR 检测，检测完成后再跳转
 		if (
 			!captureBoundingBoxInfoRef.current ||
 			!selectLayerActionRef.current ||
@@ -1159,6 +1149,7 @@ const DrawPageCore: React.FC<{
 			return;
 		}
 
+		// 先调用 OCR 检测，OCR 结束后再跳转翻译页（与 OCR 翻译按钮行为一致）
 		await handleOcrDetect(
 			captureBoundingBoxInfoRef.current,
 			selectLayerActionRef.current,
