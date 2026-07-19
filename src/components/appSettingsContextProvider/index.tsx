@@ -824,6 +824,12 @@ const AppSettingsContextProviderCore: React.FC<{
 						? newSettings.customOcrModelConfigList
 						: (prevSettings?.customOcrModelConfigList ??
 							defaultAppSettingsData[group].customOcrModelConfigList),
+					onlineOcrConfigList: Array.isArray(
+						newSettings?.onlineOcrConfigList,
+					)
+						? newSettings.onlineOcrConfigList
+						: (prevSettings?.onlineOcrConfigList ??
+							defaultAppSettingsData[group].onlineOcrConfigList),
 				};
 			} else if (group === AppSettingsGroup.FunctionChat) {
 				newSettings = newSettings as AppSettingsData[typeof group];
