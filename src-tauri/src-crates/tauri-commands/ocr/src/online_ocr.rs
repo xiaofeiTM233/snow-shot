@@ -8,7 +8,6 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-/// 与前端 `OcrDetectResult` 保持一致的序列化结构
 #[derive(serde::Serialize)]
 pub struct OnlineOcrPoint {
     pub x: f32,
@@ -28,18 +27,29 @@ pub struct OnlineOcrDetectResult {
     pub scale_factor: f32,
 }
 
-/// 与前端 `OnlineOcrConfig` 字段一一对应
 #[derive(Deserialize)]
 pub struct OnlineOcrConfig {
     pub model_name: String,
-    pub provider: String,
     pub service_type: String,
     pub language: String,
     pub youdao_app_key: String,
     pub youdao_app_secret: String,
     pub tencent_secret_id: String,
     pub tencent_secret_key: String,
-    pub tencent_region: String,
+}
+
+///以 `"provider:realType"` 形式传入 `service_type`
+fn split_service_type(service_type: &str) -> Result<(&str, &str), String> {
+    let mut parts = service_type.splitn(2, ':');
+    match (parts.next(), parts.next()) {
+        (Some(provider), Some(real)) if !provider.is_empty() && !real.is_empty() => {
+            Ok((provider, real))
+        }
+        _ => Err(format!(
+            "[online_ocr_detect] Invalid service_type format: {}",
+            service_type
+        )),
+    }
 }
 
 pub async fn online_ocr_detect(
@@ -60,12 +70,13 @@ pub async fn online_ocr_detect(
     let config: OnlineOcrConfig = serde_json::from_str(config_header)
         .map_err(|e| format!("[online_ocr_detect] Failed to parse config: {}", e))?;
 
-    match config.provider.as_str() {
-        "youdao" => youdao_ocr(&image_data, &config).await,
-        "tencent" => tencent_ocr(&image_data, &config).await,
-        other => Err(format!(
-            "[online_ocr_detect] Unknown provider: {}",
-            other
+    let (provider, real_service_type) = split_service_type(&config.service_type)?;
+    match provider {
+        "youdao" => youdao_ocr(&image_data, &config, real_service_type).await,
+        "tencent" => tencent_ocr(&image_data, &config, real_service_type).await,
+        _ => Err(format!(
+            "[online_ocr_detect] Unknown provider for service_type: {}",
+            config.service_type
         )),
     }
 }
@@ -123,6 +134,7 @@ fn parse_box_8(s: &str) -> Vec<OnlineOcrPoint> {
 async fn youdao_ocr(
     image: &[u8],
     config: &OnlineOcrConfig,
+    service_type: &str,
 ) -> Result<OnlineOcrDetectResult, String> {
     let img_b64 = BASE64_STANDARD.encode(image);
     let salt = random_salt();
@@ -160,7 +172,7 @@ async fn youdao_ocr(
         ("sign", sign.as_str()),
         ("signType", "v3"),
         ("detectType", "10012"),
-        ("type", config.service_type.as_str()),
+        ("type", service_type),
         ("langType", lang_type.as_str()),
         ("imageType", "1"),
         ("docType", "json"),
@@ -235,10 +247,11 @@ fn parse_youdao_response(body: &str) -> Result<OnlineOcrDetectResult, String> {
 async fn tencent_ocr(
     image: &[u8],
     config: &OnlineOcrConfig,
+    service_type: &str,
 ) -> Result<OnlineOcrDetectResult, String> {
     let img_b64 = BASE64_STANDARD.encode(image);
 
-    let action = match config.service_type.as_str() {
+    let action = match service_type {
         "general_accurate" => "GeneralAccurateOCR",
         _ => "GeneralBasicOCR",
     };

@@ -75,7 +75,6 @@ import {
 	OcrDetectAfterAction,
 	OcrModel,
 	type CustomOcrModelConfig,
-	OnlineOcrProvider,
 	type OnlineOcrConfig,
 	TranslationApiType,
 	TrayIconClickAction,
@@ -129,7 +128,7 @@ export const FunctionSettingsPage = () => {
 				if (
 					preSettings === undefined ||
 					preSettings[AppSettingsGroup.FunctionTranslation] !==
-						settings[AppSettingsGroup.FunctionTranslation]
+					settings[AppSettingsGroup.FunctionTranslation]
 				) {
 					translationForm.setFieldsValue(
 						settings[AppSettingsGroup.FunctionTranslation],
@@ -139,7 +138,7 @@ export const FunctionSettingsPage = () => {
 				if (
 					preSettings === undefined ||
 					preSettings[AppSettingsGroup.FunctionChat] !==
-						settings[AppSettingsGroup.FunctionChat]
+					settings[AppSettingsGroup.FunctionChat]
 				) {
 					functionForm.setFieldsValue(settings[AppSettingsGroup.FunctionChat]);
 				}
@@ -147,7 +146,7 @@ export const FunctionSettingsPage = () => {
 				if (
 					preSettings === undefined ||
 					preSettings[AppSettingsGroup.FunctionDraw] !==
-						settings[AppSettingsGroup.FunctionDraw]
+					settings[AppSettingsGroup.FunctionDraw]
 				) {
 					functionDrawForm.setFieldsValue(
 						settings[AppSettingsGroup.FunctionDraw],
@@ -157,7 +156,7 @@ export const FunctionSettingsPage = () => {
 				if (
 					preSettings === undefined ||
 					preSettings[AppSettingsGroup.FunctionScreenshot] !==
-						settings[AppSettingsGroup.FunctionScreenshot]
+					settings[AppSettingsGroup.FunctionScreenshot]
 				) {
 					screenshotForm.setFieldsValue(
 						settings[AppSettingsGroup.FunctionScreenshot],
@@ -176,7 +175,7 @@ export const FunctionSettingsPage = () => {
 				if (
 					preSettings === undefined ||
 					preSettings[AppSettingsGroup.FunctionOutput] !==
-						settings[AppSettingsGroup.FunctionOutput]
+					settings[AppSettingsGroup.FunctionOutput]
 				) {
 					outputForm.setFieldsValue(settings[AppSettingsGroup.FunctionOutput]);
 				}
@@ -184,7 +183,7 @@ export const FunctionSettingsPage = () => {
 				if (
 					preSettings === undefined ||
 					preSettings[AppSettingsGroup.FunctionFixedContent] !==
-						settings[AppSettingsGroup.FunctionFixedContent]
+					settings[AppSettingsGroup.FunctionFixedContent]
 				) {
 					fixedContentForm.setFieldsValue(
 						settings[AppSettingsGroup.FunctionFixedContent],
@@ -194,7 +193,7 @@ export const FunctionSettingsPage = () => {
 				if (
 					preSettings === undefined ||
 					preSettings[AppSettingsGroup.FunctionFullScreenDraw] !==
-						settings[AppSettingsGroup.FunctionFullScreenDraw]
+					settings[AppSettingsGroup.FunctionFullScreenDraw]
 				) {
 					fullScreenDrawForm.setFieldsValue(
 						settings[AppSettingsGroup.FunctionFullScreenDraw],
@@ -204,7 +203,7 @@ export const FunctionSettingsPage = () => {
 				if (
 					preSettings === undefined ||
 					preSettings[AppSettingsGroup.FunctionVideoRecord] !==
-						settings[AppSettingsGroup.FunctionVideoRecord]
+					settings[AppSettingsGroup.FunctionVideoRecord]
 				) {
 					const videoRecordSettings =
 						settings[AppSettingsGroup.FunctionVideoRecord];
@@ -222,7 +221,7 @@ export const FunctionSettingsPage = () => {
 				if (
 					preSettings === undefined ||
 					preSettings[AppSettingsGroup.FunctionTrayIcon] !==
-						settings[AppSettingsGroup.FunctionTrayIcon]
+					settings[AppSettingsGroup.FunctionTrayIcon]
 				) {
 					trayIconForm.setFieldsValue(
 						settings[AppSettingsGroup.FunctionTrayIcon],
@@ -232,7 +231,7 @@ export const FunctionSettingsPage = () => {
 				if (
 					preSettings === undefined ||
 					preSettings[AppSettingsGroup.FunctionOcr] !==
-						settings[AppSettingsGroup.FunctionOcr]
+					settings[AppSettingsGroup.FunctionOcr]
 				) {
 					functionOcrForm.setFieldsValue(
 						settings[AppSettingsGroup.FunctionOcr],
@@ -242,7 +241,7 @@ export const FunctionSettingsPage = () => {
 				if (
 					preSettings === undefined ||
 					preSettings[AppSettingsGroup.FunctionGlobalShortcut] !==
-						settings[AppSettingsGroup.FunctionGlobalShortcut]
+					settings[AppSettingsGroup.FunctionGlobalShortcut]
 				) {
 					functionGlobalShortcutForm.setFieldsValue(
 						settings[AppSettingsGroup.FunctionGlobalShortcut],
@@ -661,42 +660,25 @@ export const FunctionSettingsPage = () => {
 		];
 	}, [intl]);
 
-	const onlineOcrProviderOptions = useMemo(() => {
-		return [
-			{
-				label: intl.formatMessage({
-					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.provider.youdao",
-				}),
-				value: OnlineOcrProvider.Youdao,
-			},
-			{
-				label: intl.formatMessage({
-					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.provider.tencent",
-				}),
-				value: OnlineOcrProvider.Tencent,
-			},
-		];
-	}, [intl]);
-
 	const youdaoServiceTypeOptions = useMemo(() => {
 		return [
 			{
 				label: intl.formatMessage({
 					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.general",
 				}),
-				value: "general",
+				value: "youdao:general",
 			},
 			{
 				label: intl.formatMessage({
 					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.generalHigh",
 				}),
-				value: "general_high",
+				value: "youdao:general_high",
 			},
 			{
 				label: intl.formatMessage({
 					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.youdao.handwriting",
 				}),
-				value: "handwriting",
+				value: "youdao:handwriting",
 			},
 		];
 	}, [intl]);
@@ -707,16 +689,33 @@ export const FunctionSettingsPage = () => {
 				label: intl.formatMessage({
 					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.tencent.basic",
 				}),
-				value: "general_basic",
+				value: "tencent:general_basic",
 			},
 			{
 				label: intl.formatMessage({
 					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType.tencent.accurate",
 				}),
-				value: "general_accurate",
+				value: "tencent:general_accurate",
 			},
 		];
 	}, [intl]);
+
+	const onlineOcrServiceTypeOptions = useMemo(() => {
+		return [
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.provider.youdao",
+				}),
+				options: youdaoServiceTypeOptions,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.ocrSettings.onlineOcrConfig.provider.tencent",
+				}),
+				options: tencentServiceTypeOptions,
+			},
+		];
+	}, [intl, youdaoServiceTypeOptions, tencentServiceTypeOptions]);
 
 	const [ocrModelFileOptions, setOcrModelFileOptions] = useState<
 		SelectProps["options"]
@@ -771,21 +770,21 @@ export const FunctionSettingsPage = () => {
 				},
 				customVisionModelList.length > 0
 					? {
-							label: <FormattedMessage id="tools.chat.custom" />,
-							options: customVisionModelList.map((model) => ({
-								label: model.config.model_name,
-								value: model.config.model_name,
-							})),
-						}
+						label: <FormattedMessage id="tools.chat.custom" />,
+						options: customVisionModelList.map((model) => ({
+							label: model.config.model_name,
+							value: model.config.model_name,
+						})),
+					}
 					: undefined,
 				officialVisionModelList.length > 0
 					? {
-							label: <FormattedMessage id="tools.chat.official" />,
-							options: officialVisionModelList.map((model) => ({
-								label: model.config.model_name,
-								value: model.config.model_name,
-							})),
-						}
+						label: <FormattedMessage id="tools.chat.official" />,
+						options: officialVisionModelList.map((model) => ({
+							label: model.config.model_name,
+							value: model.config.model_name,
+						})),
+					}
 					: undefined,
 			].filter(Boolean) as SelectProps["options"];
 
@@ -987,35 +986,35 @@ export const FunctionSettingsPage = () => {
 						</Row>
 					)}
 
-				<Row gutter={token.marginLG}>
-					<Col span={12}>
-						<ProFormSelect
-							name="doubleClickAction"
-							layout="horizontal"
-							label={
-								<IconLabel
-									label={<FormattedMessage id="draw.doubleClickAction" />}
-								/>
-							}
-							options={doubleClickActionOptions}
-						/>
-					</Col>
+					<Row gutter={token.marginLG}>
+						<Col span={12}>
+							<ProFormSelect
+								name="doubleClickAction"
+								layout="horizontal"
+								label={
+									<IconLabel
+										label={<FormattedMessage id="draw.doubleClickAction" />}
+									/>
+								}
+								options={doubleClickActionOptions}
+							/>
+						</Col>
 
-					<Col span={12}>
-						<ProFormSelect
-							name="dragOutsideSelectRectAction"
-							layout="horizontal"
-							label={
-								<IconLabel
-									label={
-										<FormattedMessage id="draw.dragOutsideSelectRect" />
-									}
-								/>
-							}
-							options={dragOutsideSelectRectActionOptions}
-						/>
-					</Col>
-				</Row>
+						<Col span={12}>
+							<ProFormSelect
+								name="dragOutsideSelectRectAction"
+								layout="horizontal"
+								label={
+									<IconLabel
+										label={
+											<FormattedMessage id="draw.dragOutsideSelectRect" />
+										}
+									/>
+								}
+								options={dragOutsideSelectRectActionOptions}
+							/>
+						</Col>
+					</Row>
 
 
 					<Row gutter={token.marginLG}>
@@ -1499,10 +1498,10 @@ export const FunctionSettingsPage = () => {
 				<Spin spinning={appSettingsLoading}>
 					<ProForm
 						form={functionOcrForm}
-						onValuesChange={(_, values) => {
+						onValuesChange={(_, allValues) => {
 							updateAppSettings(
 								AppSettingsGroup.FunctionOcr,
-								values,
+								allValues,
 								true,
 								true,
 								true,
@@ -1513,98 +1512,98 @@ export const FunctionSettingsPage = () => {
 						submitter={false}
 						layout="vertical"
 					>
-					<>
-								<Row gutter={token.marginLG}>
-									<Col span={12}>
-										<ProFormDependency
-											name={[
-												"customOcrModelConfigList",
-												"onlineOcrConfigList",
-											]}
-										>
-											{({
-												customOcrModelConfigList,
-												onlineOcrConfigList,
-											}) => {
-												const localOptions = [
-													...ocrModelOptions,
-													...(customOcrModelConfigList || [])
-														.filter((c: CustomOcrModelConfig) => c.model_name)
-														.map((c: CustomOcrModelConfig) => ({
-															label: c.model_name,
-															value: c.model_name,
-														})),
-												];
-												const onlineOptions = (
-													onlineOcrConfigList || []
-												)
-													.filter((c: OnlineOcrConfig) => c.model_name)
-													.map((c: OnlineOcrConfig) => ({
+						<>
+							<Row gutter={token.marginLG}>
+								<Col span={12}>
+									<ProFormDependency
+										name={[
+											"customOcrModelConfigList",
+											"onlineOcrConfigList",
+										]}
+									>
+										{({
+											customOcrModelConfigList,
+											onlineOcrConfigList,
+										}) => {
+											const localOptions = [
+												...ocrModelOptions,
+												...(customOcrModelConfigList || [])
+													.filter((c: CustomOcrModelConfig) => c.model_name)
+													.map((c: CustomOcrModelConfig) => ({
 														label: c.model_name,
 														value: c.model_name,
-													}));
-												const allOptions = [
-													...(localOptions.length > 0
-														? [
-																{
-																	label: intl.formatMessage({
-																		id: "settings.functionSettings.ocrSettings.localRecognition",
-																	}),
-																	options: localOptions,
-																},
-															]
-														: []),
-													...(onlineOptions.length > 0
-														? [
-																{
-																	label: intl.formatMessage({
-																		id: "settings.functionSettings.ocrSettings.onlineRecognition",
-																	}),
-																	options: onlineOptions,
-																},
-															]
-														: []),
-												];
-												return (
-													<ProFormSelect
-														label={
-															<IconLabel
-																label={
-																	<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrModel" />
-																}
-															/>
-														}
-														name="ocrModel"
-														options={allOptions}
-													/>
-												);
-											}}
-										</ProFormDependency>
+													})),
+											];
+											const onlineOptions = (
+												onlineOcrConfigList || []
+											)
+												.filter((c: OnlineOcrConfig) => c.model_name)
+												.map((c: OnlineOcrConfig) => ({
+													label: c.model_name,
+													value: c.model_name,
+												}));
+											const allOptions = [
+												...(localOptions.length > 0
+													? [
+														{
+															label: intl.formatMessage({
+																id: "settings.functionSettings.ocrSettings.localRecognition",
+															}),
+															options: localOptions,
+														},
+													]
+													: []),
+												...(onlineOptions.length > 0
+													? [
+														{
+															label: intl.formatMessage({
+																id: "settings.functionSettings.ocrSettings.onlineRecognition",
+															}),
+															options: onlineOptions,
+														},
+													]
+													: []),
+											];
+											return (
+												<ProFormSelect
+													label={
+														<IconLabel
+															label={
+																<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrModel" />
+															}
+														/>
+													}
+													name="ocrModel"
+													options={allOptions}
+												/>
+											);
+										}}
+									</ProFormDependency>
+								</Col>
+
+								{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
+									<Col span={12}>
+										<ProFormSelect
+											name="htmlVisionModel"
+											label={
+												<IconLabel
+													label={
+														<FormattedMessage id="settings.functionSettings.ocrSettings.htmlVisionModel" />
+													}
+													tooltipTitle={
+														<FormattedMessage id="settings.functionSettings.ocrSettings.htmlVisionModel.tip" />
+													}
+												/>
+											}
+											layout="vertical"
+											options={htmlVisionModelOptions}
+											allowClear={false}
+										/>
 									</Col>
+								)}
+							</Row>
 
-									{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
-										<Col span={12}>
-											<ProFormSelect
-												name="htmlVisionModel"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.ocrSettings.htmlVisionModel" />
-														}
-														tooltipTitle={
-															<FormattedMessage id="settings.functionSettings.ocrSettings.htmlVisionModel.tip" />
-														}
-													/>
-												}
-												layout="vertical"
-												options={htmlVisionModelOptions}
-												allowClear={false}
-											/>
-										</Col>
-									)}
-								</Row>
-
-								{isReadyStatus?.(PLUGIN_ID_RAPID_OCR) && (
+							{isReadyStatus?.(PLUGIN_ID_RAPID_OCR) && (
 								<Row gutter={token.marginLG}>
 									<Col span={24}>
 										<ProFormList
@@ -1717,184 +1716,155 @@ export const FunctionSettingsPage = () => {
 										</ProFormList>
 									</Col>
 								</Row>
-						)}
+							)}
 
-						<Row gutter={token.marginLG}>
-							<Col span={24}>
-								<ProFormList
-									name="onlineOcrConfigList"
-									label={
-										<IconLabel
-											label={
-												<FormattedMessage id="settings.functionSettings.ocrSettings.onlineOcrConfig" />
-											}
-										/>
-									}
-									creatorButtonProps={{
-										creatorButtonText: intl.formatMessage({
-											id: "settings.functionSettings.ocrSettings.onlineOcrConfig.add",
-										}),
-									}}
-									className="api-config-list"
-									min={0}
-									itemRender={({ listDom, action }) => (
-										<Flex align="end" justify="space-between">
-											{listDom}
-											<div>{action}</div>
-										</Flex>
-									)}
-									creatorRecord={() => ({
-										model_name: "",
-										provider: OnlineOcrProvider.Youdao,
-										service_type: "general",
-										language: "auto",
-										youdao_app_key: "",
-										youdao_app_secret: "",
-										tencent_secret_id: "",
-										tencent_secret_key: "",
-										tencent_region: "",
-									})}
-								>
-									<Row gutter={token.marginLG} style={{ width: "100%" }}>
-										<Col span={12}>
-											<ProFormSelect
-												name="provider"
+							<Row gutter={token.marginLG}>
+								<Col span={24}>
+									<ProFormList
+										name="onlineOcrConfigList"
+										label={
+											<IconLabel
 												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.ocrSettings.onlineOcrConfig.provider" />
-														}
-													/>
-												}
-												allowClear={false}
-												options={onlineOcrProviderOptions}
-											/>
-										</Col>
-										<Col span={12}>
-											<ProFormText
-												name="model_name"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.ocrSettings.onlineOcrConfig.modelName" />
-														}
-														tooltipTitle={
-															<FormattedMessage id="settings.functionSettings.ocrSettings.modelName.tip" />
-														}
-													/>
+													<FormattedMessage id="settings.functionSettings.ocrSettings.onlineOcrConfig" />
 												}
 											/>
-										</Col>
-
-										<ProFormDependency name={["provider"]}>
-											{({ provider }) => (
-												<>
-													<Col span={12}>
-														<ProFormSelect
-															name="service_type"
+										}
+										creatorButtonProps={{
+											creatorButtonText: intl.formatMessage({
+												id: "settings.functionSettings.ocrSettings.onlineOcrConfig.add",
+											}),
+										}}
+										className="api-config-list"
+										min={0}
+										itemRender={({ listDom, action }) => (
+											<Flex align="end" justify="space-between">
+												{listDom}
+												<div>{action}</div>
+											</Flex>
+										)}
+										creatorRecord={() => ({
+											model_name: "",
+											service_type: "youdao:general",
+											language: "auto",
+											youdao_app_key: "",
+											youdao_app_secret: "",
+											tencent_secret_id: "",
+											tencent_secret_key: "",
+										})}
+									>
+										<Row gutter={token.marginLG} style={{ width: "100%" }}>
+											<Col span={12}>
+												<ProFormText
+													name="model_name"
+													label={
+														<IconLabel
 															label={
-																<IconLabel
-																	label={
-																		<FormattedMessage id="settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType" />
-																	}
-																/>
+																<FormattedMessage id="settings.functionSettings.ocrSettings.onlineOcrConfig.modelName" />
 															}
-															allowClear={false}
-															options={
-																provider === OnlineOcrProvider.Tencent
-																	? tencentServiceTypeOptions
-																	: youdaoServiceTypeOptions
+															tooltipTitle={
+																<FormattedMessage id="settings.functionSettings.ocrSettings.modelName.tip" />
 															}
 														/>
-													</Col>
-													<Col span={12}>
-														<ProFormText
-															name="language"
-															initialValue="auto"
-															label={
-																<IconLabel
-																	label={"language"}
-																/>
-															}
-														/>
-													</Col>
+													}
+												/>
+											</Col>
 
-													{provider === OnlineOcrProvider.Youdao && (
+											<ProFormDependency name={["service_type"]}>
+												{({ service_type }) => {
+													const provider = service_type?.split(":")[0];
+													return (
 														<>
 															<Col span={12}>
-																<ProFormText
-																	name="youdao_app_key"
+																<ProFormSelect
+																	name="service_type"
 																	label={
 																		<IconLabel
 																			label={
-																				"appKey"
+																				<FormattedMessage id="settings.functionSettings.ocrSettings.onlineOcrConfig.serviceType" />
 																			}
 																		/>
 																	}
+																	allowClear={false}
+																	options={onlineOcrServiceTypeOptions}
 																/>
 															</Col>
 															<Col span={12}>
-																<ProFormText.Password
-																	name="youdao_app_secret"
+																<ProFormText
+																	name="language"
+																	initialValue="auto"
 																	label={
 																		<IconLabel
-																			label={
-																				"appSecret"
-																			}
+																			label={"language"}
 																		/>
 																	}
 																/>
 															</Col>
-														</>
-													)}
 
-													{provider === OnlineOcrProvider.Tencent && (
-														<>
-															<Col span={12}>
-																<ProFormText
-																	name="tencent_secret_id"
-																	label={
-																		<IconLabel
+															{provider === "youdao" && (
+																<>
+																	<Col span={12}>
+																		<ProFormText
+																			name="youdao_app_key"
 																			label={
-																				"SecretId"
+																				<IconLabel
+																					label={
+																						"appKey"
+																					}
+																				/>
 																			}
 																		/>
-																	}
-																/>
-															</Col>
-															<Col span={12}>
-																<ProFormText.Password
-																	name="tencent_secret_key"
-																	label={
-																		<IconLabel
+																	</Col>
+																	<Col span={12}>
+																		<ProFormText.Password
+																			name="youdao_app_secret"
 																			label={
-																				"SecretKey"
+																				<IconLabel
+																					label={
+																						"appSecret"
+																					}
+																				/>
 																			}
 																		/>
-																	}
-																/>
-															</Col>
-															<Col span={12}>
-																<ProFormText
-																	name="tencent_region"
-																	label={
-																		<IconLabel
+																	</Col>
+																</>
+															)}
+
+															{provider === "tencent" && (
+																<>
+																	<Col span={12}>
+																		<ProFormText
+																			name="tencent_secret_id"
 																			label={
-																				"Region"
+																				<IconLabel
+																					label={
+																						"SecretId"
+																					}
+																				/>
 																			}
 																		/>
-																	}
-																/>
-															</Col>
+																	</Col>
+																	<Col span={12}>
+																		<ProFormText.Password
+																			name="tencent_secret_key"
+																			label={
+																				<IconLabel
+																					label={
+																						"SecretKey"
+																					}
+																				/>
+																			}
+																		/>
+																	</Col>
+																</>
+															)}
 														</>
-													)}
-												</>
-											)}
-										</ProFormDependency>
-									</Row>
-								</ProFormList>
-							</Col>
-						</Row>
+													);
+												}}
+											</ProFormDependency>
+										</Row>
+									</ProFormList>
+								</Col>
+							</Row>
 
 						</>
 
@@ -1934,8 +1904,8 @@ export const FunctionSettingsPage = () => {
 										/>
 									</Col>
 								</Row>
-						</>
-					)}
+							</>
+						)}
 					</ProForm>
 				</Spin>
 			</>
@@ -2240,255 +2210,255 @@ export const FunctionSettingsPage = () => {
 
 			{(isReadyStatus?.(PLUGIN_ID_TRANSLATE) ||
 				isReadyStatus?.(PLUGIN_ID_AI_CHAT)) && (
-				<>
-					<Divider />
+					<>
+						<Divider />
 
-					<GroupTitle
-						id="chatSettings"
-						extra={
-							<ResetSettingsButton
-								title={
-									<FormattedMessage id="settings.functionSettings.chatSettings" />
-								}
-								appSettingsGroup={AppSettingsGroup.FunctionChat}
-							/>
-						}
-					>
-						<FormattedMessage id="settings.functionSettings.chatSettings" />
-					</GroupTitle>
-
-					<Spin spinning={appSettingsLoading}>
-						<ProForm
-							form={functionForm}
-							onValuesChange={(_, values) => {
-								updateAppSettings(
-									AppSettingsGroup.FunctionChat,
-									values,
-									true,
-									true,
-									true,
-									true,
-									false,
-								);
-							}}
-							submitter={false}
+						<GroupTitle
+							id="chatSettings"
+							extra={
+								<ResetSettingsButton
+									title={
+										<FormattedMessage id="settings.functionSettings.chatSettings" />
+									}
+									appSettingsGroup={AppSettingsGroup.FunctionChat}
+								/>
+							}
 						>
-							{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
-								<Row gutter={token.marginLG}>
-									<Col span={12}>
-										<ProForm.Item
-											label={
-												<IconLabel
-													label={
-														<FormattedMessage id="settings.functionSettings.chatSettings.autoCreateNewSession" />
-													}
-												/>
-											}
-											layout="horizontal"
-											name="autoCreateNewSession"
-											valuePropName="checked"
-										>
-											<Switch />
-										</ProForm.Item>
-									</Col>
+							<FormattedMessage id="settings.functionSettings.chatSettings" />
+						</GroupTitle>
 
-									<Col span={12}>
-										<ProForm.Item
-											label={
-												<IconLabel
-													label={
-														<FormattedMessage id="settings.functionSettings.chatSettings.autoCreateNewSessionOnCloseWindow" />
-													}
-												/>
-											}
-											layout="horizontal"
-											name="autoCreateNewSessionOnCloseWindow"
-											valuePropName="checked"
-										>
-											<Switch />
-										</ProForm.Item>
-									</Col>
-								</Row>
-							)}
-
-							<Row gutter={token.marginLG}>
-								<Col span={24}>
-									<ProFormList
-										name="chatApiConfigList"
-										label={
-											<IconLabel
-												label={
-													<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig" />
-												}
-												tooltipTitle={
-													<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.tip" />
-												}
-											/>
-										}
-										creatorButtonProps={{
-											creatorButtonText: intl.formatMessage({
-												id: "settings.functionSettings.chatSettings.apiConfig.add",
-											}),
-										}}
-										actionRender={(...params) => {
-											const [field, , defaultActionDom] = params;
-											return [
-												defaultActionDom,
-												<TestChat
-													key="test-chat"
-													config={
-														functionForm.getFieldValue("chatApiConfigList")[
-															field.name
-														]
-													}
-												/>,
-											];
-										}}
-										className="api-config-list"
-										min={0}
-										itemRender={({ listDom, action }) => (
-											<Flex align="end" justify="space-between">
-												{listDom}
-												<div>{action}</div>
-											</Flex>
-										)}
-										creatorRecord={() => ({
-											api_uri: "",
-											api_key: "",
-											api_model: "",
-											model_name: "",
-										})}
-									>
+						<Spin spinning={appSettingsLoading}>
+							<ProForm
+								form={functionForm}
+								onValuesChange={(_, values) => {
+									updateAppSettings(
+										AppSettingsGroup.FunctionChat,
+										values,
+										true,
+										true,
+										true,
+										true,
+										false,
+									);
+								}}
+								submitter={false}
+							>
+								{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
 									<Row gutter={token.marginLG}>
 										<Col span={12}>
-											<ProFormText
-												name="model_name"
+											<ProForm.Item
 												label={
 													<IconLabel
 														label={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.modelName" />
-														}
-														tooltipTitle={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.modelName.tip" />
+															<FormattedMessage id="settings.functionSettings.chatSettings.autoCreateNewSession" />
 														}
 													/>
 												}
-												rules={[
-													{
-														required: true,
-														message: intl.formatMessage({
-															id: "settings.functionSettings.chatSettings.apiConfig.modelName.required",
-														}),
-													},
-												]}
-											/>
+												layout="horizontal"
+												name="autoCreateNewSession"
+												valuePropName="checked"
+											>
+												<Switch />
+											</ProForm.Item>
 										</Col>
+
 										<Col span={12}>
-											<ProFormText
-												name="api_model"
+											<ProForm.Item
 												label={
 													<IconLabel
 														label={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiModel" />
-														}
-														tooltipTitle={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiModel.tip" />
+															<FormattedMessage id="settings.functionSettings.chatSettings.autoCreateNewSessionOnCloseWindow" />
 														}
 													/>
 												}
-												rules={[
-													{
-														required: true,
-														message: intl.formatMessage({
-															id: "settings.functionSettings.chatSettings.apiConfig.apiModel.required",
-														}),
-													},
-												]}
-											/>
+												layout="horizontal"
+												name="autoCreateNewSessionOnCloseWindow"
+												valuePropName="checked"
+											>
+												<Switch />
+											</ProForm.Item>
 										</Col>
-										<Col span={12}>
-											<ProFormText
-												name="api_uri"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiUri" />
-														}
-														tooltipTitle={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiUri.tip" />
-														}
-													/>
-												}
-												rules={[
-													{
-														required: true,
-														message: intl.formatMessage({
-															id: "settings.functionSettings.chatSettings.apiConfig.apiUri.required",
-														}),
-													},
-												]}
-											/>
-										</Col>
-										<Col span={12}>
-											<ProFormText.Password
-												name="api_key"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiKey" />
-														}
-														tooltipTitle={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiKey.tip" />
-														}
-													/>
-												}
-												rules={[
-													{
-														required: true,
-														message: intl.formatMessage({
-															id: "settings.functionSettings.chatSettings.apiConfig.apiKey.required",
-														}),
-													},
-												]}
-											/>
-										</Col>
-										<Col span={12}>
-											<ProFormSwitch
-												name="support_thinking"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.supportThinking" />
-														}
-													/>
-												}
-											/>
-										</Col>
-										{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
-											<Col span={12}>
-												<ProFormSwitch
-													name="support_vision"
+									</Row>
+								)}
+
+								<Row gutter={token.marginLG}>
+									<Col span={24}>
+										<ProFormList
+											name="chatApiConfigList"
+											label={
+												<IconLabel
 													label={
-														<IconLabel
-															label={
-																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.supportVision" />
-															}
-															tooltipTitle={
-																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.supportVision.tip" />
-															}
-														/>
+														<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig" />
+													}
+													tooltipTitle={
+														<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.tip" />
 													}
 												/>
-											</Col>
-										)}
-										</Row>
-									</ProFormList>
-								</Col>
-							</Row>
-						</ProForm>
-					</Spin>
-				</>
-			)}
+											}
+											creatorButtonProps={{
+												creatorButtonText: intl.formatMessage({
+													id: "settings.functionSettings.chatSettings.apiConfig.add",
+												}),
+											}}
+											actionRender={(...params) => {
+												const [field, , defaultActionDom] = params;
+												return [
+													defaultActionDom,
+													<TestChat
+														key="test-chat"
+														config={
+															functionForm.getFieldValue("chatApiConfigList")[
+															field.name
+															]
+														}
+													/>,
+												];
+											}}
+											className="api-config-list"
+											min={0}
+											itemRender={({ listDom, action }) => (
+												<Flex align="end" justify="space-between">
+													{listDom}
+													<div>{action}</div>
+												</Flex>
+											)}
+											creatorRecord={() => ({
+												api_uri: "",
+												api_key: "",
+												api_model: "",
+												model_name: "",
+											})}
+										>
+											<Row gutter={token.marginLG}>
+												<Col span={12}>
+													<ProFormText
+														name="model_name"
+														label={
+															<IconLabel
+																label={
+																	<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.modelName" />
+																}
+																tooltipTitle={
+																	<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.modelName.tip" />
+																}
+															/>
+														}
+														rules={[
+															{
+																required: true,
+																message: intl.formatMessage({
+																	id: "settings.functionSettings.chatSettings.apiConfig.modelName.required",
+																}),
+															},
+														]}
+													/>
+												</Col>
+												<Col span={12}>
+													<ProFormText
+														name="api_model"
+														label={
+															<IconLabel
+																label={
+																	<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiModel" />
+																}
+																tooltipTitle={
+																	<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiModel.tip" />
+																}
+															/>
+														}
+														rules={[
+															{
+																required: true,
+																message: intl.formatMessage({
+																	id: "settings.functionSettings.chatSettings.apiConfig.apiModel.required",
+																}),
+															},
+														]}
+													/>
+												</Col>
+												<Col span={12}>
+													<ProFormText
+														name="api_uri"
+														label={
+															<IconLabel
+																label={
+																	<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiUri" />
+																}
+																tooltipTitle={
+																	<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiUri.tip" />
+																}
+															/>
+														}
+														rules={[
+															{
+																required: true,
+																message: intl.formatMessage({
+																	id: "settings.functionSettings.chatSettings.apiConfig.apiUri.required",
+																}),
+															},
+														]}
+													/>
+												</Col>
+												<Col span={12}>
+													<ProFormText.Password
+														name="api_key"
+														label={
+															<IconLabel
+																label={
+																	<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiKey" />
+																}
+																tooltipTitle={
+																	<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiKey.tip" />
+																}
+															/>
+														}
+														rules={[
+															{
+																required: true,
+																message: intl.formatMessage({
+																	id: "settings.functionSettings.chatSettings.apiConfig.apiKey.required",
+																}),
+															},
+														]}
+													/>
+												</Col>
+												<Col span={12}>
+													<ProFormSwitch
+														name="support_thinking"
+														label={
+															<IconLabel
+																label={
+																	<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.supportThinking" />
+																}
+															/>
+														}
+													/>
+												</Col>
+												{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
+													<Col span={12}>
+														<ProFormSwitch
+															name="support_vision"
+															label={
+																<IconLabel
+																	label={
+																		<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.supportVision" />
+																	}
+																	tooltipTitle={
+																		<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.supportVision.tip" />
+																	}
+																/>
+															}
+														/>
+													</Col>
+												)}
+											</Row>
+										</ProFormList>
+									</Col>
+								</Row>
+							</ProForm>
+						</Spin>
+					</>
+				)}
 
 			<Divider />
 
@@ -2746,23 +2716,23 @@ export const FunctionSettingsPage = () => {
 										},
 										...(currentPlatform === "macos"
 											? [
-													{
-														label: "ProRes (CPU)",
-														value: "prores",
-													},
-												]
+												{
+													label: "ProRes (CPU)",
+													value: "prores",
+												},
+											]
 											: []),
 										...(currentPlatform === "windows"
 											? [
-													{
-														label: "H264_AMF (AMD)",
-														value: "h264_amf",
-													},
-													{
-														label: "H264_NVENC (NVIDIA)",
-														value: "h264_nvenc",
-													},
-												]
+												{
+													label: "H264_AMF (AMD)",
+													value: "h264_amf",
+												},
+												{
+													label: "H264_NVENC (NVIDIA)",
+													value: "h264_nvenc",
+												},
+											]
 											: []),
 									]}
 								/>

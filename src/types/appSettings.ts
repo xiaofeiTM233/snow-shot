@@ -246,16 +246,9 @@ export type CustomOcrModelConfig = {
 	cls_model: string;
 };
 
-export enum OnlineOcrProvider {
-	Youdao = "youdao",
-	Tencent = "tencent",
-}
-
 export type OnlineOcrConfig = {
 	/** 模型名称（用于 Snow Shot 展示） */
 	model_name: string;
-	/** 服务提供商 */
-	provider: OnlineOcrProvider;
 	/** 服务类型（如 通用文字识别、通用文字识别(高精度版)） */
 	service_type: string;
 	/** 识别语言 */
@@ -268,8 +261,6 @@ export type OnlineOcrConfig = {
 	tencent_secret_id: string;
 	/** 腾讯云 SecretKey */
 	tencent_secret_key: string;
-	/** 腾讯云 地域（Region） */
-	tencent_region: string;
 };
 
 export enum KeyDisplayDirection {
