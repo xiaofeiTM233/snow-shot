@@ -87,7 +87,7 @@ export const OcrBlocks: React.FC<{
 				canvas: HTMLCanvasElement,
 				allOcrResult: AllOcrResult | undefined,
 			) => {
-				ocrResultActionRef.current?.init({
+				await ocrResultActionRef.current?.init({
 					selectRect,
 					captureBoundingBoxInfo,
 					canvas,
