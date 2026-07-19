@@ -220,6 +220,7 @@ export const draw = {
 	"draw.ocrResult.convertImageToVisionModelFormatError": "視覺理解模型轉換失敗",
 	"draw.ocrDetect.visionModelHtml": "轉換為 HTML",
 	"draw.ocrDetect.openTranslation": "轉到翻譯頁",
+	"draw.openTranslationTool": "轉到翻譯頁",
 	"draw.ocrDetect.visionModelMarkdown": "轉換為 Markdown",
 	"draw.ocrDetect.convertImageToHtml": "圖片轉為 HTML",
 	"draw.ocrDetect.convertImageToMarkdown": "圖片轉為 Markdown",

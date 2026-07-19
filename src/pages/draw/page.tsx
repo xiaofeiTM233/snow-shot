@@ -55,6 +55,7 @@ import {
 	releaseDrawPage,
 } from "@/functions/screenshot";
 import { sendErrorMessage } from "@/functions/sendMessage";
+import { executeTranslateOcrText } from "@/functions/tools";
 import { withStatePublisher } from "@/hooks/useStatePublisher";
 import { useStateSubscriber } from "@/hooks/useStateSubscriber";
 import { AppSettingsGroup, DoubleClickAction } from "@/types/appSettings";
@@ -1137,6 +1138,36 @@ const DrawPageCore: React.FC<{
 		);
 	}, []);
 
+	const onTranslateOcrToPage = useCallback(async () => {
+		if (
+			!captureBoundingBoxInfoRef.current ||
+			!selectLayerActionRef.current ||
+			!imageLayerActionRef.current ||
+			!drawLayerActionRef.current ||
+			!ocrBlocksActionRef.current
+		) {
+			return;
+		}
+
+		// 先调用 OCR 检测，OCR 结束后再跳转翻译页（与 OCR 翻译按钮行为一致）
+		await handleOcrDetect(
+			captureBoundingBoxInfoRef.current,
+			selectLayerActionRef.current,
+			imageLayerActionRef.current,
+			drawLayerActionRef.current,
+			ocrBlocksActionRef.current,
+			true,
+		);
+
+		const ocrResult = ocrBlocksActionRef.current
+			?.getOcrResultAction()
+			?.getOcrResult();
+		if (!ocrResult?.result) {
+			return;
+		}
+		executeTranslateOcrText(covertOcrResultToText(ocrResult.result));
+	}, []);
+
 	const onCopyToClipboard = useCallback(async () => {
 		const enableAutoSave =
 			getAppSettings()[AppSettingsGroup.FunctionScreenshot].autoSaveOnCopy;
@@ -1665,6 +1696,7 @@ const DrawPageCore: React.FC<{
 						onFixed={onFixed}
 						onCopyToClipboard={onCopyToClipboard}
 						onOcrDetect={onOcrDetect}
+						onTranslateOcrToPage={onTranslateOcrToPage}
 						onTopWindow={onTopWindow}
 					/>
 					<ColorPicker
