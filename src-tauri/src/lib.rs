@@ -47,8 +47,30 @@ struct MainWindowGeometry {
     y: i32,
 }
 
+/// 是否记住关闭时的窗口位置和大小（由前端设置开关控制）。
+static REMEMBER_WINDOW_GEOMETRY: std::sync::OnceLock<std::sync::Mutex<bool>> =
+    std::sync::OnceLock::new();
+
+fn remember_window_geometry_enabled() -> bool {
+    *REMEMBER_WINDOW_GEOMETRY
+        .get_or_init(|| std::sync::Mutex::new(true))
+        .lock()
+        .unwrap()
+}
+
+fn set_remember_window_geometry_enabled(enabled: bool) {
+    *REMEMBER_WINDOW_GEOMETRY
+        .get_or_init(|| std::sync::Mutex::new(true))
+        .lock()
+        .unwrap() = enabled;
+}
+
 /// 读取主窗口当前 outer 尺寸/位置并落盘。
 fn save_main_window_geometry(app: &tauri::AppHandle) {
+    // 开关关闭时不保存，确保关闭软件后下次启动恢复默认尺寸/位置
+    if !remember_window_geometry_enabled() {
+        return;
+    }
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
@@ -87,6 +109,18 @@ fn restore_main_window_geometry(app: &tauri::AppHandle) {
     if geo.width > 0 && geo.height > 0 {
         let _ = window.set_size(tauri::PhysicalSize::new(geo.width, geo.height));
         let _ = window.set_position(tauri::PhysicalPosition::new(geo.x, geo.y));
+    }
+}
+
+/// 前端开关「记住关闭时窗口的位置和大小」变化时调用。
+/// 关闭时删除已保存的几何文件，使下次启动恢复默认。
+#[tauri::command]
+fn set_remember_window_geometry(app: tauri::AppHandle, remember: bool) {
+    set_remember_window_geometry_enabled(remember);
+    if !remember {
+        if let Ok(dir) = app.path().app_config_dir() {
+            let _ = std::fs::remove_file(dir.join("main-window-geometry.json"));
+        }
     }
 }
 
@@ -356,6 +390,7 @@ pub fn run() {
             core::show_main_window,
             core::set_window_rect,
             core::get_commit_sha,
+            set_remember_window_geometry,
             scroll_screenshot::scroll_screenshot_get_image_data,
             scroll_screenshot::scroll_screenshot_init,
             scroll_screenshot::scroll_screenshot_capture,

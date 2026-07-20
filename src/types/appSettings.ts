@@ -407,6 +407,8 @@ export type AppSettingsData = {
 		runLog: boolean;
 		/** 提升进程优先级（高于正常） */
 		boostProcessPriority: boolean;
+		/** 记住关闭时窗口的位置和大小 */
+		rememberWindowGeometry: boolean;
 	};
 	[AppSettingsGroup.SystemChat]: {
 		maxTokens: number;

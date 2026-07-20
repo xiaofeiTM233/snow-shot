@@ -112,6 +112,7 @@ export const settings = {
 	"settings.systemSettings.commonSettings.runLog": "运行日志",
 	"settings.systemSettings.commonSettings.runLog.tip":
 		"将日志输出到日志文件中，用于问题反馈",
+	"settings.systemSettings.commonSettings.rememberWindowGeometry": "记住关闭时窗口的位置和大小",
 	"settings.systemSettings.commonSettings.boostProcessPriority": "提升进程优先级",
 	"settings.systemSettings.commonSettings.boostProcessPriority.tip":
 		"将应用进程优先级提升为「高于正常」，使截图与全局快捷键的响应更及时（仅 Windows）",

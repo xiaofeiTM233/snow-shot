@@ -29,6 +29,7 @@ import { AppSettingsActionContext } from "@/contexts/appSettingsActionContext";
 import { usePluginServiceContext } from "@/contexts/pluginServiceContext";
 import { useAppSettingsLoad } from "@/hooks/useAppSettingsLoad";
 import { withStatePublisher } from "@/hooks/useStatePublisher";
+import { setRememberWindowGeometry } from "@/commands/core";
 import { en } from "@/messages/en";
 import { zhHans } from "@/messages/zhHans";
 import { zhHant } from "@/messages/zhHant";
@@ -84,6 +85,11 @@ const MenuLayoutCore: React.FC<{ children: React.ReactNode }> = ({
 	useAppSettingsLoad(
 		useCallback(
 			(settings) => {
+				// 同步「记住窗口位置大小」开关到 Rust（启动即生效）
+				setRememberWindowGeometry(
+					settings[AppSettingsGroup.SystemCommon].rememberWindowGeometry,
+				);
+
 				// 获取浏览器语言，判断是否需要切换语言
 				const settingBrowserLanguage =
 					settings[AppSettingsGroup.Common].browserLanguage;

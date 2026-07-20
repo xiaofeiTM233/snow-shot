@@ -274,3 +274,7 @@ export const getCommitSha = async () => {
 	const result = await invoke<string>("get_commit_sha");
 	return result;
 };
+
+export const setRememberWindowGeometry = async (remember: boolean) => {
+	await invoke("set_remember_window_geometry", { remember });
+};

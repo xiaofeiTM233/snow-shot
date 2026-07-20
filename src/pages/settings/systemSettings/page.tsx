@@ -27,7 +27,7 @@ import {
 } from "antd";
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
-import { restartWithAdmin } from "@/commands/core";
+import { restartWithAdmin, setRememberWindowGeometry } from "@/commands/core";
 import { createLocalConfigDir, getAppConfigBaseDir } from "@/commands/file";
 import { ContentWrap } from "@/components/contentWrap";
 import { GroupTitle } from "@/components/groupTitle";
@@ -92,6 +92,10 @@ export const SystemSettingsPage = () => {
 						settings[AppSettingsGroup.SystemCommon]
 				) {
 					commonForm.setFieldsValue(settings[AppSettingsGroup.SystemCommon]);
+					// 同步「记住窗口位置大小」开关到 Rust
+					setRememberWindowGeometry(
+						settings[AppSettingsGroup.SystemCommon].rememberWindowGeometry,
+					);
 				}
 
 				if (
@@ -316,6 +320,21 @@ export const SystemSettingsPage = () => {
 									/>
 								}
 								name="runLog"
+								valuePropName="checked"
+							>
+								<Switch />
+							</ProForm.Item>
+						</Col>
+						<Col span={12}>
+							<ProForm.Item
+								label={
+									<IconLabel
+										label={
+											<FormattedMessage id="settings.systemSettings.commonSettings.rememberWindowGeometry" />
+										}
+									/>
+								}
+								name="rememberWindowGeometry"
 								valuePropName="checked"
 							>
 								<Switch />

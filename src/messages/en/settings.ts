@@ -120,6 +120,8 @@ export const settings = {
 	"settings.systemSettings.commonSettings.runLog": "Run Log",
 	"settings.systemSettings.commonSettings.runLog.tip":
 		"Output logs to a log file for troubleshooting",
+	"settings.systemSettings.commonSettings.rememberWindowGeometry":
+		"Remember window position and size on close",
 	"settings.systemSettings.commonSettings.boostProcessPriority":
 		"Boost Process Priority",
 	"settings.systemSettings.commonSettings.boostProcessPriority.tip":
