@@ -532,6 +532,14 @@ const SelectLayerCore: React.FC<SelectLayerProps> = ({ actionRef }) => {
 				imageData: ImageData;
 			},
 		) => {
+			// 懒初始化 canvas 上下文
+			if (!selectLayerCanvasContextRef.current && selectLayerCanvasRef.current) {
+				const ctx = selectLayerCanvasRef.current.getContext("2d");
+				if (ctx) {
+					selectLayerCanvasContextRef.current = ctx;
+				}
+			}
+
 			if (!selectLayerCanvasContextRef.current) {
 				appWarn(
 					"[selectLayer::drawCanvasSelectRect] selectLayerCanvasContextRef.current is undefined",
