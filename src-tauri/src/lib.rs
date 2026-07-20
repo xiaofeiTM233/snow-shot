@@ -32,7 +32,44 @@ use snow_shot_app_services::resize_window_service;
 use snow_shot_app_services::video_record_service;
 use snow_shot_app_shared::EnigoManager;
 use snow_shot_global_state::{CaptureState, ReadClipboardState, WebViewSharedBufferState};
+use serde::{Deserialize, Serialize};
 use snow_shot_plugin_service::plugin_service;
+
+/// 主窗口几何信息。
+///
+/// 使用 outer size / outer position 保存与恢复，避免无边框窗口（自定义标题栏，
+/// 通过 `set_decorations(false)` 实现）下 `inner_size` 与 `outer_size` 不一致、
+/// 以及窗口状态插件在恢复时与装饰栏变化产生竞争，导致重启后窗口尺寸/位置异常
+/// （例如被重置为默认值或变成正方形）。
+#[derive(Serialize, Deserialize, Default, Clone)]
+struct MainWindowGeometry {
+    width: u32,
+    height: u32,
+    x: i32,
+    y: i32,
+}
+
+fn main_window_geometry_file(app: &tauri::AppHandle) -> Option<PathBuf> {
+    let dir = app.path().app_config_dir().ok()?;
+    Some(dir.join("main-window-geometry.json"))
+}
+
+fn load_main_window_geometry(app: &tauri::AppHandle) -> Option<MainWindowGeometry> {
+    let path = main_window_geometry_file(app)?;
+    let content = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+fn save_main_window_geometry(app: &tauri::AppHandle, geo: &MainWindowGeometry) {
+    if let Some(path) = main_window_geometry_file(app) {
+        if let Ok(dir) = app.path().app_config_dir() {
+            let _ = std::fs::create_dir_all(&dir);
+        }
+        if let Ok(content) = serde_json::to_string(geo) {
+            let _ = std::fs::write(path, content);
+        }
+    }
+}
 
 #[cfg(feature = "dhat-heap")]
 pub static PROFILER: std::sync::LazyLock<Mutex<Option<dhat::Profiler>>> =
@@ -101,18 +138,14 @@ pub fn run() {
         log::LevelFilter::Info
     };
 
+    // 主窗口几何信息缓存（在 resize/move 时更新，在关闭/退出时落盘）
+    let main_window_geometry = std::sync::Arc::new(std::sync::Mutex::new(MainWindowGeometry::default()));
+    let geo_cache = main_window_geometry.clone();
+    let geo_for_exit = main_window_geometry.clone();
+
     #[allow(unused_mut)]
     let mut app_builder = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(
-            tauri_plugin_window_state::Builder::new()
-                .with_state_flags(
-                    tauri_plugin_window_state::StateFlags::SIZE
-                        | tauri_plugin_window_state::StateFlags::POSITION,
-                )
-                .with_filter(|label| label == "main")
-                .build(),
-        )
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             let app_window = app.get_webview_window("main").expect("no main window");
@@ -155,7 +188,7 @@ pub fn run() {
                 })
                 .build(),
         )
-        .setup(|app| {
+        .setup(move |app| {
             let main_window = app
                 .get_webview_window("main")
                 .expect("[lib::setup] no main window");
@@ -180,27 +213,90 @@ pub fn run() {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
 
+            // 恢复主窗口上一次保存的大小和位置。
+            // 使用 outer size / outer position，并在 setup 阶段（webview 加载前）恢复，
+            // 避免无边框窗口 inner/outer 不一致以及装饰栏变化带来的恢复异常。
+            if let Some(geo) = load_main_window_geometry(app.handle()) {
+                if geo.width > 0 && geo.height > 0 {
+                    let _ = main_window.set_size(tauri::PhysicalSize::new(geo.width, geo.height));
+                    // 仅当保存的位置与某个显示器相交时才恢复位置，避免窗口跑到不存在的屏幕上
+                    let mut position_intersects = false;
+                    if let Ok(monitors) = main_window.available_monitors() {
+                        for m in monitors {
+                            let mp = m.position();
+                            let ms = m.size();
+                            let left = mp.x;
+                            let right = mp.x + ms.width as i32;
+                            let top = mp.y;
+                            let bottom = mp.y + ms.height as i32;
+                            let px2 = geo.x + geo.width as i32;
+                            let py2 = geo.y + geo.height as i32;
+                            if geo.x < right && px2 > left && geo.y < bottom && py2 > top {
+                                position_intersects = true;
+                                break;
+                            }
+                        }
+                    }
+                    if position_intersects {
+                        let _ = main_window
+                            .set_position(tauri::PhysicalPosition::new(geo.x, geo.y));
+                    }
+                    *geo_cache.lock().unwrap() = geo;
+                }
+            }
+
             // 监听窗口关闭事件，拦截关闭按钮
             let window_clone = main_window.clone();
+            let app_handle_for_geo = app.handle().clone();
+            let geo_cache_for_events = geo_cache.clone();
             main_window.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
+                match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        api.prevent_close();
 
-                    #[cfg(target_os = "windows")]
-                    {
-                        if let Err(e) = window_clone.hide() {
-                            log::error!("[setup] hide window error: {:?}", e);
+                        // 保存主窗口几何信息
+                        if let (Ok(size), Ok(pos)) =
+                            (window_clone.outer_size(), window_clone.outer_position())
+                        {
+                            let geo = MainWindowGeometry {
+                                width: size.width,
+                                height: size.height,
+                                x: pos.x,
+                                y: pos.y,
+                            };
+                            *geo_cache_for_events.lock().unwrap() = geo.clone();
+                            save_main_window_geometry(&app_handle_for_geo, &geo);
+                        }
+
+                        #[cfg(target_os = "windows")]
+                        {
+                            if let Err(e) = window_clone.hide() {
+                                log::error!("[setup] hide window error: {:?}", e);
+                            }
+                        }
+
+                        #[cfg(target_os = "macos")]
+                        {
+                            if let Err(e) = window_clone.hide() {
+                                log::error!("[setup] hide window error: {:?}", e);
+                            }
+                        }
+
+                        window_clone.emit("on-hide-main-window", ()).unwrap();
+                    }
+                    tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
+                        if let (Ok(size), Ok(pos)) =
+                            (window_clone.outer_size(), window_clone.outer_position())
+                        {
+                            *geo_cache_for_events.lock().unwrap() = MainWindowGeometry {
+                                width: size.width,
+                                height: size.height,
+                                x: pos.x,
+                                y: pos.y,
+                            };
                         }
                     }
-
-                    #[cfg(target_os = "macos")]
-                    {
-                        if let Err(e) = window_clone.hide() {
-                            log::error!("[setup] hide window error: {:?}", e);
-                        }
-                    }
-
-                    window_clone.emit("on-hide-main-window", ()).unwrap();
+                    _ => {}
                 }
             });
 
@@ -365,6 +461,13 @@ pub fn run() {
                         log::error!("[listen_mouse_service:stop] Failed to emit event: {}", e);
                     }
                 }
+            }
+        })
+        .on_event(move |app, event| {
+            // 应用退出时持久化主窗口几何信息，确保即使未触发关闭按钮也能保存
+            if let tauri::RunEvent::Exit = event {
+                let geo = geo_for_exit.lock().unwrap().clone();
+                save_main_window_geometry(app, &geo);
             }
         });
 
