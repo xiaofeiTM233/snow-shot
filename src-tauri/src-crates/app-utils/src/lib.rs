@@ -549,38 +549,33 @@ pub enum ImageEncoder {
     Jpeg,
 }
 
-pub fn encode_image(image: &image::DynamicImage, encoder: ImageEncoder) -> Vec<u8> {
+pub fn encode_image(
+    image: &image::DynamicImage,
+    encoder: ImageEncoder,
+) -> Result<Vec<u8>, image::ImageError> {
     // 编码为指定格式
     let mut buf = Vec::with_capacity(image.as_bytes().len() / 8);
 
     match encoder {
         ImageEncoder::Jpeg => {
-            image
-                .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80))
-                .unwrap();
+            image.write_with_encoder(JpegEncoder::new_with_quality(&mut buf, 80))?;
         }
         ImageEncoder::Webp => {
-            image
-                .write_with_encoder(WebPEncoder::new_lossless(&mut buf))
-                .unwrap();
+            image.write_with_encoder(WebPEncoder::new_lossless(&mut buf))?;
         }
         ImageEncoder::Png => {
-            image
-                .write_with_encoder(PngEncoder::new_with_quality(
-                    &mut buf,
-                    CompressionType::Fast,
-                    FilterType::Paeth,
-                ))
-                .unwrap();
+            image.write_with_encoder(PngEncoder::new_with_quality(
+                &mut buf,
+                CompressionType::Fast,
+                FilterType::Paeth,
+            ))?;
         }
         ImageEncoder::Avif => {
-            image
-                .write_with_encoder(AvifEncoder::new_with_speed_quality(&mut buf, 10, 80))
-                .unwrap();
+            image.write_with_encoder(AvifEncoder::new_with_speed_quality(&mut buf, 10, 80))?;
         }
     }
 
-    return buf;
+    Ok(buf)
 }
 
 /// 将一个图像绘制到另一个图像上
