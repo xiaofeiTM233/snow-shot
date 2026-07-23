@@ -228,9 +228,9 @@ export const isAdmin = async () => {
 	return result;
 };
 
-export const setRunLog = async (enable: boolean) => {
+export const setRunLog = async (level: string) => {
 	const result = await invoke<void>("set_run_log", {
-		enable,
+		level,
 	});
 	return result;
 };

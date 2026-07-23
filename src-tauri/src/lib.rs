@@ -155,8 +155,10 @@ pub fn run() {
 
     let file_cache_service = Arc::new(file_cache_service::FileCacheService::new());
 
-    let enable_run_log = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let enable_run_log_clone = enable_run_log.clone();
+	let enable_run_log = std::sync::Arc::new(std::sync::atomic::AtomicU8::new(
+		log::LevelFilter::Warn as u8,
+	));
+	let enable_run_log_clone = enable_run_log.clone();
 
     let plugin_service = Arc::new(plugin_service::PluginService::new());
 
@@ -191,11 +193,8 @@ pub fn run() {
             file_name: Some(log_file_name),
         })]
     };
-    let log_level = if cfg!(debug_assertions) {
-        log::LevelFilter::Debug
-    } else {
-        log::LevelFilter::Info
-    };
+    // 将插件基础级别设为最详细，由下方 filter 根据用户选择的运行日志级别进行实际过滤
+    let log_level = log::LevelFilter::Trace;
 
     #[allow(unused_mut)]
     let mut app_builder = tauri::Builder::default()
@@ -245,10 +244,15 @@ pub fn run() {
                         return true;
                     }
 
-                    #[cfg(not(debug_assertions))]
-                    {
-                        return enable_run_log.load(std::sync::atomic::Ordering::Relaxed);
-                    }
+				#[cfg(not(debug_assertions))]
+				{
+					let level = log::LevelFilter::from_usize(
+						enable_run_log.load(std::sync::atomic::Ordering::Relaxed) as usize,
+					)
+					.unwrap_or(log::LevelFilter::Off);
+
+					return metadata.level() <= level;
+				}
                 })
                 .build(),
         )

@@ -49,6 +49,7 @@ import {
 	type HdrColorAlgorithm,
 	type HistoryValidDuration,
 	OcrDetectAfterAction,
+	RunLogLevel,
 	type TrayIconClickAction,
 	type TrayIconDefaultIcon,
 	type VideoMaxSize,
@@ -745,10 +746,10 @@ const AppSettingsContextProviderCore: React.FC<{
 							? newSettings.autoCheckVersion
 							: (prevSettings?.autoCheckVersion ??
 								defaultAppSettingsData[group].autoCheckVersion),
-					runLog:
-						typeof newSettings?.runLog === "boolean"
-							? newSettings.runLog
-							: (prevSettings?.runLog ?? defaultAppSettingsData[group].runLog),
+				runLog:
+					typeof newSettings?.runLog === "string"
+						? (newSettings.runLog as RunLogLevel)
+						: (prevSettings?.runLog ?? defaultAppSettingsData[group].runLog),
 					boostProcessPriority:
 						typeof newSettings?.boostProcessPriority === "boolean"
 							? newSettings.boostProcessPriority

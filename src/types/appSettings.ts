@@ -59,6 +59,22 @@ export enum HdrColorAlgorithm {
 	None = "None",
 }
 
+/** 运行日志级别 */
+export enum RunLogLevel {
+	/** 关闭运行日志 */
+	Off = "off",
+	/** 错误 */
+	Error = "error",
+	/** 警告 */
+	Warn = "warn",
+	/** 信息 */
+	Info = "info",
+	/** 调试 */
+	Debug = "debug",
+	/** 追踪 */
+	Trace = "trace",
+}
+
 export type ChatApiConfig = {
 	api_uri: string;
 	api_key: string;
@@ -404,7 +420,7 @@ export type AppSettingsData = {
 	[AppSettingsGroup.SystemCommon]: {
 		autoStart: boolean;
 		autoCheckVersion: boolean;
-		runLog: boolean;
+		runLog: RunLogLevel;
 		/** 提升进程优先级（高于正常） */
 		boostProcessPriority: boolean;
 		/** 记住关闭时窗口的位置和大小 */

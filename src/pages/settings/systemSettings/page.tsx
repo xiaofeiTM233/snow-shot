@@ -45,6 +45,7 @@ import {
 	AppSettingsGroup,
 	HdrColorAlgorithm,
 	HistoryValidDuration,
+	RunLogLevel,
 } from "@/types/appSettings";
 import { clearAllConfig } from "@/utils/appConfig";
 import { clearAllAppStore } from "@/utils/appStore";
@@ -236,6 +237,35 @@ export const SystemSettingsPage = () => {
 		];
 	}, [intl]);
 
+	const runLogLevelOptions = useMemo((): SelectProps["options"] => {
+		return [
+			{
+				label: "Off",
+				value: RunLogLevel.Off,
+			},
+			{
+				label: "Error",
+				value: RunLogLevel.Error,
+			},
+			{
+				label: "Warn",
+				value: RunLogLevel.Warn,
+			},
+			{
+				label: "Info",
+				value: RunLogLevel.Info,
+			},
+			{
+				label: "Debug",
+				value: RunLogLevel.Debug,
+			},
+			{
+				label: "Trace",
+				value: RunLogLevel.Trace,
+			},
+		];
+	}, []);
+
 	const [currentPlatform] = usePlatform();
 
 	const [isAdmin, setIsAdmin] = useStateRef<boolean>(false);
@@ -311,7 +341,7 @@ export const SystemSettingsPage = () => {
 							</ProForm.Item>
 						</Col>
 						<Col span={12}>
-							<ProForm.Item
+							<ProFormSelect
 								label={
 									<IconLabel
 										label={
@@ -320,10 +350,8 @@ export const SystemSettingsPage = () => {
 									/>
 								}
 								name="runLog"
-								valuePropName="checked"
-							>
-								<Switch />
-							</ProForm.Item>
+								options={runLogLevelOptions}
+							/>
 						</Col>
 						<Col span={12}>
 							<ProForm.Item

@@ -451,10 +451,20 @@ pub async fn set_process_priority(enable: bool) -> Result<(), String> {
 
 #[command]
 pub async fn set_run_log(
-    enable_run_log: tauri::State<'_, std::sync::Arc<std::sync::atomic::AtomicBool>>,
-    enable: bool,
+    enable_run_log: tauri::State<'_, std::sync::Arc<std::sync::atomic::AtomicU8>>,
+    level: String,
 ) -> Result<(), String> {
-    enable_run_log.store(enable, std::sync::atomic::Ordering::Relaxed);
+    let level_filter = match level.as_str() {
+        "off" => log::LevelFilter::Off,
+        "error" => log::LevelFilter::Error,
+        "warn" => log::LevelFilter::Warn,
+        "info" => log::LevelFilter::Info,
+        "debug" => log::LevelFilter::Debug,
+        "trace" => log::LevelFilter::Trace,
+        _ => return Err(format!("未知的日志级别: {level}")),
+    };
+
+    enable_run_log.store(level_filter as u8, std::sync::atomic::Ordering::Relaxed);
 
     Ok(())
 }
