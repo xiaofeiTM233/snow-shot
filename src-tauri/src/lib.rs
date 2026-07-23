@@ -223,7 +223,17 @@ pub fn run() {
                 .timezone_strategy(tauri_plugin_log::TimezoneStrategy::UseLocal)
                 .targets(log_targets)
                 .level(log_level)
-                .filter(move |_| {
+                .filter(move |metadata| {
+                    // 屏蔽 xcap 在枚举窗口时，对某些系统/受保护进程
+                    // 调用 GetFileVersionInfoSizeW / GetModuleBaseNameW 失败产生的无害 ERROR 日志。
+                    // 错误码 1813（无版本资源）与 5（拒绝访问）属于 Windows 上枚举窗口时的正常情况，
+                    // xcap 会忽略并继续枚举，不影响截图与窗口识别功能，仅会产生日志噪音。
+                    if metadata.target() == "xcap::platform::impl_window"
+                        && metadata.level() == log::Level::Error
+                    {
+                        return false;
+                    }
+
                     #[cfg(debug_assertions)]
                     {
                         return true;
