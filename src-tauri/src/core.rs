@@ -317,12 +317,19 @@ pub async fn auto_start_enable(app: tauri::AppHandle) -> Result<(), String> {
         }
 
         // 禁用普通自启动方式
-        match autostart_manager.disable() {
-            Ok(_) => (),
+        // 仅当普通自启动已启用时才禁用，避免自启动项不存在时报 "系统找不到指定的文件" (os error 2)
+        match autostart_manager.is_enabled() {
+            Ok(true) => match autostart_manager.disable() {
+                Ok(_) => (),
+                Err(e) => {
+                    // 如果 autostart_manager 不是设置了的状态，则可能报错
+                    // 所以不提前退出
+                    log::warn!("[auto_start_enable] Failed to disable autostart: {}", e);
+                }
+            },
+            Ok(false) => (),
             Err(e) => {
-                // 如果 autostart_manager 不是设置了的状态，则可能报错
-                // 所以不提前退出
-                log::warn!("[auto_start_enable] Failed to disable autostart: {}", e);
+                log::warn!("[auto_start_enable] Failed to check autostart status: {}", e);
             }
         }
 
@@ -346,10 +353,17 @@ pub async fn auto_start_disable(app: tauri::AppHandle) -> Result<(), String> {
     let autostart_manager = app.autolaunch();
 
     // 先禁用普通自启动方式
-    match autostart_manager.disable() {
-        Ok(_) => (),
+    // 仅当普通自启动已启用时才禁用，避免自启动项不存在时报 "系统找不到指定的文件" (os error 2)
+    match autostart_manager.is_enabled() {
+        Ok(true) => match autostart_manager.disable() {
+            Ok(_) => (),
+            Err(e) => {
+                log::warn!("[auto_start_disable] Failed to disable autostart: {}", e);
+            }
+        },
+        Ok(false) => (),
         Err(e) => {
-            log::warn!("[auto_start_disable] Failed to disable autostart: {}", e);
+            log::warn!("[auto_start_disable] Failed to check autostart status: {}", e);
         }
     }
 
