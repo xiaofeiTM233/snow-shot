@@ -171,7 +171,9 @@ pub fn run() {
 
     use tauri_plugin_log::{Target, TargetKind};
 
-    // let current_date = chrono::Local::now().format("%Y-%m-%d").to_string();
+    // 每次启动用时间戳生成独立日志文件名
+    let launch_tag = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+    let log_file_name = format!("snow-shot-{launch_tag}");
 
     // log 文件可能因为某些异常情况不断输出，造成日志文件过大
     // 先在 release 下屏蔽日志输出
@@ -179,11 +181,15 @@ pub fn run() {
     let log_targets: Vec<Target> = if cfg!(debug_assertions) {
         vec![
             Target::new(TargetKind::Stdout),
-            Target::new(TargetKind::LogDir { file_name: None }),
+            Target::new(TargetKind::LogDir {
+                file_name: Some(log_file_name.clone()),
+            }),
             Target::new(TargetKind::Webview),
         ]
     } else {
-        vec![Target::new(TargetKind::LogDir { file_name: None })]
+        vec![Target::new(TargetKind::LogDir {
+            file_name: Some(log_file_name),
+        })]
     };
     let log_level = if cfg!(debug_assertions) {
         log::LevelFilter::Debug
