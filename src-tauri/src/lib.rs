@@ -174,7 +174,7 @@ pub fn run() {
     use tauri_plugin_log::{Target, TargetKind};
 
     // 每次启动用时间戳生成独立日志文件名
-    let launch_tag = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+    let launch_tag = utc_timestamp_tag();
     let log_file_name = format!("snow-shot-{launch_tag}");
 
     // log 文件可能因为某些异常情况不断输出，造成日志文件过大
@@ -246,10 +246,14 @@ pub fn run() {
 
 				#[cfg(not(debug_assertions))]
 				{
-					let level = log::LevelFilter::from_usize(
-						enable_run_log.load(std::sync::atomic::Ordering::Relaxed) as usize,
-					)
-					.unwrap_or(log::LevelFilter::Off);
+				let level = match enable_run_log.load(std::sync::atomic::Ordering::Relaxed) {
+					0 => log::LevelFilter::Off,
+					1 => log::LevelFilter::Error,
+					2 => log::LevelFilter::Warn,
+					3 => log::LevelFilter::Info,
+					4 => log::LevelFilter::Debug,
+					_ => log::LevelFilter::Trace,
+				};
 
 					return metadata.level() <= level;
 				}
@@ -480,7 +484,7 @@ pub fn run() {
                 }
             }
         })
-        .on_event(move |app, event| {
+        .on_run_event(move |app, event| {
             // 应用退出时持久化主窗口几何信息，确保即使未触发关闭按钮也能保存
             if let tauri::RunEvent::Exit = event {
                 save_main_window_geometry(app);
@@ -495,4 +499,70 @@ pub fn run() {
     app_builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// 使用标准库生成 `YYYY-MM-DD_HH-MM-SS` 形式的时间戳（UTC），
+/// 用于日志文件名，避免引入额外的日期时间依赖。
+fn utc_timestamp_tag() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let days = secs / 86_400;
+    let rem = secs % 86_400;
+    let hour = (rem / 3_600) as u32;
+    let min = ((rem % 3_600) / 60) as u32;
+    let sec = (rem % 60) as u32;
+
+    // 从 1970-01-01 起推算年/月/日（UTC）
+    let mut year: i64 = 1970;
+    let mut d = days as i64;
+    loop {
+        let ydays = if is_leap_year(year) { 366 } else { 365 };
+        if d < ydays {
+            break;
+        }
+        d -= ydays;
+        year += 1;
+    }
+
+    let month_days = month_lengths(year);
+    let mut month = 0usize;
+    let mut day = d;
+    while day >= month_days[month] {
+        day -= month_days[month];
+        month += 1;
+    }
+
+    format!(
+        "{:04}-{:02}-{:02}_{:02}-{:02}-{:02}",
+        year,
+        month + 1,
+        day + 1,
+        hour,
+        min,
+        sec
+    )
+}
+
+fn is_leap_year(year: i64) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+fn month_lengths(year: i64) -> [i64; 12] {
+    [
+        31,
+        if is_leap_year(year) { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ]
 }
