@@ -1035,7 +1035,29 @@ const DrawPageCore: React.FC<{
 			// 停止监听键盘
 			listenKeyStop();
 
-			saveCaptureHistory(undefined, CaptureHistorySource.ScrollScreenshotFixed);
+			const imageData = await scrollScreenshotGetImageData(true);
+			const captureResult = await new Promise<ArrayBuffer | undefined>(
+				(resolve) => {
+					if (imageData instanceof HTMLCanvasElement) {
+						imageData.toBlob(
+							async (blob) => {
+								resolve(await blob?.arrayBuffer());
+							},
+							"image/png",
+							1,
+						);
+					} else if (imageData instanceof ArrayBuffer) {
+						resolve(imageData);
+					} else {
+						resolve(undefined);
+					}
+				},
+			);
+
+			saveCaptureHistory(
+				captureResult,
+				CaptureHistorySource.ScrollScreenshotFixed,
+			);
 
 			createFixedContentWindow(true);
 			finishCapture(false);
