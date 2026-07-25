@@ -553,6 +553,8 @@ export type AppSettingsData = {
 		initialPosition: AppSettingsFixedContentInitialPosition;
 		/** 双击后的行为 */
 		doubleClickAction: FixedContentDoubleClickAction;
+		/** 显示贴图时恢复默认大小 */
+		showStickerRestoreDefaultSize: boolean;
 	};
 	[AppSettingsGroup.FunctionFullScreenDraw]: {
 		/** 默认工具 */

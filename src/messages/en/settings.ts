@@ -482,6 +482,8 @@ export const settings = {
 	"settings.functionSettings.fixedContentSettings.autoOcr": "Auto OCR",
 	"settings.functionSettings.fixedContentSettings.autoCopyToClipboard":
 		"Auto copy to clipboard after pinning",
+	"settings.functionSettings.fixedContentSettings.showStickerRestoreDefaultSize":
+		"Restore default size when showing sticker",
 	"settings.functionSettings.fixedContentSettings.initialPosition.monitorCenter":
 		"Monitor Center",
 	"settings.functionSettings.fixedContentSettings.initialPosition.mousePosition":
