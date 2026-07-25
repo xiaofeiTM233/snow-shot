@@ -19,17 +19,17 @@ import { decodeParamsValue } from "@/utils/base64";
 import { copyText, copyTextAndHide } from "@/utils/clipboard";
 import { formatKey } from "@/utils/format";
 
-const TranslationCore = () => {
+export const TranslationCore = ({
+	searchParamsSign,
+	searchParamsSelectText,
+}: {
+	searchParamsSign?: string;
+	searchParamsSelectText?: string;
+}) => {
 	const { token } = theme.useToken();
 
 	const translatorActionRef = useRef<TranslatorActionType>(undefined);
 
-	const searchParams = useSearch({ from: "/_layout/tools/translation" }) as {
-		t?: string;
-		selectText?: string;
-	};
-	const searchParamsSign = searchParams.t;
-	const searchParamsSelectText = searchParams.selectText;
 	const prevSearchParamsSign = useRef<string | undefined>(undefined);
 	const ignoreDebounce = useRef<boolean>(false);
 	const updateSourceContentBySelectedText = useCallback(async () => {
@@ -167,5 +167,14 @@ const TranslationCore = () => {
 };
 
 export const TranslationPage = () => {
-	return <TranslationCore />;
+	const searchParams = useSearch({ from: "/_layout/tools/translation" }) as {
+		t?: string;
+		selectText?: string;
+	};
+	return (
+		<TranslationCore
+			searchParamsSign={searchParams.t}
+			searchParamsSelectText={searchParams.selectText}
+		/>
+	);
 };

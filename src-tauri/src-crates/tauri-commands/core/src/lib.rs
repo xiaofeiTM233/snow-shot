@@ -250,6 +250,66 @@ pub async fn create_fixed_content_window(
     Ok(())
 }
 
+/// 创建翻译弹窗窗口
+pub async fn create_translation_window(
+    app: tauri::AppHandle,
+    select_text: Option<String>,
+) -> Result<(), String> {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+
+    let url = match &select_text {
+        Some(text) => format!("/translationWindow?selectText={}&t={}", text, timestamp),
+        None => format!("/translationWindow?t={}", timestamp),
+    };
+
+    #[cfg(debug_assertions)]
+    let webview_url = tauri::WebviewUrl::External(
+        format!("http://localhost:8083{}", url)
+            .parse()
+            .unwrap(),
+    );
+    #[cfg(not(debug_assertions))]
+    let webview_url = tauri::WebviewUrl::App(PathBuf::from(url));
+
+    let label = "translation-window";
+
+    // 已存在则复用：聚焦并跳转到新的翻译地址
+    if let Some(existing) = app.get_webview_window(label) {
+        let _ = existing.show();
+        let _ = existing.set_focus();
+        let _ = existing.navigate(webview_url);
+        return Ok(());
+    }
+
+    let window = tauri::WebviewWindowBuilder::new(&app, label, webview_url)
+        .resizable(true)
+        .maximizable(false)
+        .minimizable(true)
+        .fullscreen(false)
+        .title("Snow Shot - Translation")
+        .decorations(true)
+        .shadow(true)
+        .transparent(false)
+        .skip_taskbar(true)
+        .inner_size(480.0, 640.0)
+        .min_inner_size(360.0, 480.0)
+        .build();
+
+    match window {
+        Ok(w) => {
+            let _ = w.center();
+            Ok(())
+        }
+        Err(e) => Err(format!(
+            "[create_translation_window] failed to create window: {}",
+            e
+        )),
+    }
+}
+
 pub struct FullScreenDrawWindowLabels {
     full_screen_draw_window_label: String,
     switch_mouse_through_window_label: String,

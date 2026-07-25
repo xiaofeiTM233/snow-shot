@@ -406,6 +406,7 @@ pub fn run() {
             core::auto_scroll_through,
             core::click_through,
             core::create_fixed_content_window,
+            core::create_translation_window,
             core::read_image_from_clipboard,
             core::create_full_screen_draw_window,
             core::close_full_screen_draw_window,

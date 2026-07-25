@@ -142,6 +142,7 @@ export const defaultAppSettingsData: AppSettingsData = {
 		chatApiConfigList: [],
 	},
 	[AppSettingsGroup.FunctionTranslation]: {
+		popupTranslateWindow: false,
 		optimizeAiTranslationLayout: true,
 		translationSystemPrompt: defaultTranslationPrompt,
 		translationApiConfigList: [],

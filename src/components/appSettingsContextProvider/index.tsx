@@ -902,6 +902,11 @@ const AppSettingsContextProviderCore: React.FC<{
 							? newSettings.translationSystemPrompt
 							: (prevSettings?.translationSystemPrompt ??
 								defaultAppSettingsData[group].translationSystemPrompt),
+					popupTranslateWindow:
+						typeof newSettings?.popupTranslateWindow === "boolean"
+							? newSettings.popupTranslateWindow
+							: (prevSettings?.popupTranslateWindow ??
+								defaultAppSettingsData[group].popupTranslateWindow),
 					optimizeAiTranslationLayout:
 						typeof newSettings?.optimizeAiTranslationLayout === "boolean"
 							? newSettings.optimizeAiTranslationLayout

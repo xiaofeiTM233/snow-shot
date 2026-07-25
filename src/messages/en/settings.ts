@@ -490,6 +490,10 @@ export const settings = {
 		"Mouse Position",
 	"settings.printScreen.tip":
 		"If screenshot cannot be triggered on Windows, try disabling system screenshot tool and try again. If still unresponsive, try restarting",
+	"settings.functionSettings.translationSettings.popupTranslateWindow":
+		"Popup Translation Window",
+	"settings.functionSettings.translationSettings.popupTranslateWindow.tip":
+		"Open the translation page in a separate window that can float above other apps independently of the main window",
 	"settings.functionSettings.translationSettings.optimizeAiTranslationLayout":
 		"Optimize AI Translation Layout",
 	"settings.functionSettings.translationSettings.optimizeAiTranslationLayout.tip":

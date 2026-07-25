@@ -51,6 +51,13 @@ export const createFixedContentWindow = async (
 	return result;
 };
 
+export const createTranslationWindow = async (selectText?: string) => {
+	const result = await invoke<void>("create_translation_window", {
+		selectText: selectText ? selectText : null,
+	});
+	return result;
+};
+
 export const readImageFromClipboard = async (): Promise<
 	ArrayBuffer | undefined
 > => {
