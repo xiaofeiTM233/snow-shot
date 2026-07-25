@@ -275,6 +275,9 @@ export const getCommitSha = async () => {
 	return result;
 };
 
-export const setRememberWindowGeometry = async (remember: boolean) => {
-	await invoke("set_remember_window_geometry", { remember });
+export const setRememberWindowGeometry = async (remember?: boolean) => {
+	// settings 未加载或旧配置缺失时 remember 可能为 undefined，
+	// invoke 序列化会丢弃该 key 导致 Rust 端（bool 参数）报 missing required key。
+	// 这里兜底为 true，确保始终发送明确布尔值。
+	await invoke("set_remember_window_geometry", { remember: remember ?? true });
 };
