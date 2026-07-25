@@ -1,4 +1,4 @@
-import { CheckOutlined, CropOutlined, HolderOutlined, LockOutlined } from "@ant-design/icons";
+import { CheckOutlined, HolderOutlined, LockOutlined } from "@ant-design/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Button, type ButtonProps, Flex, theme } from "antd";
 import {
@@ -22,6 +22,7 @@ import { EventListenerContext } from "@/components/eventListener";
 import {
 	ArrowSelectIcon,
 	CircleIcon,
+	CropIcon,
 	DragWindowIcon,
 	EraserIcon,
 	PenIcon,
@@ -582,7 +583,7 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 						<Button
 							{...toolButtonProps}
 							icon={
-								<CropOutlined
+								<CropIcon
 									style={{
 										fontSize: "1.1em",
 									}}

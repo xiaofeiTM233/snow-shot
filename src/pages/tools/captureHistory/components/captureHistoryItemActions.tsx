@@ -1,9 +1,5 @@
-import {
-	CopyOutlined,
-	DeleteOutlined,
-	EditOutlined,
-	FixedIcon,
-} from "@/components/icons";
+import { FixedIcon } from "@/components/icons";
+import { CopyOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { Button, Popconfirm, Space } from "antd";
 import { useCallback, useState } from "react";
 import { FormattedMessage } from "react-intl";
