@@ -27,7 +27,7 @@ export const DrawExtraTool: React.FC<{
 	const { updateAppSettings } = useContext(AppSettingsActionContext);
 
 	const [lastDrawExtraTool, setLastDrawExtraTool] = useState<DrawState>(
-		DrawState.Watermark,
+		DrawState.Idle,
 	);
 	useStateSubscriber(
 		AppSettingsPublisher,
@@ -90,9 +90,12 @@ export const DrawExtraTool: React.FC<{
 		);
 	}, [disable, drawState, intl, onToolClickAction, updateLastDrawExtraTool]);
 
+	// 未记录过选择（Idle）时默认展示高亮；若高亮被隐藏则回落到水印，若水印被隐藏则回落到高亮
 	let mainToolbarButton = customToolbarToolHiddenMap?.[DrawState.Watermark]
 		? highlightButton
-		: watermarkButton;
+		: customToolbarToolHiddenMap?.[DrawState.Highlight]
+			? watermarkButton
+			: highlightButton;
 	if (
 		lastDrawExtraTool === DrawState.Watermark &&
 		!customToolbarToolHiddenMap?.[DrawState.Watermark]
