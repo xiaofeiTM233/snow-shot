@@ -22,6 +22,7 @@ import { EventListenerContext } from "@/components/eventListener";
 import {
 	ArrowSelectIcon,
 	CircleIcon,
+	CropIcon,
 	DragWindowIcon,
 	EraserIcon,
 	PenIcon,
@@ -63,7 +64,8 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 	disabled?: boolean;
 	onConfirm: () => void;
 	switchDraw: () => void;
-}> = ({ actionRef, documentSize, disabled, onConfirm, switchDraw }) => {
+	onCrop?: () => void;
+}> = ({ actionRef, documentSize, disabled, onConfirm, switchDraw, onCrop }) => {
 	const { token } = theme.useToken();
 	const intl = useIntl();
 
@@ -575,6 +577,24 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 								}}
 							/>
 						</>
+					)}
+
+					{onCrop && (
+						<Button
+							{...toolButtonProps}
+							icon={
+								<CropIcon
+									style={{
+										fontSize: "1.1em",
+									}}
+								/>
+							}
+							type={getButtonTypeByState(false)}
+							title={intl.formatMessage({ id: "draw.crop" })}
+							onClick={() => {
+								onCrop();
+							}}
+						/>
 					)}
 
 					<div className="draw-toolbar-splitter" />
