@@ -141,6 +141,8 @@ export const draw = {
 	"draw.shadowColor": "阴影颜色",
 	"draw.resizeModal": "调整大小",
 	"draw.confirm": "确定",
+	"draw.crop": "裁剪",
+	"draw.crop.cancel": "取消",
 	"draw.serialNumber": "序号",
 	"draw.drawStyleTool": "绘制样式",
 	"draw.scrollAction": "滚动行为",

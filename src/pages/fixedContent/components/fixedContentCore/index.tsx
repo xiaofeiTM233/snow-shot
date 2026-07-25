@@ -60,6 +60,8 @@ import {
 	saveCanvasToCloud,
 } from "@/pages/draw/actions";
 import type { SelectRectParams } from "@/pages/draw/components/selectLayer";
+import type { ElementRect } from "@/types/commands/screenshot";
+import { CropLayer } from "./components/cropLayer";
 import {
 	type CaptureBoundingBoxInfo,
 	DrawEvent,
@@ -1723,6 +1725,163 @@ const copyToClipboard = useCallback(async () => {
 		hideLoading();
 	}, [getAppSettings, message, renderToCanvas]);
 
+	// ===================== 裁剪相关 =====================
+	const [enableCrop, setEnableCrop] = useState(false);
+	const cropSourceRef = useRef<HTMLCanvasElement | undefined>(undefined);
+	const [cropCanvasSize, setCropCanvasSize] = useState<{
+		width: number;
+		height: number;
+	}>({ width: 0, height: 0 });
+	const [cropDisplaySize, setCropDisplaySize] = useState<{
+		width: number;
+		height: number;
+	}>({ width: 0, height: 0 });
+
+	const isCropSupported = useCallback(() => {
+		return (
+			!isThumbnailRef.current &&
+			(fixedContentTypeRef.current === FixedContentType.Image ||
+				fixedContentTypeRef.current === FixedContentType.DrawCanvas) &&
+			hasInitImageLayerRef.current
+		);
+	}, [fixedContentTypeRef, isThumbnailRef]);
+
+	const startCrop = useCallback(async () => {
+		if (!isCropSupported() || enableCrop) {
+			return;
+		}
+
+		const canvas = await renderToCanvas(false);
+		if (!canvas) {
+			return;
+		}
+
+		cropSourceRef.current = canvas;
+		setCropCanvasSize({
+			width: canvasPropsRef.current.width,
+			height: canvasPropsRef.current.height,
+		});
+		const isImg =
+			fixedContentTypeRef.current === FixedContentType.Image ||
+			fixedContentTypeRef.current === FixedContentType.DrawCanvas;
+		const csf = isImg ? textScaleFactorRef.current : 1;
+		setCropDisplaySize({
+			width: (windowSizeRef.current.width / csf) * scaleRef.current.x / 100,
+			height: (windowSizeRef.current.height / csf) * scaleRef.current.y / 100,
+		});
+		setEnableCrop(true);
+	}, [isCropSupported, enableCrop, renderToCanvas]);
+
+	const cancelCrop = useCallback(() => {
+		setEnableCrop(false);
+		cropSourceRef.current = undefined;
+	}, []);
+
+	const confirmCrop = useCallback(
+		async (cropRect: ElementRect) => {
+			const source = cropSourceRef.current;
+			if (!source) {
+				setEnableCrop(false);
+				return;
+			}
+
+			const cropW = Math.max(
+				1,
+				Math.round(cropRect.max_x - cropRect.min_x),
+			);
+			const cropH = Math.max(
+				1,
+				Math.round(cropRect.max_y - cropRect.min_y),
+			);
+
+			const out = document.createElement("canvas");
+			out.width = cropW;
+			out.height = cropH;
+			const ctx = out.getContext("2d");
+			if (!ctx) {
+				setEnableCrop(false);
+				return;
+			}
+			ctx.drawImage(
+				source,
+				cropRect.min_x,
+				cropRect.min_y,
+				cropW,
+				cropH,
+				0,
+				0,
+				cropW,
+				cropH,
+			);
+
+			let bitmap: ImageBitmap;
+			try {
+				bitmap = await createImageBitmap(out);
+			} catch {
+				setEnableCrop(false);
+				return;
+			}
+
+			// 重置图像处理配置（旋转、翻转已通过裁剪固化为内容本身）
+			setProcessImageConfig({
+				angle: 0,
+				horizontalFlip: false,
+				verticalFlip: false,
+			});
+			// 清除绘制层中的元素（裁剪会丢弃选区外内容）
+			drawActionRef.current?.clearElements?.();
+
+			const imageLayerAction =
+				imageLayerActionRef.current?.getImageLayerAction();
+			if (!imageLayerAction) {
+				setEnableCrop(false);
+				return;
+			}
+			await imageLayerAction.setBaseImage(bitmap);
+			await imageLayerAction.applyProcessImageConfigToCanvas(
+				INIT_CONTAINER_KEY,
+				{ angle: 0, horizontalFlip: false, verticalFlip: false },
+				cropW,
+				cropH,
+			);
+
+			const scaleFactor = canvasPropsRef.current.scaleFactor;
+			canvasPropsRef.current = {
+				...canvasPropsRef.current,
+				width: cropW,
+				height: cropH,
+			};
+			setWindowSize({
+				width: cropW / scaleFactor,
+				height: cropH / scaleFactor,
+			});
+
+			// 保持窗口中心不变，调整窗口大小
+			const appWindow = appWindowRef.current;
+			if (appWindow) {
+				const newPhysicalSize = getWindowPhysicalSize(scaleRef.current.x);
+				const [currentSize, currentPosition] = await Promise.all([
+					appWindow.outerSize(),
+					appWindow.outerPosition(),
+				]);
+				const centerX = currentPosition.x + currentSize.width / 2;
+				const centerY = currentPosition.y + currentSize.height / 2;
+				const newX = Math.round(centerX - newPhysicalSize.width / 2);
+				const newY = Math.round(centerY - newPhysicalSize.height / 2);
+				await setWindowRect(
+					newX,
+					newY,
+					newX + newPhysicalSize.width,
+					newY + newPhysicalSize.height,
+				);
+			}
+
+			setEnableCrop(false);
+			cropSourceRef.current = undefined;
+		},
+		[scaleRef, setProcessImageConfig, setWindowSize, appWindowRef],
+	);
+
 	const createRightClickMenu = useCallback(async (): Promise<
 		| {
 				mainMenu: Menu | undefined;
@@ -2034,6 +2193,14 @@ const copyToClipboard = useCallback(async () => {
 				{
 					item: "Separator",
 				},
+				isCropSupported() && !enableCrop
+					? {
+							id: `${appWindow.label}-cropTool`,
+							text: intl.formatMessage({ id: "draw.crop" }),
+							enabled: !isThumbnail,
+							action: startCrop,
+						}
+					: undefined,
 				{
 					id: `${appWindow.label}-switchThumbnailTool`,
 					text: intl.formatMessage({ id: "draw.switchThumbnail" }),
@@ -2184,6 +2351,9 @@ const copyToClipboard = useCallback(async () => {
 		enableSaveToCloud,
 		onSaveToCloud,
 		enableTrayIcon,
+		startCrop,
+		isCropSupported,
+		enableCrop,
 	]);
 
 	const onWheel = useCallback(
@@ -2898,7 +3068,7 @@ const copyToClipboard = useCallback(async () => {
 					actionRef={drawActionRef}
 					documentSize={documentSize}
 					scaleInfo={scale}
-					disabled={!enableDraw || !enableDrawLayer}
+					disabled={!enableDraw || !enableDrawLayer || enableCrop}
 					hidden={enableSelectText}
 					onConfirm={switchDraw}
 					getImageLayerAction={getImageLayerAction}
@@ -2909,6 +3079,17 @@ const copyToClipboard = useCallback(async () => {
 					getZoom={getZoom}
 					switchDraw={switchDraw}
 					isImageLayerReady={isImageLayerReady}
+					onCrop={startCrop}
+				/>
+			)}
+
+			{enableCrop && cropSourceRef.current && (
+				<CropLayer
+					sourceCanvas={cropSourceRef.current}
+					canvasSize={cropCanvasSize}
+					displaySize={cropDisplaySize}
+					onConfirm={confirmCrop}
+					onCancel={cancelCrop}
 				/>
 			)}
 
@@ -2940,6 +3121,7 @@ const copyToClipboard = useCallback(async () => {
 						display:
 							isThumbnail ||
 							enableDraw ||
+							enableCrop ||
 							(enableSelectText && !enableOcrTranslate)
 								? "none"
 								: undefined,
@@ -3140,7 +3322,7 @@ const copyToClipboard = useCallback(async () => {
                     font-size: ${token.fontSizeSM}px;
                     z-index: ${zIndexs.FixedToScreen_ScaleInfo};
                     transition: opacity ${token.motionDurationFast} ${token.motionEaseInOut};
-                    display: ${isThumbnail || enableDraw || enableSelectText ? "none" : "block"};
+                    display: ${isThumbnail || enableDraw || enableCrop || enableSelectText ? "none" : "block"};
                 }
 
                 /* 
