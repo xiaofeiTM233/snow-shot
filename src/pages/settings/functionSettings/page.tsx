@@ -865,6 +865,23 @@ export const FunctionSettingsPage = () => {
 								layout="horizontal"
 							/>
 						</Col>
+
+						<Col span={12}>
+							<ProFormSwitch
+								label={
+									<IconLabel
+										label={
+											<FormattedMessage id="settings.functionSettings.screenshotSettings.disableLongScreenshotAutoScroll" />
+										}
+										tooltipTitle={
+											<FormattedMessage id="settings.functionSettings.screenshotSettings.disableLongScreenshotAutoScroll.tip" />
+										}
+									/>
+								}
+								name="disableLongScreenshotAutoScroll"
+								layout="horizontal"
+							/>
+						</Col>
 					</Row>
 
 					{currentPlatform !== "macos" && (

@@ -214,6 +214,10 @@ export const settings = {
 		"「取消截圖」的彈出視窗提示",
 	"settings.functionSettings.screenshotSettings.shortcutCanleTip.tip":
 		"透過快捷鍵「取消截圖」時，是否彈出視窗提示",
+	"settings.functionSettings.screenshotSettings.disableLongScreenshotAutoScroll":
+		"關閉長截圖點擊自動滾動及提示",
+	"settings.functionSettings.screenshotSettings.disableLongScreenshotAutoScroll.tip":
+		"長截圖時，不透過單擊截圖區域進行自動滾動，也不顯示操作提示彈窗",
 	"settings.functionSettings.screenshotSettings.lockDrawTool": "鎖定繪製工具",
 	"settings.functionSettings.screenshotSettings.ocrAfterAction":
 		"文字辨識後自動執行",

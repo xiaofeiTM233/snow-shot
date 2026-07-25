@@ -449,7 +449,10 @@ export const ScrollScreenshot: React.FC<{
 				max_x: rect.max_x * scale,
 				max_y: rect.max_y * scale,
 			});
-			setShowTip(true);
+			setShowTip(
+			!getAppSettings()[AppSettingsGroup.FunctionScreenshot]
+				.disableLongScreenshotAutoScroll,
+		);
 
 			const scrollSettings =
 				getAppSettings()[AppSettingsGroup.SystemScrollScreenshot];
@@ -619,6 +622,14 @@ export const ScrollScreenshot: React.FC<{
 		}
 
 		if (enableIgnoreCursorEventsRef.current) {
+			return;
+		}
+
+		if (
+			getAppSettings()[AppSettingsGroup.FunctionScreenshot]
+				.disableLongScreenshotAutoScroll
+		) {
+			// 已关闭长截图点击自动滚动，不启动自动滚动
 			return;
 		}
 

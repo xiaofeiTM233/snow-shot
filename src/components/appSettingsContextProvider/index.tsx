@@ -1061,6 +1061,10 @@ const AppSettingsContextProviderCore: React.FC<{
 						typeof newSettings?.ocrCopyText === "boolean"
 							? newSettings.ocrCopyText
 							: (prevSettings?.ocrCopyText ?? false),
+					disableLongScreenshotAutoScroll:
+						typeof newSettings?.disableLongScreenshotAutoScroll === "boolean"
+							? newSettings.disableLongScreenshotAutoScroll
+							: (prevSettings?.disableLongScreenshotAutoScroll ?? false),
 					focusedWindowCopyToClipboard:
 						typeof newSettings?.focusedWindowCopyToClipboard === "boolean"
 							? newSettings.focusedWindowCopyToClipboard
