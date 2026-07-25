@@ -511,6 +511,12 @@ export const settings = {
 	"settings.systemSettings.dataDirectory": "数据目录",
 	"settings.systemSettings.dataFilePath.setDirectory.tip":
 		"修改后，软件数据将存储该目录下，重启后生效",
+	"settings.systemSettings.cacheDirectory": "缓存目录",
+	"settings.systemSettings.cacheDirectory.setDirectory.tip":
+		"修改后，软件缓存数据将存储在该目录下，重启后生效",
+	"settings.systemSettings.cacheDirectory.open": "打开目录",
+	"settings.systemSettings.cacheDirectory.open.failed":
+		"打开缓存目录失败，请手动复制目录打开",
 	"settings.systemSettings.dataFilePath.setDirectory": "更换目录",
 	"settings.systemSettings.dataFilePath": "配置目录",
 	"settings.systemSettings.dataFilePath.open": "打开目录",
