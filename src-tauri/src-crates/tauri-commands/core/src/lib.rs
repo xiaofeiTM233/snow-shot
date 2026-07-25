@@ -155,6 +155,7 @@ pub async fn create_fixed_content_window(
     app: tauri::AppHandle,
     hot_load_page_service: tauri::State<'_, Arc<HotLoadPageService>>,
     scroll_screenshot: bool,
+    file_path: Option<String>,
 ) -> Result<(), String> {
     let (_, _, monitor) = get_target_monitor()?;
 
@@ -175,7 +176,13 @@ pub async fn create_fixed_content_window(
         window_y = monitor_y / monitor_scale_factor;
     }
 
-    let url = format!("/fixedContent?scroll_screenshot={}", scroll_screenshot);
+    let url = match &file_path {
+        Some(file_path) => format!(
+            "/fixedContent?scroll_screenshot={}&file_path={}",
+            scroll_screenshot, file_path
+        ),
+        None => format!("/fixedContent?scroll_screenshot={}", scroll_screenshot),
+    };
 
     if let Some(window) = hot_load_page_service.pop_page().await {
         window.set_always_on_top(true).unwrap();

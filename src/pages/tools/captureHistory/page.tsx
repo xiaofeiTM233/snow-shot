@@ -113,6 +113,11 @@ export const CaptureHistoryPage = () => {
 	const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
 
 	const currentFilterDataRef = useRef<CaptureHistoryRecordItem[]>([]);
+
+	// 预览展示状态：true 展示「截图结果」，false 展示「显示器画面」
+	const [showCaptureResultMap, setShowCaptureResultMap] = useState<
+		Record<string, boolean>
+	>({});
 	const tableAlertOptionRender = useCallback(() => {
 		return (
 			<Space>
@@ -391,11 +396,18 @@ export const CaptureHistoryPage = () => {
 						search: false,
 						cardActionProps: "extra",
 						render: (_, item: CaptureHistoryRecordItem) => {
+							const showCaptureResult =
+								showCaptureResultMap[item.id] ?? true;
+							const pinImagePath = showCaptureResult
+								? (item.capture_result_file_path ?? item.file_path)
+								: item.file_path;
+
 							return (
 								<CaptureHistoryItemActions
 									item={item}
 									reloadList={reloadList}
 									captureHistoryRef={captureHistoryRef}
+									pinImagePath={pinImagePath}
 								/>
 							);
 						},
@@ -403,7 +415,20 @@ export const CaptureHistoryPage = () => {
 					extra: {
 						search: false,
 						render: (_: unknown, item: CaptureHistoryRecordItem) => {
-							return <CaptureHistoryItemPreview item={item} />;
+							return (
+								<CaptureHistoryItemPreview
+									item={item}
+									showCaptureResult={
+										showCaptureResultMap[item.id] ?? true
+									}
+									onToggleShowCaptureResult={() => {
+										setShowCaptureResultMap((prev) => ({
+											...prev,
+											[item.id]: !(prev[item.id] ?? true),
+										}));
+									}}
+								/>
+							);
 						},
 					},
 				}}
