@@ -10,6 +10,7 @@ export const menu = {
 	"menu.tools.translation": "Translation",
 	"menu.tools.chat": "AI Chat",
 	"menu.tools.captureHistory": "Screenshot History",
+	"menu.tools.collage": "Collage",
 	"menu.personalization": "Personalization",
 	"menu.personalization.plugins": "Plugins",
 	"menu.personalization.appearance": "Appearance",
