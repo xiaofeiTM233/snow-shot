@@ -67,11 +67,13 @@ pub async fn create_fixed_content_window(
         Arc<snow_shot_app_services::hot_load_page_service::HotLoadPageService>,
     >,
     scroll_screenshot: bool,
+    file_path: Option<String>,
 ) -> Result<(), String> {
     snow_shot_tauri_commands_core::create_fixed_content_window(
         app,
         hot_load_page_service,
         scroll_screenshot,
+        file_path,
     )
     .await
 }

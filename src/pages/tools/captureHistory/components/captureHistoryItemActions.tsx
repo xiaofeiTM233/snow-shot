@@ -1,8 +1,14 @@
-import { CopyOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import {
+	CopyOutlined,
+	DeleteOutlined,
+	EditOutlined,
+	FixedIcon,
+} from "@/components/icons";
 import { Button, Popconfirm, Space } from "antd";
 import { useCallback, useState } from "react";
 import { FormattedMessage } from "react-intl";
 import { executeScreenshot } from "@/functions/screenshot";
+import { createFixedContentWindow } from "@/commands/core";
 import type { CaptureHistory } from "@/utils/captureHistory";
 import { writeFilePathToClipboard } from "@/utils/clipboard";
 import { ScreenshotType } from "@/utils/types";
@@ -12,10 +18,13 @@ export const CaptureHistoryItemActions: React.FC<{
 	item: CaptureHistoryRecordItem;
 	reloadList: () => Promise<void>;
 	captureHistoryRef: React.RefObject<CaptureHistory | undefined>;
-}> = ({ item, reloadList, captureHistoryRef }) => {
+	// 当前预览展示的图片路径，贴图时优先使用该路径
+	pinImagePath?: string;
+}> = ({ item, reloadList, captureHistoryRef, pinImagePath }) => {
 	const [editLoading, setEditLoading] = useState(false);
 	const [copyLoading, setCopyLoading] = useState(false);
 	const [deleteLoading, setDeleteLoading] = useState(false);
+	const [fixedLoading, setFixedLoading] = useState(false);
 	const deleteAction = useCallback(async () => {
 		if (!(await captureHistoryRef.current?.inited())) {
 			return;
@@ -23,6 +32,21 @@ export const CaptureHistoryItemActions: React.FC<{
 		await captureHistoryRef.current?.delete(item.id);
 		await reloadList();
 	}, [captureHistoryRef, item.id, reloadList]);
+
+	const fixedAction = useCallback(async () => {
+		if (!pinImagePath) {
+			return;
+		}
+
+		setFixedLoading(true);
+		try {
+			await createFixedContentWindow(false, pinImagePath);
+		} catch (error) {
+			console.error("[CaptureHistoryItemActions] 贴图失败", error);
+		} finally {
+			setFixedLoading(false);
+		}
+	}, [pinImagePath]);
 
 	return (
 		<Space wrap style={{ width: "100%" }}>
@@ -63,6 +87,17 @@ export const CaptureHistoryItemActions: React.FC<{
 				loading={copyLoading}
 			>
 				<FormattedMessage id="tools.captureHistory.copy" />
+			</Button>
+			<Button
+				onClick={fixedAction}
+				key="fixed"
+				size="small"
+				color="primary"
+				variant="link"
+				icon={<FixedIcon />}
+				loading={fixedLoading}
+			>
+				<FormattedMessage id="tools.captureHistory.fixed" />
 			</Button>
 			<Popconfirm
 				key="delete"
