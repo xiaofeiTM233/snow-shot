@@ -455,6 +455,8 @@ export const settings = {
 	"settings.functionSettings.fixedContentSettings.autoOcr": "自动文本识别",
 	"settings.functionSettings.fixedContentSettings.autoCopyToClipboard":
 		"贴图后自动复制到剪贴板",
+	"settings.functionSettings.fixedContentSettings.showStickerRestoreDefaultSize":
+		"显示贴图同时恢复默认大小",
 	"settings.functionSettings.fixedContentSettings.initialPosition.monitorCenter":
 		"显示器居中",
 	"settings.functionSettings.fixedContentSettings.initialPosition.mousePosition":

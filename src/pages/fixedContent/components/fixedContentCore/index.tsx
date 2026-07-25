@@ -268,6 +268,9 @@ const FixedContentCoreInner: React.FC<{
 		y: 100,
 	});
 
+	// 贴图首次加载完成时的缩放比例，作为“默认大小”
+	const defaultScaleRef = useRef<{ x: number; y: number } | undefined>(undefined);
+
 	const [enableSaveToCloud, setEnableSaveToCloud] = useState(false);
 	const [fixedContentType, setFixedContentType, fixedContentTypeRef] =
 		useStateRef<FixedContentType | undefined>(undefined);
@@ -495,6 +498,7 @@ const FixedContentCoreInner: React.FC<{
 						)
 					: 1;
 
+				captureDefaultScale();
 				onImageLoad?.(
 					{
 						naturalWidth: baseImageSize.width,
@@ -581,6 +585,7 @@ const FixedContentCoreInner: React.FC<{
 			copyRawToClipboard,
 			getAppSettings,
 			setScale,
+			captureDefaultScale,
 		],
 	);
 
@@ -689,6 +694,7 @@ const FixedContentCoreInner: React.FC<{
 
 				setTimeout(() => {
 					tryInitImageLayer(true);
+					captureDefaultScale();
 					onTextLoad?.(textContentContainerRef.current);
 
 					if (textContentContainerRef.current) {
@@ -716,6 +722,7 @@ const FixedContentCoreInner: React.FC<{
 			onTextLoad,
 			setWindowSize,
 			tryInitImageLayer,
+			captureDefaultScale,
 		],
 	);
 
@@ -882,17 +889,19 @@ const FixedContentCoreInner: React.FC<{
 				}
 			}
 
-			onDrawLoad?.();
-		},
-		[
-			setEnableSelectText,
-			setWindowSize,
-			isReady,
-			onDrawLoad,
-			tryInitImageLayer,
-			getAppSettings,
-		],
-	);
+		captureDefaultScale();
+		onDrawLoad?.();
+	},
+	[
+		setEnableSelectText,
+		setWindowSize,
+		isReady,
+		onDrawLoad,
+		tryInitImageLayer,
+		getAppSettings,
+		captureDefaultScale,
+	],
+);
 
 	useEffect(() => {
 		if (ocrResultActionRef.current) {
@@ -1117,15 +1126,71 @@ const FixedContentCoreInner: React.FC<{
 								: textScaleFactorRef.current))),
 			);
 
-			return {
-				width: newWidth,
-				height: newHeight,
-			};
-		},
-		[textScaleFactorRef],
-	);
+		return {
+			width: newWidth,
+			height: newHeight,
+		};
+	},
+	[textScaleFactorRef],
+);
 
-	const copyToClipboard = useCallback(async () => {
+	// 记录贴图首次加载完成时的缩放比例作为“默认大小”
+	const captureDefaultScale = useCallback(() => {
+		if (defaultScaleRef.current) {
+			return;
+		}
+		defaultScaleRef.current = { x: scaleRef.current.x, y: scaleRef.current.y };
+	}, [scaleRef]);
+
+	// 显示隐藏贴图时，若开启了对应设置，将窗口恢复为默认大小
+	const restoreDefaultSize = useCallback(async () => {
+		if (
+			!getAppSettings()[AppSettingsGroup.FunctionFixedContent]
+				.showStickerRestoreDefaultSize
+		) {
+			return;
+		}
+
+		// 处于缩略图模式时，先退出缩略图模式并恢复到进入缩略图前的位置
+		if (isThumbnailRef.current) {
+			const origin =
+				originWindowSizeAndPositionRef.current?.position ?? undefined;
+			originWindowSizeAndPositionRef.current = undefined;
+			setIsThumbnail(false);
+			if (origin) {
+				appWindowRef.current?.setPosition(
+					new PhysicalPosition(origin.x, origin.y),
+				);
+			}
+		}
+
+		const defaultScale = defaultScaleRef.current;
+		if (!defaultScale) {
+			return;
+		}
+
+		if (
+			scaleRef.current.x === defaultScale.x &&
+			scaleRef.current.y === defaultScale.y
+		) {
+			return;
+		}
+
+		setScale({ x: defaultScale.x, y: defaultScale.y });
+		const { width, height } = getWindowPhysicalSize(defaultScale.x);
+		await appWindowRef.current?.setSize(new PhysicalSize(width, height));
+		ocrResultActionRef.current?.setScale(defaultScale.x);
+	}, [
+		getAppSettings,
+		getWindowPhysicalSize,
+		scaleRef,
+		setScale,
+		appWindowRef,
+		originWindowSizeAndPositionRef,
+		setIsThumbnail,
+	]);
+
+const copyToClipboard = useCallback(async () => {
 		if (isThumbnailRef.current) {
 			return;
 		}
@@ -2230,10 +2295,11 @@ const FixedContentCoreInner: React.FC<{
 					htmlContentContainerRef.current.style.width = `${width}px`;
 					htmlContentContainerRef.current.style.height = `${height}px`;
 				}
-				onHtmlLoad?.({
-					width: width * window.devicePixelRatio,
-					height: height * window.devicePixelRatio,
-				});
+			captureDefaultScale();
+			onHtmlLoad?.({
+				width: width * window.devicePixelRatio,
+				height: height * window.devicePixelRatio,
+			});
 
 				setWindowSize({
 					width: width,
@@ -2296,6 +2362,7 @@ const FixedContentCoreInner: React.FC<{
 		fixedContentType,
 		onScrollDown,
 		tryInitImageLayer,
+		captureDefaultScale,
 	]);
 
 	useHotkeys(
@@ -2629,6 +2696,7 @@ const FixedContentCoreInner: React.FC<{
 			<HandleFocusMode
 				disabled={disabled}
 				onToggleVisibility={onToggleVisibility}
+				onShowSticker={restoreDefaultSize}
 			/>
 
 			<div className="fixed-image-container-content">

@@ -1349,7 +1349,12 @@ const AppSettingsContextProviderCore: React.FC<{
 						typeof newSettings?.doubleClickAction === "string"
 							? newSettings.doubleClickAction
 							: (prevSettings?.doubleClickAction ??
-								defaultAppSettingsData[group].doubleClickAction),
+									defaultAppSettingsData[group].doubleClickAction),
+					showStickerRestoreDefaultSize:
+						typeof newSettings?.showStickerRestoreDefaultSize === "boolean"
+							? newSettings.showStickerRestoreDefaultSize
+							: (prevSettings?.showStickerRestoreDefaultSize ??
+								defaultAppSettingsData[group].showStickerRestoreDefaultSize),
 				};
 			} else if (group === AppSettingsGroup.SystemScreenshot) {
 				newSettings = newSettings as AppSettingsData[typeof group];

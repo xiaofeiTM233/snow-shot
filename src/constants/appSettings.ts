@@ -281,6 +281,7 @@ Priority order (highest to lowest):
 		autoCopyToClipboard: false,
 		initialPosition: AppSettingsFixedContentInitialPosition.MousePosition,
 		doubleClickAction: FixedContentDoubleClickAction.SwitchThumbnail,
+		showStickerRestoreDefaultSize: false,
 	},
 	[AppSettingsGroup.FunctionOutput]: {
 		manualSaveFileNameFormat: `SnowShot_{{YYYY-MM-DD_HH-mm-ss}}`,
