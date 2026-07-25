@@ -463,6 +463,10 @@ export const settings = {
 		"滑鼠位置",
 	"settings.printScreen.tip":
 		"Windows 下如無法喚起截圖，請停用系統的截圖工具後再次嘗試，如無回應可嘗試重新啟動",
+	"settings.functionSettings.translationSettings.popupTranslateWindow":
+		"彈窗翻譯頁",
+	"settings.functionSettings.translationSettings.popupTranslateWindow.tip":
+		"以獨立視窗的形式彈出翻譯頁，可獨立於主視窗懸浮在其他應用上方",
 	"settings.functionSettings.translationSettings.optimizeAiTranslationLayout":
 		"最佳化 AI 翻譯的排版",
 	"settings.functionSettings.translationSettings.optimizeAiTranslationLayout.tip":

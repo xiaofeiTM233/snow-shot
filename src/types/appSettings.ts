@@ -453,6 +453,8 @@ export type AppSettingsData = {
 		markdownVisionModelSystemPrompt: string;
 	};
 	[AppSettingsGroup.FunctionTranslation]: {
+		/** 弹窗翻译页 */
+		popupTranslateWindow: boolean;
 		/** 优化 AI 翻译的排版 */
 		optimizeAiTranslationLayout: boolean;
 		translationSystemPrompt: string;

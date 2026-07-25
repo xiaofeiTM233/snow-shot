@@ -1723,10 +1723,29 @@ export const FunctionSettingsPage = () => {
 							}}
 							submitter={false}
 						>
-							<Row gutter={token.marginLG}>
-								<Col span={12}>
-									<ProFormSwitch
-										name="optimizeAiTranslationLayout"
+						<Row gutter={token.marginLG}>
+							<Col span={12}>
+								<ProFormSwitch
+									name="popupTranslateWindow"
+									label={
+										<IconLabel
+											label={
+												<FormattedMessage id="settings.functionSettings.translationSettings.popupTranslateWindow" />
+											}
+											tooltipTitle={
+												<FormattedMessage id="settings.functionSettings.translationSettings.popupTranslateWindow.tip" />
+											}
+										/>
+									}
+									layout="vertical"
+								/>
+							</Col>
+						</Row>
+
+						<Row gutter={token.marginLG}>
+							<Col span={12}>
+								<ProFormSwitch
+									name="optimizeAiTranslationLayout"
 										label={
 											<IconLabel
 												label={
