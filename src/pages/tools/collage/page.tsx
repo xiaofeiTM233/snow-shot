@@ -398,37 +398,39 @@ const CollageCore = () => {
 									/>
 								</Tooltip>
 								{mode === "free" && (
-									<Tooltip
-										title={intl.formatMessage({
-											id: "tools.collage.bringToFront",
-										})}
-									>
-										<Button
-											type="text"
-											size="small"
-											icon={<ToTopOutlined />}
-											onClick={(e) => {
-												e.stopPropagation();
-												bringToFront(it.id);
-												setSelectedId(it.id);
-											}}
-										/>
-									</Tooltip>
-									<Tooltip
-										title={intl.formatMessage({
-											id: "tools.collage.sendToBack",
-										})}
-									>
-										<Button
-											type="text"
-											size="small"
-											icon={<VerticalAlignBottomOutlined />}
-											onClick={(e) => {
-												e.stopPropagation();
-												sendToBack(it.id);
-											}}
-										/>
-									</Tooltip>
+									<>
+										<Tooltip
+											title={intl.formatMessage({
+												id: "tools.collage.bringToFront",
+											})}
+										>
+											<Button
+												type="text"
+												size="small"
+												icon={<ToTopOutlined />}
+												onClick={(e) => {
+													e.stopPropagation();
+													bringToFront(it.id);
+													setSelectedId(it.id);
+												}}
+											/>
+										</Tooltip>
+										<Tooltip
+											title={intl.formatMessage({
+												id: "tools.collage.sendToBack",
+											})}
+										>
+											<Button
+												type="text"
+												size="small"
+												icon={<VerticalAlignBottomOutlined />}
+												onClick={(e) => {
+													e.stopPropagation();
+													sendToBack(it.id);
+												}}
+											/>
+										</Tooltip>
+									</>
 								)}
 								<Tooltip title={intl.formatMessage({ id: "tools.collage.remove" })}>
 									<Button
