@@ -10,6 +10,7 @@ export const menu = {
 	"menu.tools.translation": "翻译",
 	"menu.tools.chat": "AI 对话",
 	"menu.tools.captureHistory": "截图历史",
+	"menu.tools.collage": "拼图",
 	"menu.personalization": "个性化",
 	"menu.personalization.plugins": "插件",
 	"menu.personalization.appearance": "外观配色",
