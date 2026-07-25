@@ -1,4 +1,4 @@
-import { CheckOutlined, HolderOutlined, LockOutlined } from "@ant-design/icons";
+import { CheckOutlined, CropOutlined, HolderOutlined, LockOutlined } from "@ant-design/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Button, type ButtonProps, Flex, theme } from "antd";
 import {
@@ -63,7 +63,8 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 	disabled?: boolean;
 	onConfirm: () => void;
 	switchDraw: () => void;
-}> = ({ actionRef, documentSize, disabled, onConfirm, switchDraw }) => {
+	onCrop?: () => void;
+}> = ({ actionRef, documentSize, disabled, onConfirm, switchDraw, onCrop }) => {
 	const { token } = theme.useToken();
 	const intl = useIntl();
 
@@ -575,6 +576,24 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 								}}
 							/>
 						</>
+					)}
+
+					{onCrop && (
+						<Button
+							{...toolButtonProps}
+							icon={
+								<CropOutlined
+									style={{
+										fontSize: "1.1em",
+									}}
+								/>
+							}
+							type={getButtonTypeByState(false)}
+							title={intl.formatMessage({ id: "draw.crop" })}
+							onClick={() => {
+								onCrop();
+							}}
+						/>
 					)}
 
 					<div className="draw-toolbar-splitter" />
