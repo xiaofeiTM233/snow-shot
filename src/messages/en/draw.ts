@@ -151,6 +151,8 @@ export const draw = {
 	"draw.shadowColor": "Shadow Color",
 	"draw.resizeModal": "Resize",
 	"draw.confirm": "Confirm",
+	"draw.crop": "Crop",
+	"draw.crop.cancel": "Cancel",
 	"draw.serialNumber": "Serial Number",
 	"draw.drawStyleTool": "Drawing Style",
 	"draw.scrollAction": "Scroll Action",
