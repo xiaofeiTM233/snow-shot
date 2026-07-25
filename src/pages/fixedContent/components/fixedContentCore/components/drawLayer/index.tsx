@@ -56,6 +56,7 @@ export type FixedContentCoreDrawActionType = {
 	getDrawMenuSize: () => { width: number; height: number };
 	getCanvas: () => HTMLCanvasElement | null;
 	tryRenderElements: () => Promise<void>;
+	clearElements: () => void;
 };
 
 const DRAW_MENU_WIDTH = 200;
@@ -81,6 +82,7 @@ const DrawLayerCore: React.FC<{
 	getZoom: () => number;
 	switchDraw: () => void;
 	isImageLayerReady: () => boolean;
+	onCrop?: () => void;
 }> = ({
 	actionRef,
 	documentSize,
@@ -96,6 +98,7 @@ const DrawLayerCore: React.FC<{
 	getZoom,
 	switchDraw,
 	isImageLayerReady,
+	onCrop,
 }) => {
 	const { token } = theme.useToken();
 
@@ -459,6 +462,9 @@ const DrawLayerCore: React.FC<{
 				return drawCoreActionRef.current?.getCanvas() ?? null;
 			},
 			tryRenderElements,
+			clearElements: () => {
+				drawCoreActionRef.current?.updateScene({ elements: [] });
+			},
 		};
 	}, [getDrawMenuSize, tryRenderElements]);
 
@@ -493,6 +499,7 @@ const DrawLayerCore: React.FC<{
 						documentSize={documentSize}
 						onConfirm={onConfirm}
 						switchDraw={switchDraw}
+						onCrop={onCrop}
 					/>
 				</DrawCoreContext.Provider>
 
