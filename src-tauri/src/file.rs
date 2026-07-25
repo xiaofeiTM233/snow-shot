@@ -92,6 +92,24 @@ pub async fn get_app_config_base_dir(
 }
 
 #[command]
+pub async fn get_app_cache_dir(
+    app: tauri::AppHandle,
+    text_file_cache_service: tauri::State<'_, Arc<FileCacheService>>,
+) -> Result<PathBuf, String> {
+    let path = text_file_cache_service.get_app_cache_dir(&app)?;
+    Ok(path)
+}
+
+#[command]
+pub async fn create_local_cache_dir(
+    app: tauri::AppHandle,
+    text_file_cache_service: tauri::State<'_, Arc<FileCacheService>>,
+    path: PathBuf,
+) -> Result<(), String> {
+    text_file_cache_service.create_local_cache_dir(&app, path)
+}
+
+#[command]
 pub async fn is_portable_app(
     text_file_cache_service: tauri::State<'_, Arc<FileCacheService>>,
 ) -> Result<bool, String> {

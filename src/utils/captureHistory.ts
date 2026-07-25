@@ -9,7 +9,7 @@ import { retainDirFiles } from "@/commands/core";
 import {
 	copyFile,
 	createDir,
-	getAppConfigBaseDir,
+	getAppCacheDir,
 	removeDir,
 	removeFile,
 	writeFile,
@@ -46,7 +46,7 @@ export const getCaptureHistoryImageAbsPath = async (fileName: string) => {
 	}
 
 	const path = await joinPath(
-		await getAppConfigBaseDir(),
+		await getAppCacheDir(),
 		getCaptureImageFilePath(fileName),
 	);
 	getCaptureHistoryImageAbsPathCache.set(fileName, path);

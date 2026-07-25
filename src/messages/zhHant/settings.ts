@@ -511,6 +511,12 @@ export const settings = {
 	"settings.systemSettings.dataDirectory": "資料目錄",
 	"settings.systemSettings.dataFilePath.setDirectory.tip":
 		"修改後，軟體資料將儲存該目錄下，重新啟動後生效",
+	"settings.systemSettings.cacheDirectory": "快取目錄",
+	"settings.systemSettings.cacheDirectory.setDirectory.tip":
+		"修改後，截圖快取（截圖歷史等）將儲存於該目錄下，重新啟動後生效",
+	"settings.systemSettings.cacheDirectory.open": "開啟目錄",
+	"settings.systemSettings.cacheDirectory.open.failed":
+		"開啟快取目錄失敗，請手動複製目錄開啟",
 	"settings.systemSettings.dataFilePath.setDirectory": "更換目錄",
 	"settings.systemSettings.dataFilePath": "配置目錄",
 	"settings.systemSettings.dataFilePath.open": "開啟目錄",

@@ -28,7 +28,12 @@ import {
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { restartWithAdmin, setRememberWindowGeometry } from "@/commands/core";
-import { createLocalConfigDir, getAppConfigBaseDir } from "@/commands/file";
+import {
+	createLocalCacheDir,
+	createLocalConfigDir,
+	getAppCacheDir,
+	getAppConfigBaseDir,
+} from "@/commands/file";
 import { ContentWrap } from "@/components/contentWrap";
 import { GroupTitle } from "@/components/groupTitle";
 import { IconLabel } from "@/components/iconLable";
@@ -157,6 +162,7 @@ export const SystemSettingsPage = () => {
 
 	const [configDirPath, setConfigDirPath] = useState<string>("");
 	const [configDirBasePath, setConfigDirBasePath] = useState<string>("");
+	const [cacheDirPath, setCacheDirPath] = useState<string>("");
 	const [appLogPath, setAppLogPath] = useState<string>("");
 	useEffect(() => {
 		getConfigDirPath().then((path) => {
@@ -167,6 +173,9 @@ export const SystemSettingsPage = () => {
 		});
 		getAppConfigBaseDir().then((path) => {
 			setConfigDirBasePath(path);
+		});
+		getAppCacheDir().then((path) => {
+			setCacheDirPath(path);
 		});
 	}, []);
 
@@ -1116,6 +1125,82 @@ export const SystemSettingsPage = () => {
 												<FormattedMessage id="settings.systemSettings.dataFilePath.setDirectory.tip" />
 											}
 										/>
+									</Button>
+									<Button
+										onClick={async () => {
+											try {
+												await openPath(configDirBasePath);
+											} catch {
+												message.error(
+													<FormattedMessage id="settings.systemSettings.dataFilePath.open.failed" />,
+												);
+											}
+										}}
+									>
+										<FormattedMessage id="settings.systemSettings.dataFilePath.open" />
+									</Button>
+								</Space>
+							</ProForm.Item>
+						</Col>
+						<Col span={24}>
+							<ProForm.Item
+								label={
+									<IconLabel
+										label={
+											<FormattedMessage id="settings.systemSettings.cacheDirectory" />
+										}
+									/>
+								}
+							>
+								<Space wrap>
+									<Typography.Text
+										copyable={{
+											text: cacheDirPath,
+										}}
+									>
+										{cacheDirPath}
+									</Typography.Text>
+									<Button
+										color="orange"
+										onClick={async () => {
+											try {
+												const path = await dialog.open({
+													directory: true,
+													defaultPath: cacheDirPath,
+												});
+												if (!path) {
+													return;
+												}
+
+												await createLocalCacheDir(path);
+												relaunch();
+											} catch (error) {
+												appError("[enableLocalCache] error", error);
+												message.error(`${error}`);
+											}
+										}}
+									>
+										<IconLabel
+											label={
+												<FormattedMessage id="settings.systemSettings.dataFilePath.setDirectory" />
+											}
+											tooltipTitle={
+												<FormattedMessage id="settings.systemSettings.cacheDirectory.setDirectory.tip" />
+											}
+										/>
+									</Button>
+									<Button
+										onClick={async () => {
+											try {
+												await openPath(cacheDirPath);
+											} catch {
+												message.error(
+													<FormattedMessage id="settings.systemSettings.cacheDirectory.open.failed" />,
+												);
+											}
+										}}
+									>
+										<FormattedMessage id="settings.systemSettings.cacheDirectory.open" />
 									</Button>
 								</Space>
 							</ProForm.Item>

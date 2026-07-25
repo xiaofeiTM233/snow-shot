@@ -541,6 +541,12 @@ export const settings = {
 	"settings.systemSettings.dataDirectory": "Data Directory",
 	"settings.systemSettings.dataFilePath.setDirectory.tip":
 		"After modification, app data will be stored in this directory, takes effect after restart",
+	"settings.systemSettings.cacheDirectory": "Cache Directory",
+	"settings.systemSettings.cacheDirectory.setDirectory.tip":
+		"After modification, screenshot cache (capture history, etc.) will be stored in this directory, takes effect after restart",
+	"settings.systemSettings.cacheDirectory.open": "Open Directory",
+	"settings.systemSettings.cacheDirectory.open.failed":
+		"Failed to open cache directory, please manually copy and open the directory",
 	"settings.systemSettings.dataFilePath.setDirectory": "Change Directory",
 	"settings.systemSettings.dataFilePath": "Config Directory",
 	"settings.systemSettings.dataFilePath.open": "Open Directory",

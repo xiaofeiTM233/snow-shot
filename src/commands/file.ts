@@ -65,6 +65,16 @@ export const getAppConfigBaseDir = async () => {
 	return result;
 };
 
+export const getAppCacheDir = async () => {
+	const result = await invoke<string>("get_app_cache_dir");
+	return result;
+};
+
+export const createLocalCacheDir = async (path: string) => {
+	const result = await invoke<void>("create_local_cache_dir", { path });
+	return result;
+};
+
 export const isPortableApp = async () => {
 	const result = await invoke<boolean>("is_portable_app");
 	return result;
