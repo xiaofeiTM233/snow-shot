@@ -24,6 +24,7 @@ import { AntdContext } from "@/contexts/antdContext";
 import { AppContext } from "@/contexts/appContext";
 import { AppSettingsPublisher } from "@/contexts/appSettingsActionContext";
 import { usePluginServiceContext } from "@/contexts/pluginServiceContext";
+import { toggleFixedContentVisibility } from "@/functions/fixedContent";
 import {
 	executeScreenshot,
 	executeScreenshotFocusedWindow,
@@ -90,6 +91,7 @@ const TrayIconLoaderComponent = () => {
 	const intl = useIntl();
 	const { message } = useContext(AntdContext);
 	const [disableShortcut, _setDisableShortcut] = useState(false);
+	const [fixedContentVisible, setFixedContentVisible] = useState(true);
 	const [, setTrayIconState] = useStateSubscriber(
 		TrayIconStatePublisher,
 		useCallback((state: { disableShortcut: boolean }) => {
@@ -429,6 +431,23 @@ const TrayIconLoaderComponent = () => {
 						createFixedContentWindow();
 					},
 				},
+				{
+					id: `${appWindow.label}-toggle-fixed-content-visibility`,
+					text: intl.formatMessage({
+						id: "home.toggleFixedContentVisibility",
+					}),
+					accelerator: disableShortcut
+						? undefined
+						: formatKey(
+								shortcutKeys[AppFunction.ToggleFixedContentVisibility]
+									.shortcutKey,
+							),
+					checked: fixedContentVisible,
+					action: async () => {
+						setFixedContentVisible((visible) => !visible);
+						await toggleFixedContentVisibility();
+					},
+				},
 				...getPlatformValue(
 					[
 						{
@@ -573,6 +592,7 @@ const TrayIconLoaderComponent = () => {
 		enableTrayIcon,
 		intl,
 		disableShortcut,
+		fixedContentVisible,
 		delayScreenshotSeconds,
 		iconPath,
 		message,
