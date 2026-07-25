@@ -17,6 +17,8 @@ const APP_CONFIG_DIR: &str = "app_config_dir";
 const APP_CONFIG_BASE_DIR: &str = "app_config_base_dir";
 const APP_CONFIG_DIR_NAME: &str = "configs";
 const APP_CUSTOM_CONFIG_DIR_DATA_FILE_NAME: &str = "__custom_config_dir";
+const APP_CACHE_DIR: &str = "app_cache_dir";
+const APP_CUSTOM_CACHE_DIR_DATA_FILE_NAME: &str = "__custom_cache_dir";
 #[cfg(target_os = "windows")]
 const APP_PORTABLE_DIR_DATA_FILE_NAME: &str = "__portable";
 
@@ -169,6 +171,72 @@ impl FileCacheService {
 
         self.env_path_cache
             .insert(APP_CONFIG_BASE_DIR.to_string(), path.clone());
+
+        Ok(path)
+    }
+
+    /// 获取自定义的缓存目录（通过标记文件记录）
+    fn get_app_custom_cache_dir(&self, app: &tauri::AppHandle) -> Option<PathBuf> {
+        let app_data_config_dir = match app.path().app_config_dir() {
+            Ok(path) => path,
+            Err(_) => return None,
+        };
+
+        let custom_cache_dir_data_file =
+            app_data_config_dir.join(APP_CUSTOM_CACHE_DIR_DATA_FILE_NAME);
+
+        let path = match fs::read_to_string(custom_cache_dir_data_file) {
+            Ok(path) => path,
+            Err(_) => return None,
+        };
+        let path = PathBuf::from(path);
+
+        if !path.exists() {
+            return None;
+        }
+
+        Some(path)
+    }
+
+    /// 设置自定义的缓存目录（将路径写入标记文件）
+    pub fn create_local_cache_dir(
+        &self,
+        app: &tauri::AppHandle,
+        path: PathBuf,
+    ) -> Result<(), String> {
+        if !path.exists() {
+            fs::create_dir_all(path.clone()).map_err(|e| e.to_string())?;
+        }
+
+        let path = match path.to_str() {
+            Some(path) => path,
+            None => return Err(String::from("[create_local_cache_dir] Invalid path")),
+        };
+
+        // 写入到文件中记录下路径
+        let app_data_config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+
+        let custom_cache_dir_data_file =
+            app_data_config_dir.join(APP_CUSTOM_CACHE_DIR_DATA_FILE_NAME);
+
+        fs::write(custom_cache_dir_data_file, path.as_bytes()).map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
+
+    /// 获取缓存目录（应用缓存数据的存放位置，默认跟随系统缓存目录）
+    pub fn get_app_cache_dir(&self, app: &tauri::AppHandle) -> Result<PathBuf, String> {
+        if let Some(path) = self.env_path_cache.get(APP_CACHE_DIR) {
+            return Ok(path.clone());
+        }
+
+        let path = match self.get_app_custom_cache_dir(app) {
+            Some(path) => path,
+            None => app.path().app_cache_dir().map_err(|e| e.to_string())?,
+        };
+
+        self.env_path_cache
+            .insert(APP_CACHE_DIR.to_string(), path.clone());
 
         Ok(path)
     }
