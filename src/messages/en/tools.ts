@@ -89,6 +89,7 @@ export const tools = {
 	"tools.captureHistory.drawElements": "Draw Elements",
 	"tools.captureHistory.switch": "Edit",
 	"tools.captureHistory.copy": "Copy",
+	"tools.captureHistory.fixed": "Pin",
 	"tools.captureHistory.copyMonitor": "Copy Monitor Screen",
 	"tools.captureHistory.delete": "Delete",
 	"tools.captureHistory.delete.confirm": "Confirm to delete this screenshot?",
