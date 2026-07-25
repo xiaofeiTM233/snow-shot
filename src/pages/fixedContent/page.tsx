@@ -70,6 +70,15 @@ export const FixedContentPage: React.FC = () => {
 			return;
 		}
 
+		// 贴图指定的本地图片文件
+		const filePath = urlParams.get("file_path");
+		if (filePath) {
+			fixedContentActionRef.current?.init({
+				imageContent: convertFileSrc(filePath),
+			});
+			return;
+		}
+
 		if (urlParams.get("scroll_screenshot") === "true") {
 			// 可能通过 SharedBuffer 传递
 			const imageSharedBufferPromise =

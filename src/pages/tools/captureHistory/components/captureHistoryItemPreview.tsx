@@ -1,14 +1,13 @@
 import { EyeOutlined } from "@ant-design/icons";
 import { Image, Tooltip } from "antd";
-import { useState } from "react";
 import { FormattedMessage } from "react-intl";
 import type { CaptureHistoryRecordItem } from "../extra";
 
 export const CaptureHistoryItemPreview: React.FC<{
 	item: CaptureHistoryRecordItem;
-}> = ({ item }) => {
-	const [showCaptureResult, setShowCaptureResult] = useState(true);
-
+	showCaptureResult: boolean;
+	onToggleShowCaptureResult: () => void;
+}> = ({ item, showCaptureResult, onToggleShowCaptureResult }) => {
 	return (
 		<Tooltip
 			title={
@@ -39,7 +38,7 @@ export const CaptureHistoryItemPreview: React.FC<{
 				style={{ objectFit: "contain" }}
 				onContextMenu={(e) => {
 					e.preventDefault();
-					setShowCaptureResult(!showCaptureResult);
+					onToggleShowCaptureResult();
 				}}
 			/>
 		</Tooltip>
