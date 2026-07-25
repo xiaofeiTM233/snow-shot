@@ -162,6 +162,7 @@ pub fn run() {
 		log::LevelFilter::Warn as u8,
 	));
 	let enable_run_log_clone = enable_run_log.clone();
+	let enable_run_log_boot = enable_run_log.clone();
 
     let plugin_service = Arc::new(plugin_service::PluginService::new());
 
@@ -264,6 +265,19 @@ pub fn run() {
                 .build(),
         )
         .setup(move |app| {
+            // 启动前先读取用户持久化的「运行日志」级别
+            let run_log_level = read_run_log_setting(app);
+            enable_run_log_boot.store(run_log_level as u8, std::sync::atomic::Ordering::Relaxed);
+
+            // 软件启动 info 日志：记录版本、平台与架构，便于排查环境相关问题。
+            log::info!(
+                "[startup] Snow Shot 启动 | 版本: {} | 平台: {} | 架构: {} | 调试模式: {}",
+                app.config().version.as_deref().unwrap_or("unknown"),
+                std::env::consts::OS,
+                std::env::consts::ARCH,
+                cfg!(debug_assertions)
+            );
+
             let main_window = app
                 .get_webview_window("main")
                 .expect("[lib::setup] no main window");
@@ -503,6 +517,44 @@ pub fn run() {
             save_main_window_geometry(app);
         }
     });
+}
+
+/// 读取持久化的「运行日志」级别。
+fn read_run_log_setting(app: &tauri::App) -> log::LevelFilter {
+    let file_cache = app.state::<Arc<file_cache_service::FileCacheService>>();
+    let config_dir = match file_cache.get_app_config_dir(app.handle()) {
+        Ok(dir) => dir,
+        Err(_) => return log::LevelFilter::Warn,
+    };
+
+    let path = config_dir.join("systemCommon.json");
+    let content = match std::fs::read_to_string(path) {
+        Ok(value) => value,
+        Err(_) => return log::LevelFilter::Warn,
+    };
+
+    let value: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(value) => value,
+        Err(_) => return log::LevelFilter::Warn,
+    };
+
+    match value.get("runLog").and_then(|value| value.as_str()) {
+        Some(level) => map_run_log_str(level),
+        None => log::LevelFilter::Warn,
+    }
+}
+
+/// 将 runLog 字符串映射为 log 级别；未知值回退 Warn。
+fn map_run_log_str(level: &str) -> log::LevelFilter {
+    match level {
+        "off" => log::LevelFilter::Off,
+        "error" => log::LevelFilter::Error,
+        "warn" => log::LevelFilter::Warn,
+        "info" => log::LevelFilter::Info,
+        "debug" => log::LevelFilter::Debug,
+        "trace" => log::LevelFilter::Trace,
+        _ => log::LevelFilter::Warn,
+    }
 }
 
 /// 使用标准库生成 `YYYY-MM-DD_HH-MM-SS` 形式的时间戳（UTC），
