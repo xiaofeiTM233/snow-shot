@@ -1433,6 +1433,16 @@ export const FunctionSettingsPage = () => {
 								layout="horizontal"
 							/>
 						</Col>
+
+						<Col span={12}>
+							<ProFormSwitch
+								label={
+									<FormattedMessage id="settings.functionSettings.fixedContentSettings.showStickerRestoreDefaultSize" />
+								}
+								name="showStickerRestoreDefaultSize"
+								layout="horizontal"
+							/>
+						</Col>
 					</Row>
 				</ProForm>
 			</Spin>

@@ -1,5 +1,9 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import React, { useContext, useEffect } from "react";
+import React, {
+	useContext,
+	useEffect,
+	useRef,
+} from "react";
 import { EventListenerContext } from "@/components/eventListener";
 import {
 	FIXED_CONTENT_FOCUS_MODE_CLOSE_ALL_WINDOW,
@@ -12,8 +16,13 @@ import {
 const HandleFocusModeCore: React.FC<{
 	disabled?: boolean;
 	onToggleVisibility?: (visible: boolean) => void;
-}> = ({ disabled, onToggleVisibility }) => {
+	onShowSticker?: () => void;
+}> = ({ disabled, onToggleVisibility, onShowSticker }) => {
 	const { addListener, removeListener } = useContext(EventListenerContext);
+
+	// 始终持有最新的 onShowSticker，避免监听器闭包过期
+	const onShowStickerRef = useRef(onShowSticker);
+	onShowStickerRef.current = onShowSticker;
 
 	// Toggle visibility 监听器不受 disabled 控制，否则隐藏后无法恢复
 	useEffect(() => {
@@ -31,6 +40,7 @@ const HandleFocusModeCore: React.FC<{
 				const currentWindow = getCurrentWindow();
 				if (payload.payload.visible) {
 					currentWindow.show();
+					onShowStickerRef.current?.();
 				} else {
 					currentWindow.hide();
 				}
@@ -53,6 +63,7 @@ const HandleFocusModeCore: React.FC<{
 			FIXED_CONTENT_FOCUS_MODE_SHOW_ALL_WINDOW,
 			() => {
 				currentWindow.show();
+				onShowStickerRef.current?.();
 			},
 		);
 		const hideOtherWindowListenerId = addListener(
