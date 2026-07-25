@@ -483,12 +483,6 @@ pub fn run() {
                     }
                 }
             }
-        })
-        .on_run_event(move |app, event| {
-            // 应用退出时持久化主窗口几何信息，确保即使未触发关闭按钮也能保存
-            if let tauri::RunEvent::Exit = event {
-                save_main_window_geometry(app);
-            }
         });
 
     #[cfg(target_os = "windows")]
@@ -496,9 +490,16 @@ pub fn run() {
         app_builder = app_builder.manage(shared_buffer_service);
     }
 
-    app_builder
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+    let app = app_builder
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(move |app, event| {
+        // 应用退出时持久化主窗口几何信息，确保即使未触发关闭按钮也能保存
+        if let tauri::RunEvent::Exit = event {
+            save_main_window_geometry(app);
+        }
+    });
 }
 
 /// 使用标准库生成 `YYYY-MM-DD_HH-MM-SS` 形式的时间戳（UTC），
