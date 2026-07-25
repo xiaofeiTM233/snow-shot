@@ -211,6 +211,18 @@ const MenuLayoutCore: React.FC<{ children: React.ReactNode }> = ({
 							},
 						],
 					},
+					{
+						key: "/tools/collage",
+						path: "/tools/collage",
+						label: intl.formatMessage({ id: "menu.tools.collage" }),
+						hideTabs: true,
+						tabs: [
+							{
+								key: "collage",
+								label: intl.formatMessage({ id: "menu.tools.collage" }),
+							},
+						],
+					},
 				].filter((item) => {
 					if (item.key === "/tools/chat") {
 						return isReadyStatus?.(PLUGIN_ID_AI_CHAT);
