@@ -24,6 +24,7 @@ import { AntdContext } from "@/contexts/antdContext";
 import { AppContext } from "@/contexts/appContext";
 import { AppSettingsPublisher } from "@/contexts/appSettingsActionContext";
 import { usePluginServiceContext } from "@/contexts/pluginServiceContext";
+import { toggleFixedContentVisibility } from "@/functions/fixedContent";
 import {
 	executeScreenshot,
 	executeScreenshotFocusedWindow,
@@ -427,6 +428,21 @@ const TrayIconLoaderComponent = () => {
 						: formatKey(shortcutKeys[AppFunction.FixedContent].shortcutKey),
 					action: async () => {
 						createFixedContentWindow();
+					},
+				},
+				{
+					id: `${appWindow.label}-toggle-fixed-content-visibility`,
+					text: intl.formatMessage({
+						id: "home.toggleFixedContentVisibility",
+					}),
+					accelerator: disableShortcut
+						? undefined
+						: formatKey(
+								shortcutKeys[AppFunction.ToggleFixedContentVisibility]
+									.shortcutKey,
+							),
+					action: async () => {
+						await toggleFixedContentVisibility();
 					},
 				},
 				...getPlatformValue(
