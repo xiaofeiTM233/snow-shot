@@ -39,9 +39,14 @@ export const autoScrollThrough = async (
 	return result;
 };
 
-export const createFixedContentWindow = async (scrollScreenshot?: boolean) => {
+export const createFixedContentWindow = async (
+	scrollScreenshot?: boolean,
+	// 指定要贴图的图片绝对路径
+	filePath?: string,
+) => {
 	const result = await invoke<void>("create_fixed_content_window", {
 		scrollScreenshot: scrollScreenshot ?? false,
+		filePath: filePath ? encodeURIComponent(filePath) : null,
 	});
 	return result;
 };

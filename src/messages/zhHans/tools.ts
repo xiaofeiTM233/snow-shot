@@ -88,6 +88,7 @@ export const tools = {
 	"tools.captureHistory.drawElements": "绘制元素",
 	"tools.captureHistory.switch": "编辑",
 	"tools.captureHistory.copy": "复制",
+	"tools.captureHistory.fixed": "贴图",
 	"tools.captureHistory.copyMonitor": "复制显示器画面",
 	"tools.captureHistory.delete": "删除",
 	"tools.captureHistory.delete.confirm": "确定要删除该截图吗？",

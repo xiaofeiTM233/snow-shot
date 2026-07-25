@@ -88,6 +88,7 @@ export const tools = {
 	"tools.captureHistory.drawElements": "繪製元素",
 	"tools.captureHistory.switch": "編輯",
 	"tools.captureHistory.copy": "複製",
+	"tools.captureHistory.fixed": "貼圖",
 	"tools.captureHistory.copyMonitor": "複製螢幕畫面",
 	"tools.captureHistory.delete": "刪除",
 	"tools.captureHistory.delete.confirm": "確定要刪除該截圖嗎？",
