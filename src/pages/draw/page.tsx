@@ -81,7 +81,7 @@ import {
 	getImagePathFromSettings,
 	showImageDialog,
 } from "@/utils/file";
-import { appError, appWarn } from "@/utils/log";
+import { appError, appWarn, appInfo } from "@/utils/log";
 import { MousePosition } from "@/utils/mousePosition";
 import { ScreenshotType } from "@/utils/types";
 import { setWindowRect, showWindow as showCurrentWindow } from "@/utils/window";
@@ -640,6 +640,11 @@ const DrawPageCore: React.FC<{
 			excuteScreenshotType: ScreenshotType,
 			params: { windowId?: string; captureHistoryId?: string },
 		) => {
+			appInfo("[DIAG] excuteScreenshot: start", {
+				excuteScreenshotType,
+				capturing: capturingRef.current,
+				drawPageState: drawPageStateRef.current,
+			});
 			capturingRef.current = true;
 			setCaptureStateAction(true);
 			drawToolbarActionRef.current?.setEnable(false);
@@ -1414,6 +1419,11 @@ const DrawPageCore: React.FC<{
 	useEffect(() => {
 		// 监听截图命令
 		const listenerId = addListener("execute-screenshot", (args) => {
+			appInfo("[DIAG] draw: execute-screenshot listener fired", {
+				label: appWindowRef.current?.label,
+				capturing: capturingRef.current,
+				drawPageState: drawPageStateRef.current,
+			});
 			const payload = (
 				args as {
 					payload: {
