@@ -91,7 +91,6 @@ const TrayIconLoaderComponent = () => {
 	const intl = useIntl();
 	const { message } = useContext(AntdContext);
 	const [disableShortcut, _setDisableShortcut] = useState(false);
-	const [fixedContentVisible, setFixedContentVisible] = useState(true);
 	const [, setTrayIconState] = useStateSubscriber(
 		TrayIconStatePublisher,
 		useCallback((state: { disableShortcut: boolean }) => {
@@ -442,9 +441,7 @@ const TrayIconLoaderComponent = () => {
 								shortcutKeys[AppFunction.ToggleFixedContentVisibility]
 									.shortcutKey,
 							),
-					checked: fixedContentVisible,
 					action: async () => {
-						setFixedContentVisible((visible) => !visible);
 						await toggleFixedContentVisibility();
 					},
 				},
@@ -592,7 +589,6 @@ const TrayIconLoaderComponent = () => {
 		enableTrayIcon,
 		intl,
 		disableShortcut,
-		fixedContentVisible,
 		delayScreenshotSeconds,
 		iconPath,
 		message,
