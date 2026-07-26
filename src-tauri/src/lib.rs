@@ -272,7 +272,7 @@ pub fn run() {
             // 软件启动 info 日志：记录版本、平台与架构，便于排查环境相关问题。
             log::info!(
                 "[startup] Snow Shot 启动 | 版本: {} | 平台: {} | 架构: {} | 调试模式: {}",
-                app.config().version,
+                app.config().version.as_deref().unwrap_or("unknown"),
                 std::env::consts::OS,
                 std::env::consts::ARCH,
                 cfg!(debug_assertions)
