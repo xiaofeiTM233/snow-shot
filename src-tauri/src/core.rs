@@ -78,6 +78,15 @@ pub async fn create_fixed_content_window(
     .await
 }
 
+/// 创建翻译弹窗窗口
+#[command]
+pub async fn create_translation_window(
+    app: tauri::AppHandle,
+    select_text: Option<String>,
+) -> Result<(), String> {
+    snow_shot_tauri_commands_core::create_translation_window(app, select_text).await
+}
+
 #[command]
 pub async fn read_image_from_clipboard(
     handle: tauri::AppHandle,
