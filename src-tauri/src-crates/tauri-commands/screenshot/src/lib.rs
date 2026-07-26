@@ -13,7 +13,7 @@ use snow_shot_app_utils::monitor_info::{
 };
 use snow_shot_global_state::WebViewSharedBufferState;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::ipc::Response;
 use tokio::sync::Mutex;
 
@@ -583,16 +583,18 @@ pub async fn get_mouse_position(app: tauri::AppHandle) -> Result<(i32, i32), Str
     snow_shot_app_utils::get_mouse_position(&app)
 }
 
+/// 用于生成唯一的「绘图/截图」窗口标签，避免同一秒内创建多个窗口时标签冲突
+static DRAW_WINDOW_COUNTER: AtomicU64 = AtomicU64::new(0);
+
 pub async fn create_draw_window(app: tauri::AppHandle) {
-    let window = tauri::WebviewWindowBuilder::new(
+    let draw_window_label = format!(
+        "draw-{}",
+        DRAW_WINDOW_COUNTER.fetch_add(1, Ordering::SeqCst)
+    );
+
+    let window = match tauri::WebviewWindowBuilder::new(
         &app,
-        format!(
-            "draw-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-        ),
+        draw_window_label,
         tauri::WebviewUrl::App(format!("/draw").into()),
     )
     .resizable(false)
@@ -608,7 +610,13 @@ pub async fn create_draw_window(app: tauri::AppHandle) {
     .visible(false)
     .focused(false)
     .build()
-    .unwrap();
+    {
+        Ok(window) => window,
+        Err(e) => {
+            log::error!("[create_draw_window] Failed to build window: {}", e);
+            return;
+        }
+    };
 
     #[cfg(target_os = "windows")]
     {

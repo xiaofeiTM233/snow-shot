@@ -3,7 +3,10 @@ use futures::stream::StreamExt;
 use serde::Serialize;
 use std::{
     path::PathBuf,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::Emitter;
@@ -150,6 +153,9 @@ pub async fn click_through(window: tauri::Window) -> Result<(), ()> {
     Ok(())
 }
 
+/// 用于生成唯一的「内容固定」窗口标签，避免同一秒内创建多个窗口时标签冲突
+static FIXED_CONTENT_WINDOW_COUNTER: AtomicU64 = AtomicU64::new(0);
+
 /// 创建内容固定到屏幕的窗口
 pub async fn create_fixed_content_window(
     app: tauri::AppHandle,
@@ -216,15 +222,14 @@ pub async fn create_fixed_content_window(
         return Ok(());
     }
 
-    let window = tauri::WebviewWindowBuilder::new(
+    let fixed_content_window_label = format!(
+        "fixed-content-{}",
+        FIXED_CONTENT_WINDOW_COUNTER.fetch_add(1, Ordering::SeqCst)
+    );
+
+    let window = match tauri::WebviewWindowBuilder::new(
         &app,
-        format!(
-            "fixed-content-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-        ),
+        fixed_content_window_label,
         tauri::WebviewUrl::App(PathBuf::from(url)),
     )
     .always_on_top(true)
@@ -242,7 +247,16 @@ pub async fn create_fixed_content_window(
     .inner_size(500.0, 500.0)
     .position(0.0, 0.0)
     .build()
-    .unwrap();
+    {
+        Ok(window) => window,
+        Err(e) => {
+            log::error!("[create_fixed_content_window] Failed to build window: {}", e);
+            return Err(format!(
+                "[create_fixed_content_window] Failed to build window: {}",
+                e
+            ));
+        }
+    };
 
     window.hide().unwrap();
     window.center().unwrap();
