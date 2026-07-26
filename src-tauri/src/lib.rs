@@ -74,10 +74,19 @@ fn save_main_window_geometry(app: &tauri::AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
+    // 最小化时 outer 尺寸/位置是系统占位值（如 Windows 的 -32000），
+    // 此时保存会把窗口“丢”到屏幕外，应跳过，保留上一次正常几何
+    if matches!(window.is_minimized(), Ok(true)) {
+        return;
+    }
     let (size, pos) = match (window.outer_size(), window.outer_position()) {
         (Ok(s), Ok(p)) => (s, p),
         _ => return,
     };
+    // 兜底校验：过滤异常几何（最小化残留、拖出屏幕外等）
+    if size.width < 10 || size.height < 10 || pos.x < 0 || pos.y < 0 {
+        return;
+    }
     let geo = MainWindowGeometry {
         width: size.width,
         height: size.height,
@@ -106,7 +115,7 @@ fn restore_main_window_geometry(app: &tauri::AppHandle) {
     let Ok(geo) = serde_json::from_str::<MainWindowGeometry>(&content) else {
         return;
     };
-    if geo.width > 0 && geo.height > 0 {
+    if geo.width >= 10 && geo.height >= 10 && geo.x >= 0 && geo.y >= 0 {
         let _ = window.set_size(tauri::PhysicalSize::new(geo.width, geo.height));
         let _ = window.set_position(tauri::PhysicalPosition::new(geo.x, geo.y));
     }
@@ -485,12 +494,6 @@ pub fn run() {
                         log::error!("[listen_mouse_service:stop] Failed to emit event: {}", e);
                     }
                 }
-            }
-        })
-        .on_run_event(move |app, event| {
-            // 应用退出时持久化主窗口几何信息，确保即使未触发关闭按钮也能保存
-            if let tauri::RunEvent::Exit = event {
-                save_main_window_geometry(app);
             }
         });
 
