@@ -715,10 +715,11 @@ const DrawPageCore: React.FC<{
 					layerOnExecuteScreenshotPromise,
 				]);
 			} catch (error) {
+				// 无论如何先把 capturing 状态复位，避免一次异常导致后续所有截图静默失效
+				capturingRef.current = false;
+				setCaptureStateAction(false);
 				// 防止用户提前退出报错
 				if (getCaptureEvent()?.event !== CaptureEvent.onExecuteScreenshot) {
-					capturingRef.current = false;
-					setCaptureStateAction(false);
 					return;
 				}
 
