@@ -502,12 +502,6 @@ pub fn run() {
                     }
                 }
             }
-        })
-        .on_run_event(move |app, event| {
-            // 应用退出时持久化主窗口几何信息，确保即使未触发关闭按钮也能保存
-            if let tauri::RunEvent::Exit = event {
-                save_main_window_geometry(app);
-            }
         });
 
     #[cfg(target_os = "windows")]
