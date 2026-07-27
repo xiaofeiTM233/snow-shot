@@ -63,7 +63,7 @@ impl HotLoadPageService {
         let window = match tauri::WebviewWindowBuilder::new(
             app_handle,
             window_label.as_str(),
-            tauri::WebviewUrl::App(PathBuf::from(format!("/fixedContent?idle_page=true",))),
+            tauri::WebviewUrl::App(PathBuf::from(format!("/#/fixedContent?idle_page=true",))),
         )
         .resizable(false)
         .maximizable(false)

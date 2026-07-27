@@ -230,7 +230,7 @@ pub async fn create_fixed_content_window(
     let window = match tauri::WebviewWindowBuilder::new(
         &app,
         fixed_content_window_label,
-        tauri::WebviewUrl::App(PathBuf::from(url)),
+        tauri::WebviewUrl::App(PathBuf::from(format!("/#{}", url))),
     )
     .always_on_top(true)
     .resizable(false)
@@ -335,9 +335,9 @@ pub async fn create_full_screen_draw_window(
                     window
                 }
                 None => tauri::WebviewWindowBuilder::new(
-                    &app,
-                    format!("full-screen-draw"),
-                    tauri::WebviewUrl::App(PathBuf::from(main_window_url.clone())),
+                &app,
+                format!("full-screen-draw"),
+                tauri::WebviewUrl::App(PathBuf::from(format!("/#{}", main_window_url.clone()))),
                 )
                 .always_on_top(true)
                 .resizable(false)
@@ -384,9 +384,9 @@ pub async fn create_full_screen_draw_window(
                     window
                 }
                 None => tauri::WebviewWindowBuilder::new(
-                    &app,
-                    format!("full-screen-draw-switch-mouse-through"),
-                    tauri::WebviewUrl::App(PathBuf::from(switch_mouse_through_window_url.clone())),
+                &app,
+                format!("full-screen-draw-switch-mouse-through"),
+                tauri::WebviewUrl::App(PathBuf::from(format!("/#{}", switch_mouse_through_window_url.clone()))),
                 )
                 .always_on_top(true)
                 .resizable(false)
@@ -647,7 +647,7 @@ pub async fn create_video_record_window(
                 None => tauri::WebviewWindowBuilder::new(
                     &app,
                     "video-recording",
-                    tauri::WebviewUrl::App(PathBuf::from(main_window_url.clone())),
+                    tauri::WebviewUrl::App(PathBuf::from(format!("/#{}", main_window_url.clone()))),
                 )
                 .always_on_top(true)
                 .resizable(false)
@@ -693,7 +693,7 @@ pub async fn create_video_record_window(
                 None => tauri::WebviewWindowBuilder::new(
                     &app,
                     "video-recording-toolbar",
-                    tauri::WebviewUrl::App(PathBuf::from(toolbar_window_url.clone())),
+                    tauri::WebviewUrl::App(PathBuf::from(format!("/#{}", toolbar_window_url.clone()))),
                 )
                 .always_on_top(true)
                 .resizable(false)

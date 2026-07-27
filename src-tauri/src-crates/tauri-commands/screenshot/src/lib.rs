@@ -595,7 +595,7 @@ pub async fn create_draw_window(app: tauri::AppHandle) {
     let window = match tauri::WebviewWindowBuilder::new(
         &app,
         draw_window_label,
-        tauri::WebviewUrl::App(format!("/draw").into()),
+        tauri::WebviewUrl::App(format!("/#/draw").into()),
     )
     .resizable(false)
     .maximizable(false)
