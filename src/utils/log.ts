@@ -78,26 +78,24 @@ function formatExtraInfo(extra: unknown): string {
 	if (typeof extra === "object") {
 		try {
 			const obj = extra as Record<string, unknown>;
-			const lines: string[] = [];
+			const parts: string[] = [];
 
 			for (const [key, value] of Object.entries(obj)) {
 				if (key === "stack" && typeof value === "string") {
-					// 堆栈信息直接输出，保留换行符
-					lines.push(`${key}:`);
-					lines.push(value);
+					// 堆栈信息压缩成单行，避免日志被拆成多行
+					parts.push(`${key}: ${value.replace(/\s*\n\s*/g, " ")}`);
 				} else if (typeof value === "string" && value.includes("\n")) {
-					// 其他包含换行符的字符串
-					lines.push(`${key}:`);
-					lines.push(value);
+					// 其他包含换行符的字符串同样压缩成单行
+					parts.push(`${key}: ${value.replace(/\s*\n\s*/g, " ")}`);
 				} else {
 					// 其他值使用 JSON.stringify
-					lines.push(`${key}: ${JSON.stringify(value)}`);
+					parts.push(`${key}: ${JSON.stringify(value)}`);
 				}
 			}
 
-			return `\n${lines.join("\n")}`;
+			return ` ${parts.join(", ")}`;
 		} catch {
-			return "\n[无法序列化额外信息]";
+			return " [无法序列化额外信息]";
 		}
 	}
 
