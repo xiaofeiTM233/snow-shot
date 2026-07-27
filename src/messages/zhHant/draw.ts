@@ -143,6 +143,8 @@ export const draw = {
 	"draw.confirm": "確定",
 	"draw.crop": "裁剪",
 	"draw.crop.cancel": "取消",
+	"draw.crop.reset": "重新選擇",
+	"draw.crop.hint": "拖拽選擇裁剪區域",
 	"draw.serialNumber": "序列號",
 	"draw.drawStyleTool": "繪製樣式",
 	"draw.scrollAction": "捲動行為",

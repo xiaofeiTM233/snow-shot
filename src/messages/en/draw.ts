@@ -153,6 +153,8 @@ export const draw = {
 	"draw.confirm": "Confirm",
 	"draw.crop": "Crop",
 	"draw.crop.cancel": "Cancel",
+	"draw.crop.reset": "Reselect",
+	"draw.crop.hint": "Drag to select crop area",
 	"draw.serialNumber": "Serial Number",
 	"draw.drawStyleTool": "Drawing Style",
 	"draw.scrollAction": "Scroll Action",

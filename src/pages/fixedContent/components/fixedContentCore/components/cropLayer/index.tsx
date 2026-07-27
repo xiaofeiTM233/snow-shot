@@ -1,9 +1,12 @@
-import { CheckOutlined, CloseOutlined } from "@ant-design/icons";
+import {
+	CheckOutlined,
+	CloseOutlined,
+	ReloadOutlined,
+} from "@ant-design/icons";
 import { Button, theme } from "antd";
 import React, {
 	useCallback,
 	useEffect,
-	useImperativeHandle,
 	useRef,
 	useState,
 } from "react";
@@ -16,13 +19,14 @@ export type CropLayerProps = {
 	sourceCanvas: HTMLCanvasElement;
 	/** 画布坐标系尺寸 */
 	canvasSize: { width: number; height: number };
-	/** 显示尺寸（CSS 像素，等于窗口内容显示尺寸） */
-	displaySize: { width: number; height: number };
+	/** 显示尺寸（CSS 像素），仅作为首帧参考，实际尺寸由容器自适应测量 */
+	displaySize?: { width: number; height: number };
 	onConfirm: (cropRect: ElementRect) => void;
 	onCancel: () => void;
 };
 
 type DragMode =
+	| "create"
 	| "move"
 	| "nw"
 	| "n"
@@ -51,6 +55,9 @@ const clamp = (value: number, min: number, max: number) => {
 	return Math.min(Math.max(value, min), max);
 };
 
+const isRectValid = (rect: ElementRect) =>
+	rect.max_x - rect.min_x > 1 && rect.max_y - rect.min_y > 1;
+
 export const CropLayer: React.FC<CropLayerProps> = ({
 	sourceCanvas,
 	canvasSize,
@@ -65,17 +72,26 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 	const displayCanvasRef = useRef<HTMLCanvasElement>(null);
 	const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
 
+	// 实际显示尺寸（CSS 像素），由容器自适应测量，避免外部传入尺寸不准
+	const [viewSize, setViewSize] = useState<{ width: number; height: number }>(
+		() => ({
+			width: displaySize?.width || canvasSize.width,
+			height: displaySize?.height || canvasSize.height,
+		}),
+	);
+
 	const factorRef = useRef({ x: 1, y: 1 });
 	factorRef.current = {
-		x: canvasSize.width / Math.max(1, displaySize.width),
-		y: canvasSize.height / Math.max(1, displaySize.height),
+		x: canvasSize.width / Math.max(1, viewSize.width),
+		y: canvasSize.height / Math.max(1, viewSize.height),
 	};
 
+	// 初始无选区（全遮罩），由用户拖拽创建——更贴近截图选区体验
 	const [selectRect, setSelectRect] = useState<ElementRect>({
 		min_x: 0,
 		min_y: 0,
-		max_x: canvasSize.width,
-		max_y: canvasSize.height,
+		max_x: 0,
+		max_y: 0,
 	});
 
 	const dragModeRef = useRef<DragMode | undefined>(undefined);
@@ -84,6 +100,26 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 		y: number;
 		rect: ElementRect;
 	} | undefined>(undefined);
+
+	// 测量容器真实显示尺寸
+	useEffect(() => {
+		const el = containerRef.current;
+		if (!el) {
+			return;
+		}
+		const update = () => {
+			const rect = el.getBoundingClientRect();
+			if (rect.width > 0 && rect.height > 0) {
+				setViewSize({ width: rect.width, height: rect.height });
+			}
+		};
+		update();
+		const ro = new ResizeObserver(update);
+		ro.observe(el);
+		return () => {
+			ro.disconnect();
+		};
+	}, []);
 
 	// 绘制显示画布（快照）
 	useEffect(() => {
@@ -115,9 +151,8 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 		const factor = factorRef.current;
 		const dpr = window.devicePixelRatio || 1;
 
-		// 使用 CSS 像素作为绘制坐标系，保证清晰度与交互一致
-		const cssWidth = displaySize.width;
-		const cssHeight = displaySize.height;
+		const cssWidth = viewSize.width;
+		const cssHeight = viewSize.height;
 		if (
 			overlayCanvas.width !== Math.round(cssWidth * dpr) ||
 			overlayCanvas.height !== Math.round(cssHeight * dpr)
@@ -128,14 +163,21 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 		ctx.clearRect(0, 0, cssWidth, cssHeight);
 
+		const hasSelection = isRectValid(selectRect);
+
+		// 遮罩
+		ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+		ctx.fillRect(0, 0, cssWidth, cssHeight);
+
+		if (!hasSelection) {
+			return;
+		}
+
 		const sx = selectRect.min_x / factor.x;
 		const sy = selectRect.min_y / factor.y;
 		const sw = (selectRect.max_x - selectRect.min_x) / factor.x;
 		const sh = (selectRect.max_y - selectRect.min_y) / factor.y;
 
-		// 遮罩
-		ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
-		ctx.fillRect(0, 0, cssWidth, cssHeight);
 		// 透出选区内容
 		ctx.clearRect(sx, sy, sw, sh);
 
@@ -172,7 +214,7 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 				handleSize,
 			);
 		}
-	}, [selectRect, displaySize.width, displaySize.height, token.colorPrimary, token.colorWhite]);
+	}, [selectRect, viewSize.width, viewSize.height, token.colorPrimary, token.colorWhite]);
 
 	useEffect(() => {
 		drawOverlay();
@@ -180,25 +222,30 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 
 	const getCanvasPosition = useCallback(
 		(clientX: number, clientY: number) => {
-			const overlayCanvas = overlayCanvasRef.current;
-			if (!overlayCanvas) {
+			const el = containerRef.current;
+			if (!el) {
 				return { x: 0, y: 0 };
 			}
-			const rect = overlayCanvas.getBoundingClientRect();
-			const factor = factorRef.current;
+			const rect = el.getBoundingClientRect();
+			if (rect.width === 0 || rect.height === 0) {
+				return { x: 0, y: 0 };
+			}
 			return {
-				x: ((clientX - rect.left) * factor.x) / (rect.width / displaySize.width),
-				y: ((clientY - rect.top) * factor.y) / (rect.height / displaySize.height),
+				x: ((clientX - rect.left) * canvasSize.width) / rect.width,
+				y: ((clientY - rect.top) * canvasSize.height) / rect.height,
 			};
 		},
-		[displaySize.width, displaySize.height],
+		[canvasSize.width, canvasSize.height],
 	);
 
 	const getDragModeFromPosition = useCallback(
 		(x: number, y: number): DragMode => {
+			const sel = selectRect;
+			if (!isRectValid(sel)) {
+				return "create";
+			}
 			const factor = factorRef.current;
 			const tolerance = 12 * Math.max(factor.x, factor.y);
-			const sel = selectRect;
 			const handleCenters: { mode: DragMode; x: number; y: number }[] = [
 				{ mode: "nw", x: sel.min_x, y: sel.min_y },
 				{ mode: "n", x: (sel.min_x + sel.max_x) / 2, y: sel.min_y },
@@ -217,7 +264,16 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 					return handle.mode;
 				}
 			}
-			return "move";
+			// 选区内部 → 移动；选区外部 → 重新框选
+			if (
+				x > sel.min_x &&
+				x < sel.max_x &&
+				y > sel.min_y &&
+				y < sel.max_y
+			) {
+				return "move";
+			}
+			return "create";
 		},
 		[selectRect],
 	);
@@ -241,7 +297,10 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 			dragStartRef.current = {
 				x: pos.x,
 				y: pos.y,
-				rect: { ...selectRect },
+				rect:
+					mode === "create"
+						? { min_x: pos.x, min_y: pos.y, max_x: pos.x, max_y: pos.y }
+						: { ...selectRect },
 			};
 		},
 		[getCanvasPosition, getDragModeFromPosition, selectRect],
@@ -262,9 +321,20 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 			const canvasW = canvasSize.width;
 			const canvasH = canvasSize.height;
 			const minSize = 1;
-
 			const mode = dragModeRef.current;
-			const handle = HANDLE_LIST.find((item) => item.mode === mode);
+
+			if (mode === "create") {
+				const newMaxX = clamp(Math.max(orig.min_x, pos.x), 0, canvasW);
+				const newMaxY = clamp(Math.max(orig.min_y, pos.y), 0, canvasH);
+				setSelectRect({
+					min_x: orig.min_x,
+					min_y: orig.min_y,
+					max_x: newMaxX,
+					max_y: newMaxY,
+				});
+				return;
+			}
+
 			if (mode === "move") {
 				const selW = orig.max_x - orig.min_x;
 				const selH = orig.max_y - orig.min_y;
@@ -279,6 +349,7 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 				return;
 			}
 
+			const handle = HANDLE_LIST.find((item) => item.mode === mode);
 			if (!handle) {
 				return;
 			}
@@ -301,20 +372,23 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 		[getCanvasPosition, canvasSize.width, canvasSize.height],
 	);
 
-	const onPointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-		if (e.button !== 0) {
-			return;
-		}
-		e.preventDefault();
-		e.stopPropagation();
-		try {
-			overlayCanvasRef.current?.releasePointerCapture(e.pointerId);
-		} catch {
-			// ignore
-		}
-		dragModeRef.current = undefined;
-		dragStartRef.current = undefined;
-	}, []);
+	const onPointerUp = useCallback(
+		(e: React.PointerEvent<HTMLCanvasElement>) => {
+			if (e.button !== 0) {
+				return;
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			try {
+				overlayCanvasRef.current?.releasePointerCapture(e.pointerId);
+			} catch {
+				// ignore
+			}
+			dragModeRef.current = undefined;
+			dragStartRef.current = undefined;
+		},
+		[],
+	);
 
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
@@ -323,7 +397,9 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 				onCancel();
 			} else if (e.key === "Enter") {
 				e.preventDefault();
-				onConfirm(selectRect);
+				if (isRectValid(selectRect)) {
+					onConfirm(selectRect);
+				}
 			}
 		};
 		window.addEventListener("keydown", onKeyDown);
@@ -331,6 +407,8 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 			window.removeEventListener("keydown", onKeyDown);
 		};
 	}, [onCancel, onConfirm, selectRect]);
+
+	const hasSelection = isRectValid(selectRect);
 
 	return (
 		<div
@@ -340,11 +418,16 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 				position: "absolute",
 				top: 0,
 				left: 0,
-				width: `${displaySize.width}px`,
-				height: `${displaySize.height}px`,
+				right: 0,
+				bottom: 0,
 				zIndex: zIndexs.FixedToScreen_CloseButton + 1,
 				pointerEvents: "auto",
-				cursor: dragModeRef.current === "move" ? "move" : "crosshair",
+				cursor:
+					dragModeRef.current === "create"
+						? "crosshair"
+						: dragModeRef.current === "move"
+							? "move"
+							: "default",
 				userSelect: "none",
 			}}
 			onWheel={(e) => {
@@ -361,8 +444,8 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 					position: "absolute",
 					top: 0,
 					left: 0,
-					width: `${displaySize.width}px`,
-					height: `${displaySize.height}px`,
+					width: "100%",
+					height: "100%",
 				}}
 			/>
 			<canvas
@@ -371,8 +454,9 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 					position: "absolute",
 					top: 0,
 					left: 0,
-					width: `${displaySize.width}px`,
-					height: `${displaySize.height}px`,
+					width: "100%",
+					height: "100%",
+					zIndex: 1,
 					touchAction: "none",
 				}}
 				onPointerDown={onPointerDown}
@@ -380,6 +464,24 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 				onPointerUp={onPointerUp}
 				onPointerCancel={onPointerUp}
 			/>
+
+			{!hasSelection && (
+				<div
+					style={{
+						position: "absolute",
+						top: "50%",
+						left: "50%",
+						transform: "translate(-50%, -50%)",
+						color: token.colorWhite,
+						fontSize: 14,
+						pointerEvents: "none",
+						zIndex: 2,
+						textShadow: "0 1px 2px rgba(0,0,0,0.6)",
+					}}
+				>
+					{intl.formatMessage({ id: "draw.crop.hint" })}
+				</div>
+			)}
 
 			<div
 				style={{
@@ -389,7 +491,12 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 					transform: "translateX(-50%)",
 					display: "flex",
 					gap: token.paddingXS,
-					zIndex: zIndexs.FixedToScreen_CloseButton + 2,
+					zIndex: 2,
+					pointerEvents: "auto",
+				}}
+				onPointerDown={(e) => {
+					// 防止点击按钮时触发底层 canvas 的指针捕获/拖拽
+					e.stopPropagation();
 				}}
 			>
 				<Button
@@ -399,10 +506,22 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 					<FormattedMessage id="draw.crop.cancel" />
 				</Button>
 				<Button
+					icon={<ReloadOutlined />}
+					disabled={!hasSelection}
+					onClick={() => {
+						setSelectRect({ min_x: 0, min_y: 0, max_x: 0, max_y: 0 });
+					}}
+				>
+					<FormattedMessage id="draw.crop.reset" />
+				</Button>
+				<Button
 					type="primary"
 					icon={<CheckOutlined />}
+					disabled={!hasSelection}
 					onClick={() => {
-						onConfirm(selectRect);
+						if (isRectValid(selectRect)) {
+							onConfirm(selectRect);
+						}
 					}}
 				>
 					<FormattedMessage id="draw.confirm" />
