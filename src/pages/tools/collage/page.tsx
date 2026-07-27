@@ -365,7 +365,7 @@ const CollageCore = () => {
 						}`}
 						onClick={() => mode === "free" && setSelectedId(it.id)}
 					>
-						<img src={it.src} alt={it.name} />
+						<img className="collage-image-thumb" src={it.src} alt={it.name} />
 						<div className="collage-image-item-mask">
 							<Typography.Text ellipsis style={{ maxWidth: 120, color: "#fff" }}>
 								{it.name}
@@ -862,7 +862,7 @@ const CollageCore = () => {
                     border-color: ${token.colorPrimary};
                 }
 
-                :global(.collage-image-item) img {
+                :global(.collage-image-thumb) {
                     display: block;
                     max-width: 100%;
                     max-height: 240px;
