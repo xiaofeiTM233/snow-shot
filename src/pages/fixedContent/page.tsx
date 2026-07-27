@@ -62,7 +62,10 @@ export const FixedContentPage: React.FC = () => {
 		if (targetUrl) {
 			urlParams = new URL(targetUrl, window.location.origin).searchParams;
 		} else {
-			urlParams = new URLSearchParams(window.location.search);
+			const hash = window.location.hash;
+			const search =
+				hash.includes("?") ? hash.slice(hash.indexOf("?")) : window.location.search;
+			urlParams = new URLSearchParams(search);
 		}
 
 		if (urlParams.get("idle_page") === "true") {
