@@ -125,15 +125,15 @@ fn restore_main_window_geometry(app: &tauri::AppHandle) {
 /// 关闭时删除已保存的几何文件，使下次启动恢复默认。
 #[tauri::command]
 fn set_remember_window_geometry(app: tauri::AppHandle, remember: Option<bool>) {
-    // 前端旧配置/未加载时可能传入 undefined，JSON 序列化后该 key 被丢弃，
-    // 这里回退到默认 true，避免命令因缺少必需参数而报错。
-    let remember = remember.unwrap_or(true);
-    set_remember_window_geometry_enabled(remember);
-    if !remember {
-        if let Ok(dir) = app.path().app_config_dir() {
-            let _ = std::fs::remove_file(dir.join("main-window-geometry.json"));
-        }
-    }
+	// 前端旧配置/未加载时可能传入 undefined，JSON 序列化后该 key 被丢弃，
+	// 这里回退到默认 true，避免命令因缺少必需参数而报错。
+	let remember = remember.unwrap_or(true);
+	set_remember_window_geometry_enabled(remember);
+	if !remember {
+		if let Ok(dir) = app.path().app_config_dir() {
+			let _ = std::fs::remove_file(dir.join("main-window-geometry.json"));
+		}
+	}
 }
 
 #[cfg(feature = "dhat-heap")]
