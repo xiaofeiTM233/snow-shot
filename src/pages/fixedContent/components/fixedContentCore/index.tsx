@@ -273,6 +273,14 @@ const FixedContentCoreInner: React.FC<{
 	// 贴图首次加载完成时的缩放比例，作为“默认大小”
 	const defaultScaleRef = useRef<{ x: number; y: number } | undefined>(undefined);
 
+	// 记录贴图首次加载完成时的缩放比例作为“默认大小”
+	const captureDefaultScale = useCallback(() => {
+		if (defaultScaleRef.current) {
+			return;
+		}
+		defaultScaleRef.current = { x: scaleRef.current.x, y: scaleRef.current.y };
+	}, [scaleRef]);
+
 	const [enableSaveToCloud, setEnableSaveToCloud] = useState(false);
 	const [fixedContentType, setFixedContentType, fixedContentTypeRef] =
 		useStateRef<FixedContentType | undefined>(undefined);
@@ -891,19 +899,19 @@ const FixedContentCoreInner: React.FC<{
 				}
 			}
 
-		captureDefaultScale();
-		onDrawLoad?.();
-	},
-	[
-		setEnableSelectText,
-		setWindowSize,
-		isReady,
-		onDrawLoad,
-		tryInitImageLayer,
-		getAppSettings,
-		captureDefaultScale,
-	],
-);
+			captureDefaultScale();
+			onDrawLoad?.();
+		},
+		[
+			setEnableSelectText,
+			setWindowSize,
+			isReady,
+			onDrawLoad,
+			tryInitImageLayer,
+			getAppSettings,
+			captureDefaultScale,
+		],
+	);
 
 	useEffect(() => {
 		if (ocrResultActionRef.current) {
@@ -1128,21 +1136,13 @@ const FixedContentCoreInner: React.FC<{
 								: textScaleFactorRef.current))),
 			);
 
-		return {
-			width: newWidth,
-			height: newHeight,
-		};
-	},
-	[textScaleFactorRef],
-);
-
-	// 记录贴图首次加载完成时的缩放比例作为“默认大小”
-	const captureDefaultScale = useCallback(() => {
-		if (defaultScaleRef.current) {
-			return;
-		}
-		defaultScaleRef.current = { x: scaleRef.current.x, y: scaleRef.current.y };
-	}, [scaleRef]);
+			return {
+				width: newWidth,
+				height: newHeight,
+			};
+		},
+		[textScaleFactorRef],
+	);
 
 	// 显示隐藏贴图时，若开启了对应设置，将窗口恢复为默认大小
 	const restoreDefaultSize = useCallback(async () => {
@@ -1192,7 +1192,7 @@ const FixedContentCoreInner: React.FC<{
 		setIsThumbnail,
 	]);
 
-const copyToClipboard = useCallback(async () => {
+	const copyToClipboard = useCallback(async () => {
 		if (isThumbnailRef.current) {
 			return;
 		}
@@ -1761,16 +1761,18 @@ const copyToClipboard = useCallback(async () => {
 			width: canvasPropsRef.current.width,
 			height: canvasPropsRef.current.height,
 		});
-		const isImg =
-			fixedContentTypeRef.current === FixedContentType.Image ||
-			fixedContentTypeRef.current === FixedContentType.DrawCanvas;
-		const csf = isImg ? textScaleFactorRef.current : 1;
 		setCropDisplaySize({
-			width: (windowSizeRef.current.width / csf) * scaleRef.current.x / 100,
-			height: (windowSizeRef.current.height / csf) * scaleRef.current.y / 100,
+			width:
+				(windowSizeRef.current.width / contentScaleFactor) *
+				scaleRef.current.x /
+				100,
+			height:
+				(windowSizeRef.current.height / contentScaleFactor) *
+				scaleRef.current.y /
+				100,
 		});
 		setEnableCrop(true);
-	}, [isCropSupported, enableCrop, renderToCanvas]);
+	}, [isCropSupported, enableCrop, renderToCanvas, contentScaleFactor]);
 
 	const cancelCrop = useCallback(() => {
 		setEnableCrop(false);
@@ -1779,6 +1781,7 @@ const copyToClipboard = useCallback(async () => {
 
 	const confirmCrop = useCallback(
 		async (cropRect: ElementRect) => {
+			try {
 			const source = cropSourceRef.current;
 			if (!source) {
 				setEnableCrop(false);
@@ -1876,8 +1879,12 @@ const copyToClipboard = useCallback(async () => {
 				);
 			}
 
-			setEnableCrop(false);
-			cropSourceRef.current = undefined;
+			} catch (error) {
+				appError("[confirmCrop] crop failed", error);
+			} finally {
+				setEnableCrop(false);
+				cropSourceRef.current = undefined;
+			}
 		},
 		[scaleRef, setProcessImageConfig, setWindowSize, appWindowRef],
 	);
@@ -2465,11 +2472,11 @@ const copyToClipboard = useCallback(async () => {
 					htmlContentContainerRef.current.style.width = `${width}px`;
 					htmlContentContainerRef.current.style.height = `${height}px`;
 				}
-			captureDefaultScale();
-			onHtmlLoad?.({
-				width: width * window.devicePixelRatio,
-				height: height * window.devicePixelRatio,
-			});
+				captureDefaultScale();
+				onHtmlLoad?.({
+					width: width * window.devicePixelRatio,
+					height: height * window.devicePixelRatio,
+				});
 
 				setWindowSize({
 					width: width,
