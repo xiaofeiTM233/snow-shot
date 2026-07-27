@@ -1153,9 +1153,17 @@ const FixedContentCoreInner: React.FC<{
 			return;
 		}
 
-		// 缩略图模式下不处理
+		// 处于缩略图模式时，先退出缩略图模式并恢复到进入缩略图前的位置
 		if (isThumbnailRef.current) {
-			return;
+			const origin =
+				originWindowSizeAndPositionRef.current?.position ?? undefined;
+			originWindowSizeAndPositionRef.current = undefined;
+			setIsThumbnail(false);
+			if (origin) {
+				appWindowRef.current?.setPosition(
+					new PhysicalPosition(origin.x, origin.y),
+				);
+			}
 		}
 
 		const defaultScale = defaultScaleRef.current;
@@ -1174,7 +1182,15 @@ const FixedContentCoreInner: React.FC<{
 		const { width, height } = getWindowPhysicalSize(defaultScale.x);
 		await appWindowRef.current?.setSize(new PhysicalSize(width, height));
 		ocrResultActionRef.current?.setScale(defaultScale.x);
-	}, [getAppSettings, getWindowPhysicalSize, scaleRef, setScale, appWindowRef]);
+	}, [
+		getAppSettings,
+		getWindowPhysicalSize,
+		scaleRef,
+		setScale,
+		appWindowRef,
+		originWindowSizeAndPositionRef,
+		setIsThumbnail,
+	]);
 
 	const copyToClipboard = useCallback(async () => {
 		if (isThumbnailRef.current) {
