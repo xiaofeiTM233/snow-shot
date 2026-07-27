@@ -1758,8 +1758,8 @@ const FixedContentCoreInner: React.FC<{
 
 		cropSourceRef.current = canvas;
 		setCropCanvasSize({
-			width: canvasPropsRef.current.width,
-			height: canvasPropsRef.current.height,
+			width: canvas.width,
+			height: canvas.height,
 		});
 		setCropDisplaySize({
 			width:
@@ -1840,7 +1840,7 @@ const FixedContentCoreInner: React.FC<{
 				setEnableCrop(false);
 				return;
 			}
-			await imageLayerAction.setBaseImage(bitmap);
+			await imageLayerActionRef.current?.setBaseImage(bitmap);
 			await imageLayerAction.applyProcessImageConfigToCanvas(
 				INIT_CONTAINER_KEY,
 				{ angle: 0, horizontalFlip: false, verticalFlip: false },
