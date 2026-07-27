@@ -1,6 +1,7 @@
 export const home = {
 	"home.commonFunction": "常用功能",
 	"home.showMainWindow": "顯示主視窗",
+	"home.resetWindowGeometry": "恢復預設視窗位置大小",
 	"home.restart": "重新啟動",
 	"home.screenshotFunction": "截圖",
 	"home.screenshotFunction.screenshotFocusedWindow": "擷取焦點視窗",

@@ -12,6 +12,7 @@ import { exitApp } from "@/commands";
 import {
 	createFixedContentWindow,
 	createFullScreenDrawWindow,
+	resetMainWindowGeometry,
 	restart,
 } from "@/commands/core";
 import {
@@ -488,15 +489,22 @@ const TrayIconLoaderComponent = () => {
 					item: "Separator",
 				},
 				{
-					id: `${appWindow.label}-disableShortcut`,
-					text: intl.formatMessage({ id: "home.disableShortcut" }),
-					checked: disableShortcut,
-					action: async () => {
-						setTrayIconState({
-							disableShortcut: !disableShortcut,
-						});
-					},
+					id: `${appWindow.label}-reset-window-geometry`,
+				text: intl.formatMessage({ id: "home.resetWindowGeometry" }),
+				action: async () => {
+					await resetMainWindowGeometry();
 				},
+			},
+			{
+				id: `${appWindow.label}-disableShortcut`,
+				text: intl.formatMessage({ id: "home.disableShortcut" }),
+				checked: disableShortcut,
+				action: async () => {
+					setTrayIconState({
+						disableShortcut: !disableShortcut,
+					});
+				},
+			},
 				{
 					id: `${appWindow.label}-show-main-window`,
 					text: intl.formatMessage({ id: "home.showMainWindow" }),

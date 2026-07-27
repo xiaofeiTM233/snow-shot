@@ -136,6 +136,33 @@ fn set_remember_window_geometry(app: tauri::AppHandle, remember: Option<bool>) {
 	}
 }
 
+/// 恢复主窗口到默认尺寸/位置：
+/// 删除已保存的几何文件，并将窗口重置为配置文件中的默认宽高并居中。
+#[tauri::command]
+fn reset_main_window_geometry(app: tauri::AppHandle) {
+	let Some(window) = app.get_webview_window("main") else {
+		return;
+	};
+
+	// 删除已保存的几何信息，使下次启动同样恢复默认
+	if let Ok(dir) = app.path().app_config_dir() {
+		let _ = std::fs::remove_file(dir.join("main-window-geometry.json"));
+	}
+
+	// 从配置读取主窗口默认宽高（写死兜底，防止配置缺失）
+	let (width, height) = app
+		.config()
+		.app
+		.windows
+		.iter()
+		.find(|w| w.label == "main")
+		.map(|w| (w.width as u32, w.height as u32))
+		.unwrap_or((1024, 632));
+
+	let _ = window.set_size(tauri::PhysicalSize::new(width, height));
+	let _ = window.center();
+}
+
 #[cfg(feature = "dhat-heap")]
 pub static PROFILER: std::sync::LazyLock<Mutex<Option<dhat::Profiler>>> =
     std::sync::LazyLock::new(|| Mutex::new(None));
@@ -441,6 +468,7 @@ pub fn run() {
             core::set_window_rect,
             core::get_commit_sha,
             set_remember_window_geometry,
+            reset_main_window_geometry,
             scroll_screenshot::scroll_screenshot_get_image_data,
             scroll_screenshot::scroll_screenshot_init,
             scroll_screenshot::scroll_screenshot_capture,
