@@ -286,3 +286,7 @@ export const setRememberWindowGeometry = async (remember?: boolean) => {
 	// 这里兜底为 true，确保始终发送明确布尔值。
 	await invoke("set_remember_window_geometry", { remember: remember ?? true });
 };
+
+export const resetMainWindowGeometry = async () => {
+	await invoke("reset_main_window_geometry");
+};

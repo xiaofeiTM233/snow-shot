@@ -1,6 +1,7 @@
 export const home = {
 	"home.commonFunction": "Common Functions",
 	"home.showMainWindow": "Show Main Window",
+	"home.resetWindowGeometry": "Restore Default Window Size & Position",
 	"home.restart": "Restart",
 	"home.screenshotFunction": "Screenshot",
 	"home.screenshotFunction.screenshotFocusedWindow": "Capture Focused Window",
