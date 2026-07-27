@@ -1,10 +1,17 @@
-import { CloseOutlined, CopyOutlined, SwapOutlined } from "@ant-design/icons";
+import {
+	CloseOutlined,
+	ColumnHeightOutlined,
+	ColumnWidthOutlined,
+	CopyOutlined,
+	SwapOutlined,
+} from "@ant-design/icons";
 import {
 	Button,
 	Col,
 	Flex,
 	Form,
 	Row,
+	Segmented,
 	Select,
 	type SelectProps,
 	Spin,
@@ -18,6 +25,7 @@ import React, {
 	useImperativeHandle,
 	useMemo,
 	useRef,
+	useState,
 } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import {
@@ -331,6 +339,17 @@ const TranslatorCore: React.FC<{
 	const ignoreDebounceRef = useRef<boolean>(false);
 	const [sourceContent, setSourceContent] = useStateRef<string>("");
 
+	const [translationLayout, setTranslationLayout] = useState<"horizontal" | "vertical">(
+		() => {
+			const saved = localStorage.getItem("translation-layout");
+			return saved === "vertical" ? "vertical" : "horizontal";
+		},
+	);
+	useEffect(() => {
+		localStorage.setItem("translation-layout", translationLayout);
+	}, [translationLayout]);
+	const isVerticalLayout = translationLayout === "vertical";
+
 	const requestTranslateDebounce = useMemo(
 		() => debounce(requestTranslate, 1500),
 		[requestTranslate],
@@ -506,15 +525,48 @@ const TranslatorCore: React.FC<{
 								variant="underlined"
 							/>
 						</Form.Item>
+						<Form.Item
+							style={{ marginBottom: token.marginXS }}
+							label={<FormattedMessage id="tools.translation.layout" />}
+						>
+							<Segmented
+								value={translationLayout}
+								onChange={(value) =>
+									setTranslationLayout(value as "horizontal" | "vertical")
+								}
+								options={[
+									{
+										value: "horizontal",
+										icon: <ColumnWidthOutlined />,
+										title: intl.formatMessage({
+											id: "tools.translation.layout.horizontal",
+										}),
+									},
+									{
+										value: "vertical",
+										icon: <ColumnHeightOutlined />,
+										title: intl.formatMessage({
+											id: "tools.translation.layout.vertical",
+										}),
+									},
+								]}
+							/>
+						</Form.Item>
 					</Flex>
 				</Flex>
-				<Row gutter={token.marginLG} style={{ marginTop: token.marginXXS }}>
-					<Col span={12} style={{ position: "relative" }}>
+				<Row
+					gutter={[
+						token.marginLG,
+						isVerticalLayout ? token.marginLG : 0,
+					]}
+					style={{ marginTop: token.marginXXS }}
+				>
+					<Col span={isVerticalLayout ? 24 : 12} style={{ position: "relative" }}>
 						<TextArea
-							rows={12}
+							rows={isVerticalLayout ? 6 : 12}
 							maxLength={5000}
 							showCount
-							autoSize={{ minRows: 12 }}
+							autoSize={{ minRows: isVerticalLayout ? 6 : 12 }}
 							placeholder={intl.formatMessage({
 								id: "tools.translation.placeholder",
 							})}
@@ -534,7 +586,7 @@ const TranslatorCore: React.FC<{
 							}}
 						/>
 					</Col>
-					<Col span={12}>
+					<Col span={isVerticalLayout ? 24 : 12}>
 						<Spin spinning={startTranslateLoading}>
 							<div style={{ position: "relative" }}>
 								<Spin
@@ -546,10 +598,10 @@ const TranslatorCore: React.FC<{
 									}}
 								/>
 								<TextArea
-									rows={12}
+									rows={isVerticalLayout ? 6 : 12}
 									variant="filled"
 									style={{ flex: 1 }}
-									autoSize={{ minRows: 12 }}
+									autoSize={{ minRows: isVerticalLayout ? 6 : 12 }}
 									readOnly
 									value={translatedContent}
 								/>
