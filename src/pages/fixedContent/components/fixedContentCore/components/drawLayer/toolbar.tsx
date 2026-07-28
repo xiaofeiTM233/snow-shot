@@ -33,7 +33,10 @@ import { AppSettingsActionContext } from "@/contexts/appSettingsActionContext";
 import { useAppSettingsLoad } from "@/hooks/useAppSettingsLoad";
 import { useStateRef } from "@/hooks/useStateRef";
 import { useStateSubscriber } from "@/hooks/useStateSubscriber";
-import { useDragElement } from "@/pages/draw/components/drawToolbar/components/dragButton";
+import {
+	useDragElement,
+	type DragElementOptionalConfig,
+} from "@/pages/draw/components/drawToolbar/components/dragButton";
 import { HistoryControls } from "@/pages/draw/components/drawToolbar/components/historyControls";
 import { ToolButton } from "@/pages/draw/components/drawToolbar/components/toolButton";
 import { ArrowTool } from "@/pages/draw/components/drawToolbar/components/tools/arrowTool";
@@ -133,6 +136,32 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 					};
 				},
 			};
+		}, [getDevicePixelRatio, getSelectedRect, token.marginXXS]),
+		// 溢出回退：底部溢出时翻转到贴图框上方，上方也溢出则回退到右下角默认位置
+		useMemo<DragElementOptionalConfig[]>(() => {
+			return [
+				{
+					config: {
+						getBaseOffset: (element) => {
+							const limitRect = getSelectedRect();
+							const devicePixelRatio = getDevicePixelRatio();
+							return {
+								x:
+									limitRect.max_x / devicePixelRatio -
+									BOX_SHADOW_WIDTH -
+									element.clientWidth,
+								y:
+									limitRect.min_y / devicePixelRatio -
+									element.clientHeight -
+									token.marginXXS,
+							};
+						},
+					},
+					needTry: (dragRes) => dragRes.isBeyondMaxY,
+					canApply: (dragRes) =>
+						!(dragRes.isBeyondMaxY || dragRes.isBeyondMinY),
+				},
+			];
 		}, [getDevicePixelRatio, getSelectedRect, token.marginXXS]),
 	);
 

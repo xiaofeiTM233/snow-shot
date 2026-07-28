@@ -486,7 +486,7 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 			<div
 				style={{
 					position: "absolute",
-					bottom: token.margin,
+					top: `calc(100% + ${token.margin}px)`,
 					left: "50%",
 					transform: "translateX(-50%)",
 					display: "flex",

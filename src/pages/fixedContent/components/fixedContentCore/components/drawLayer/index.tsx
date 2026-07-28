@@ -214,7 +214,7 @@ const DrawLayerCore: React.FC<{
 			getBaseOffset: (limitRect: ElementRect, devicePixelRatio: number) => {
 				return {
 					x: limitRect.max_x / devicePixelRatio + token.marginXXS,
-					y: limitRect.min_x / devicePixelRatio + 3,
+					y: limitRect.min_y / devicePixelRatio + 3,
 				};
 			},
 			getAction: () => {
