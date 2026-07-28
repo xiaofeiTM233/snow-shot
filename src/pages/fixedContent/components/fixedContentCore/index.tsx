@@ -1394,10 +1394,7 @@ const FixedContentCoreInner: React.FC<{
 
 		setEnableSelectText((enable) => !enable);
 	}, [fixedContentTypeRef, setEnableSelectText, processImageConfigRef]);
-	// 进入编辑（绘制/裁剪）全屏：仅把窗口尺寸扩展到当前显示器，
-	// 保持窗口位置不变，这样内容（窗口内 left:0）的视觉位置完全不变，
-	// 工具栏/裁剪按钮（position: fixed）仍能在扩展后的窗口范围内移动，
-	// 且 calculatedBoundaryRect 会随窗口尺寸自动扩展到整个显示器。
+	// 进入编辑（绘制/裁剪）全屏：仅把窗口尺寸扩展到当前显示器的最大尺寸，内容偏移到原来的位置，保证内容在窗口中不动
 	const enterEditFullScreen = useCallback(async () => {
 		const appWindow = appWindowRef.current;
 		if (!appWindow || drawFullScreenRef.current) {
@@ -1411,13 +1408,9 @@ const FixedContentCoreInner: React.FC<{
 		drawFullScreenOriginRef.current = { size, position };
 		const monitorInfo = await getCurrentMonitorInfo();
 
-		// 过渡期间隐藏内容：窗口移动（Tauri IPC 异步）与 DOM 偏移无法保证同帧，
-		// 直接切换会闪烁到屏幕左上角，先隐藏、窗口就位后再显示即可彻底避免
-		const containerElement = fixedContainerRef.current;
-		if (containerElement) {
-			containerElement.style.visibility = "hidden";
-		}
-		// 同步提交内容偏移与遮罩（flushSync 确保 DOM 立即更新）
+		// 整窗隐藏：窗口移动与 DOM 偏移无法保证同帧，移动过程隐藏整个窗口，再整窗显示
+		await appWindow.hide();
+		// 同步提交内容偏移与遮罩
 		flushSync(() => {
 			setEditFullScreenOffset({
 				x: (position.x - monitorInfo.monitor_x) / window.devicePixelRatio,
@@ -1426,8 +1419,7 @@ const FixedContentCoreInner: React.FC<{
 			setShowEditFullScreenMask(true);
 		});
 
-		// 内容已隐藏，窗口移动期间不会错位，直接 await 窗口移动完成，
-		// 无需预先等待渲染帧
+		// 窗口已隐藏，移动/缩放期间不会绘制任何中间帧，直接 await 完成
 		await appWindow.setPosition(
 			new PhysicalPosition(monitorInfo.monitor_x, monitorInfo.monitor_y),
 		);
@@ -1436,15 +1428,11 @@ const FixedContentCoreInner: React.FC<{
 		);
 		drawFullScreenRef.current = true;
 
-		// 窗口就位后恢复显示，内容已处于正确的偏移位置
-		if (containerElement) {
-			containerElement.style.visibility = "";
-		}
+		// 窗口已在最终全屏位置且内容偏移正确，整窗显示即一步到位，无任何闪烁
+		await appWindow.show();
 	}, [appWindowRef]);
 
 	// 退出编辑全屏：把窗口还原到内容所在的屏幕位置
-	// （内容一直保持在原视觉位置，直接以原窗口左上角为锚点，
-	// 尺寸按当前内容计算——编辑期间可能发生裁剪导致内容变化）
 	const exitEditFullScreen = useCallback(async () => {
 		const appWindow = appWindowRef.current;
 		const origin = drawFullScreenOriginRef.current;
@@ -1456,17 +1444,14 @@ const FixedContentCoreInner: React.FC<{
 			return;
 		}
 
-		// 过渡期间隐藏内容，避免窗口还原与 DOM 更新不同帧的闪烁
-		const containerElement = fixedContainerRef.current;
-		if (containerElement) {
-			containerElement.style.visibility = "hidden";
-		}
+		// 整窗隐藏后还原，避免移动过程中的中间帧闪烁
+		await appWindow.hide();
 		flushSync(() => {
 			setEditFullScreenOffset(undefined);
 			setShowEditFullScreenMask(false);
 		});
 
-		// 内容已隐藏，直接 await 还原窗口，无需预先等待渲染帧
+		// 窗口已隐藏，直接 await 还原窗口，无需预先等待渲染帧
 		const targetSize = getWindowPhysicalSize(scaleRef.current.x);
 		await appWindow.setSize(
 			new PhysicalSize(targetSize.width, targetSize.height),
@@ -1475,10 +1460,8 @@ const FixedContentCoreInner: React.FC<{
 			new PhysicalPosition(origin.position.x, origin.position.y),
 		);
 
-		// 窗口还原后恢复显示
-		if (containerElement) {
-			containerElement.style.visibility = "";
-		}
+		// 窗口已还原到内容原位置，整窗显示即一步到位，无任何闪烁
+		await appWindow.show();
 	}, [appWindowRef, getWindowPhysicalSize, scaleRef]);
 
 	const switchDrawCore = useCallback(async () => {
