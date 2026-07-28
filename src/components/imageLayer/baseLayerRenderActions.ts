@@ -507,12 +507,7 @@ const getOrCreateBlurFilter = (
 		newFilter.resolution = 1;
 	} else if (filterType === "kawaseBlur") {
 		const strength = Math.max(1, (blur / 100) * 32);
-		// clamp=true：着色器中显式 clamp 采样坐标到纹理边界，
-		// 确保越界采样返回边缘像素而非透明值。
-		newFilter = new PIXIFilters.KawaseBlurFilter({ strength, clamp: true });
-		// padding 归零：临时纹理 = sprite bounds，sprite mesh 完整覆盖，
-		// 消除屏幕边缘的透明空洞。
-		newFilter.padding = 0;
+		newFilter = new PIXIFilters.KawaseBlurFilter({ strength });
 		newFilter.resolution = 0.3;
 	} else if (filterType === "motionBlur") {
 		const kernelSize = Math.max(1, (blur / 100) * 25);
@@ -520,8 +515,6 @@ const getOrCreateBlurFilter = (
 			kernelSize,
 			velocity: { x: 42, y: 42 },
 		});
-		// padding 归零（同 BlurFilter repeatEdgePixels 的原理）
-		newFilter.padding = 0;
 		newFilter.resolution = 0.3;
 	} else if (filterType === "rgbSplit") {
 		const offset = (blur / 100) * 12;
@@ -557,6 +550,76 @@ const getOrCreateBlurFilter = (
 
 	blurSpriteFilterMapRef.current.set(filterKey, newFilter);
 	return newFilter;
+};
+
+/**
+ * 计算旋转和缩放后矩形的边界框，用于设置 filterArea
+ * 注意：此函数计算的是与 spriteMask 变换相匹配的区域
+ * spriteMask 的变换顺序：rotate -> translate(center) -> scale(zoom) -> rect
+ * @param x 矩形左上角 x 坐标（未缩放）
+ * @param y 矩形左上角 y 坐标（未缩放）
+ * @param width 矩形宽度（未缩放）
+ * @param height 矩形高度（未缩放）
+ * @param angle 旋转角度（弧度）
+ * @param zoom 缩放比例
+ */
+const calculateRotatedFilterArea = (
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+	angle: number,
+	zoom: number,
+): PIXI.Rectangle => {
+	// 中心点坐标（变换的中心）
+	const centerX = (x + width * 0.5) * zoom;
+	const centerY = (y + height * 0.5) * zoom;
+
+	// 缩放后的尺寸
+	const scaledWidth = width * zoom;
+	const scaledHeight = height * zoom;
+
+	if (angle === 0) {
+		// 无旋转时，直接计算缩放后的矩形位置
+		// 由于缩放是围绕中心点的，所以左上角位置需要调整
+		return new PIXI.Rectangle(
+			centerX - scaledWidth * 0.5,
+			centerY - scaledHeight * 0.5,
+			scaledWidth,
+			scaledHeight,
+		);
+	}
+
+	// 旋转后的矩形半宽和半高
+	const halfWidth = scaledWidth * 0.5;
+	const halfHeight = scaledHeight * 0.5;
+
+	const cos = Math.cos(angle);
+	const sin = Math.sin(angle);
+
+	// 计算旋转后的四个顶点（展开循环以提高性能）
+	// 左上角
+	const x1 = -halfWidth * cos - -halfHeight * sin + centerX;
+	const y1 = -halfWidth * sin + -halfHeight * cos + centerY;
+
+	// 右上角
+	const x2 = halfWidth * cos - -halfHeight * sin + centerX;
+	const y2 = halfWidth * sin + -halfHeight * cos + centerY;
+
+	// 左下角
+	const x3 = -halfWidth * cos - halfHeight * sin + centerX;
+	const y3 = -halfWidth * sin + halfHeight * cos + centerY;
+
+	// 右下角
+	const x4 = halfWidth * cos - halfHeight * sin + centerX;
+	const y4 = halfWidth * sin + halfHeight * cos + centerY;
+
+	const minX = Math.min(x1, x2, x3, x4);
+	const minY = Math.min(y1, y2, y3, y4);
+	const maxX = Math.max(x1, x2, x3, x4);
+	const maxY = Math.max(y1, y2, y3, y4);
+
+	return new PIXI.Rectangle(minX, minY, maxX - minX, maxY - minY);
 };
 
 export const renderUpdateBlurSpriteAction = (
@@ -620,7 +683,21 @@ export const renderUpdateBlurSpriteAction = (
 			color: "red",
 		});
 
-		// 不设置 filterArea（同矩形情况的处理逻辑）
+		// 计算 points 情况下的 filterArea
+		// 扩展区域以包含笔画宽度
+		const expandedWidth = blurProps.width + strokeWidth;
+		const expandedHeight = blurProps.height + strokeWidth;
+		const expandedX = rectMinX - strokeWidth * 0.5;
+		const expandedY = rectMinY - strokeWidth * 0.5;
+
+		blurSprite.sprite.filterArea = calculateRotatedFilterArea(
+			expandedX,
+			expandedY,
+			expandedWidth,
+			expandedHeight,
+			blurProps.angle,
+			blurProps.zoom,
+		);
 	} else {
 		blurSprite.spriteMask
 			.clear()
@@ -638,10 +715,15 @@ export const renderUpdateBlurSpriteAction = (
 			)
 			.fill();
 
-		// 不设置 filterArea：让滤镜使用 sprite 的完整 bounds（即完整截图区域）作为处理范围。
-		// 这样卷积核在屏幕边缘处能采样到实际像素（通过 GPU CLAMP_TO_EDGE），
-		// 而非临时纹理中的透明空洞，避免边缘模糊变淡问题。
-		// 视觉裁剪由 spriteMask 负责，不影响显示效果。
+		// 计算矩形情况下的 filterArea
+		blurSprite.sprite.filterArea = calculateRotatedFilterArea(
+			blurProps.x,
+			blurProps.y,
+			blurProps.width,
+			blurProps.height,
+			blurProps.angle,
+			blurProps.zoom,
+		);
 	}
 
 	blurSprite.spriteContainer.alpha =
