@@ -83,7 +83,6 @@ const DrawLayerCore: React.FC<{
 	switchDraw: () => void;
 	isImageLayerReady: () => boolean;
 	onCrop?: () => void;
-	contentOffset?: { x: number; y: number };
 }> = ({
 	actionRef,
 	documentSize,
@@ -100,7 +99,6 @@ const DrawLayerCore: React.FC<{
 	switchDraw,
 	isImageLayerReady,
 	onCrop,
-	contentOffset,
 }) => {
 	const { token } = theme.useToken();
 
@@ -203,15 +201,11 @@ const DrawLayerCore: React.FC<{
 	const drawCoreContextValue = useMemo<DrawCoreContextValue>(() => {
 		return {
 			getLimitRect: () => {
-				// limitRect 用于工具栏/绘制菜单的定位（视口坐标），
-				// 编辑全屏时内容有偏移，需要把偏移计算在内
-				const offsetX = (contentOffset?.x ?? 0) * window.devicePixelRatio;
-				const offsetY = (contentOffset?.y ?? 0) * window.devicePixelRatio;
 				return {
-					min_x: offsetX,
-					min_y: offsetY,
-					max_x: offsetX + documentSize.width * window.devicePixelRatio,
-					max_y: offsetY + documentSize.height * window.devicePixelRatio,
+					min_x: 0,
+					min_y: 0,
+					max_x: documentSize.width * window.devicePixelRatio,
+					max_y: documentSize.height * window.devicePixelRatio,
 				};
 			},
 			getDevicePixelRatio: () => {
@@ -317,8 +311,6 @@ const DrawLayerCore: React.FC<{
 		documentSize.height,
 		documentSize.width,
 		token.marginXXS,
-		contentOffset?.x,
-		contentOffset?.y,
 	]);
 
 	const drawContextValue = useMemo<DrawContextType>(() => {

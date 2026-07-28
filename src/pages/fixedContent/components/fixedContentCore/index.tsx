@@ -332,10 +332,8 @@ const FixedContentCoreInner: React.FC<{
 		  }
 		| undefined
 	>(undefined);
-	// 编辑全屏时内容的偏移，保持内容在屏幕上的视觉位置不变
-	const [editFullScreenOffset, setEditFullScreenOffset] = useState<
-		{ x: number; y: number } | undefined
-	>(undefined);
+	// 编辑全屏时窗口的物理位置（进入全屏前保存），用于鼠标穿透坐标换算
+	const editFullScreenWindowPosRef = useRef<PhysicalPosition | undefined>(undefined);
 	// 编辑全屏时鼠标穿透轮询定时器
 	const editFullScreenMouseThroughTimerRef = useRef<
 		ReturnType<typeof setInterval> | undefined
@@ -1408,18 +1406,16 @@ const FixedContentCoreInner: React.FC<{
 		}
 
 		editFullScreenMouseThroughTimerRef.current = setInterval(async () => {
-			const monitorInfo = editFullScreenMonitorRef.current;
-			if (!monitorInfo || !drawFullScreenRef.current) {
-				return;
-			}
+		const winPos = editFullScreenWindowPosRef.current;
+		if (!winPos || !drawFullScreenRef.current) {
+			return;
+		}
 
-			try {
-				const [mouseX, mouseY] = await getMousePosition();
-				// 全局物理坐标 → 窗口内 CSS 坐标（窗口位于显示器原点）
-				const clientX =
-					(mouseX - monitorInfo.monitor_x) / window.devicePixelRatio;
-				const clientY =
-					(mouseY - monitorInfo.monitor_y) / window.devicePixelRatio;
+		try {
+			const [mouseX, mouseY] = await getMousePosition();
+			// 全局物理坐标 → 窗口内 CSS 坐标（窗口保持原位置不变）
+			const clientX = (mouseX - winPos.x) / window.devicePixelRatio;
+			const clientY = (mouseY - winPos.y) / window.devicePixelRatio;
 
 				let shouldIgnore: boolean;
 				if (
@@ -1459,10 +1455,10 @@ const FixedContentCoreInner: React.FC<{
 		}
 	}, [appWindowRef]);
 
-	// 进入编辑（绘制/裁剪）全屏：把窗口扩展到当前显示器，
-	// 这样工具栏/裁剪按钮（position: fixed）就能在整个屏幕范围内任意移动，
-	// 且 calculatedBoundaryRect 会随窗口位置/尺寸自动扩展到整个显示器。
-	// 内容通过 editFullScreenOffset 保持在屏幕上的原视觉位置。
+	// 进入编辑（绘制/裁剪）全屏：仅把窗口尺寸扩展到当前显示器，
+	// 保持窗口位置不变，这样内容（窗口内 left:0）的视觉位置完全不变，
+	// 工具栏/裁剪按钮（position: fixed）仍能在扩展后的窗口范围内移动，
+	// 且 calculatedBoundaryRect 会随窗口尺寸自动扩展到整个显示器。
 	const enterEditFullScreen = useCallback(async () => {
 		const appWindow = appWindowRef.current;
 		if (!appWindow || drawFullScreenRef.current) {
@@ -1476,14 +1472,9 @@ const FixedContentCoreInner: React.FC<{
 		drawFullScreenOriginRef.current = { size, position };
 		const monitorInfo = await getCurrentMonitorInfo();
 		editFullScreenMonitorRef.current = monitorInfo;
-		// 内容偏移 = 原窗口位置相对显示器原点（物理 → CSS 像素）
-		setEditFullScreenOffset({
-			x: (position.x - monitorInfo.monitor_x) / window.devicePixelRatio,
-			y: (position.y - monitorInfo.monitor_y) / window.devicePixelRatio,
-		});
-		await appWindow.setPosition(
-			new PhysicalPosition(monitorInfo.monitor_x, monitorInfo.monitor_y),
-		);
+		// 仅扩展窗口尺寸到当前显示器，保持窗口位置不变，
+		// 这样内容（窗口内 left:0）的视觉位置完全不变，避免闪烁到左上角
+		editFullScreenWindowPosRef.current = position;
 		await appWindow.setSize(
 			new PhysicalSize(monitorInfo.monitor_width, monitorInfo.monitor_height),
 		);
@@ -1500,18 +1491,16 @@ const FixedContentCoreInner: React.FC<{
 		drawFullScreenRef.current = false;
 		drawFullScreenOriginRef.current = undefined;
 		editFullScreenMonitorRef.current = undefined;
-		setEditFullScreenOffset(undefined);
+		editFullScreenWindowPosRef.current = undefined;
 		await stopEditFullScreenMouseThrough();
 		if (!appWindow || !origin) {
 			return;
 		}
 
+		// 仅恢复窗口尺寸到内容大小，窗口位置保持不变，内容原地、无闪烁
 		const targetSize = getWindowPhysicalSize(scaleRef.current.x);
 		await appWindow.setSize(
 			new PhysicalSize(targetSize.width, targetSize.height),
-		);
-		await appWindow.setPosition(
-			new PhysicalPosition(origin.position.x, origin.position.y),
 		);
 	}, [
 		appWindowRef,
@@ -3155,9 +3144,6 @@ const FixedContentCoreInner: React.FC<{
 			className="fixed-image-container"
 			style={{
 				position: "absolute",
-				// 编辑全屏时窗口覆盖整个显示器，用偏移保持内容在屏幕上的原视觉位置
-				left: editFullScreenOffset ? `${editFullScreenOffset.x}px` : undefined,
-				top: editFullScreenOffset ? `${editFullScreenOffset.y}px` : undefined,
 				width: `${documentSize.width}px`,
 				height: `${documentSize.height}px`,
 				zIndex: zIndexs.Draw_FixedImage,
@@ -3389,7 +3375,6 @@ const FixedContentCoreInner: React.FC<{
 					switchDraw={switchDraw}
 					isImageLayerReady={isImageLayerReady}
 					onCrop={startCrop}
-					contentOffset={editFullScreenOffset}
 				/>
 			)}
 
@@ -3555,8 +3540,8 @@ const FixedContentCoreInner: React.FC<{
 
                 .fixed-image-container-inner-border {
                     position: fixed;
-                    top: ${editFullScreenOffset ? `${editFullScreenOffset.y}px` : 0};
-                    left: ${editFullScreenOffset ? `${editFullScreenOffset.x}px` : 0};
+                    top: 0;
+                    left: 0;
                     width: calc(${isThumbnail ? "100vw" : `${documentSize.width}px`});
                     height: calc(${isThumbnail ? "100vh" : `${documentSize.height}px`});
                     border: 2px solid ${fixedBorderColor ?? token.colorBorder};
@@ -3569,8 +3554,8 @@ const FixedContentCoreInner: React.FC<{
 
                 .fixed-image-container-inner-resize-window {
                     position: fixed;
-                    top: ${editFullScreenOffset ? `${editFullScreenOffset.y}px` : 0};
-                    left: ${editFullScreenOffset ? `${editFullScreenOffset.x}px` : 0};
+                    top: 0;
+                    left: 0;
                     width: calc(${isThumbnail ? "100vw" : `${documentSize.width}px`});
                     height: calc(${isThumbnail ? "100vh" : `${documentSize.height}px`});
                     pointer-events: none;
