@@ -1859,24 +1859,31 @@ const FixedContentCoreInner: React.FC<{
 				height: cropH / scaleFactor,
 			});
 
-			// 保持窗口中心不变，调整窗口大小
-			const appWindow = appWindowRef.current;
-			if (appWindow) {
-				const newPhysicalSize = getWindowPhysicalSize(scaleRef.current.x);
-				const [currentSize, currentPosition] = await Promise.all([
-					appWindow.outerSize(),
-					appWindow.outerPosition(),
-				]);
-				const centerX = currentPosition.x + currentSize.width / 2;
-				const centerY = currentPosition.y + currentSize.height / 2;
-				const newX = Math.round(centerX - newPhysicalSize.width / 2);
-				const newY = Math.round(centerY - newPhysicalSize.height / 2);
-				await setWindowRect(
-					newX,
-					newY,
-					newX + newPhysicalSize.width,
-					newY + newPhysicalSize.height,
-				);
+			if (enableDrawRef.current) {
+				// 裁剪后仍处于绘制模式（裁剪通常从绘制工具栏触发），
+				// 需按工具栏尺寸重新扩容窗口，否则小尺寸窗口会把
+				// fixed-content-draw-toolbar-container 工具栏裁掉
+				await updateDrawWindowSize();
+			} else {
+				// 保持窗口中心不变，调整窗口大小
+				const appWindow = appWindowRef.current;
+				if (appWindow) {
+					const newPhysicalSize = getWindowPhysicalSize(scaleRef.current.x);
+					const [currentSize, currentPosition] = await Promise.all([
+						appWindow.outerSize(),
+						appWindow.outerPosition(),
+					]);
+					const centerX = currentPosition.x + currentSize.width / 2;
+					const centerY = currentPosition.y + currentSize.height / 2;
+					const newX = Math.round(centerX - newPhysicalSize.width / 2);
+					const newY = Math.round(centerY - newPhysicalSize.height / 2);
+					await setWindowRect(
+						newX,
+						newY,
+						newX + newPhysicalSize.width,
+						newY + newPhysicalSize.height,
+					);
+				}
 			}
 
 			} catch (error) {
