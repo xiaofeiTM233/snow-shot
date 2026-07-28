@@ -10,6 +10,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useIntl } from "react-intl";
 import { startFreeDrag } from "@/commands/core";
 import {
@@ -527,7 +528,7 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 		};
 	}, [addListener, removeListener, switchDraw]);
 
-	return (
+	return createPortal(
 		<div className="fixed-content-draw-toolbar-container">
 			<div className="fixed-content-draw-toolbar" ref={toolbarElementRef}>
 				<Flex align="center" gap={token.paddingXS}>
@@ -783,7 +784,8 @@ export const FixedContentCoreDrawToolbar: React.FC<{
                     background-color: ${token.colorBorder};
                     margin: 0 ${token.marginXS}px;
                 }
-            `}</style>
-		</div>
+			`}</style>
+		</div>,
+		document.body,
 	);
 };
