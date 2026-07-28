@@ -334,6 +334,12 @@ const FixedContentCoreInner: React.FC<{
 	>(undefined);
 	// 编辑全屏时显示的遮罩（覆盖内容以外的区域，与截图时的遮罩一致）
 	const [showEditFullScreenMask, setShowEditFullScreenMask] = useState(false);
+	// 编辑全屏时内容的偏移，保持内容在屏幕上的视觉位置不变
+	const [editFullScreenOffset, setEditFullScreenOffset] = useState<
+		{ x: number; y: number } | undefined
+	>(undefined);
+	// 容器元素引用，用于全屏切换过渡期间隐藏内容避免闪烁
+	const fixedContainerRef = useRef<HTMLDivElement>(null);
 	const [enableSelectText, setEnableSelectText, enableSelectTextRef] =
 		useStateRef(false);
 	const [contentOpacity, setContentOpacity, contentOpacityRef] = useStateRef(1);
@@ -1404,13 +1410,36 @@ const FixedContentCoreInner: React.FC<{
 		]);
 		drawFullScreenOriginRef.current = { size, position };
 		const monitorInfo = await getCurrentMonitorInfo();
-		// 仅扩展窗口尺寸到当前显示器，保持窗口位置不变，
-		// 这样内容（窗口内 left:0）的视觉位置完全不变，避免闪烁到左上角
+
+		// 过渡期间隐藏内容：窗口移动（Tauri IPC 异步）与 DOM 偏移无法保证同帧，
+		// 直接切换会闪烁到屏幕左上角，先隐藏、窗口就位后再显示即可彻底避免
+		const containerElement = fixedContainerRef.current;
+		if (containerElement) {
+			containerElement.style.visibility = "hidden";
+		}
+		// 同步提交内容偏移与遮罩（flushSync 确保 DOM 立即更新）
+		flushSync(() => {
+			setEditFullScreenOffset({
+				x: (position.x - monitorInfo.monitor_x) / window.devicePixelRatio,
+				y: (position.y - monitorInfo.monitor_y) / window.devicePixelRatio,
+			});
+			setShowEditFullScreenMask(true);
+		});
+
+		// 内容已隐藏，窗口移动期间不会错位，直接 await 窗口移动完成，
+		// 无需预先等待渲染帧
+		await appWindow.setPosition(
+			new PhysicalPosition(monitorInfo.monitor_x, monitorInfo.monitor_y),
+		);
 		await appWindow.setSize(
 			new PhysicalSize(monitorInfo.monitor_width, monitorInfo.monitor_height),
 		);
 		drawFullScreenRef.current = true;
-		setShowEditFullScreenMask(true);
+
+		// 窗口就位后恢复显示，内容已处于正确的偏移位置
+		if (containerElement) {
+			containerElement.style.visibility = "";
+		}
 	}, [appWindowRef]);
 
 	// 退出编辑全屏：把窗口还原到内容所在的屏幕位置
@@ -1421,16 +1450,35 @@ const FixedContentCoreInner: React.FC<{
 		const origin = drawFullScreenOriginRef.current;
 		drawFullScreenRef.current = false;
 		drawFullScreenOriginRef.current = undefined;
-		setShowEditFullScreenMask(false);
 		if (!appWindow || !origin) {
+			setEditFullScreenOffset(undefined);
+			setShowEditFullScreenMask(false);
 			return;
 		}
 
-		// 仅恢复窗口尺寸到内容大小，窗口位置保持不变，内容原地、无闪烁
+		// 过渡期间隐藏内容，避免窗口还原与 DOM 更新不同帧的闪烁
+		const containerElement = fixedContainerRef.current;
+		if (containerElement) {
+			containerElement.style.visibility = "hidden";
+		}
+		flushSync(() => {
+			setEditFullScreenOffset(undefined);
+			setShowEditFullScreenMask(false);
+		});
+
+		// 内容已隐藏，直接 await 还原窗口，无需预先等待渲染帧
 		const targetSize = getWindowPhysicalSize(scaleRef.current.x);
 		await appWindow.setSize(
 			new PhysicalSize(targetSize.width, targetSize.height),
 		);
+		await appWindow.setPosition(
+			new PhysicalPosition(origin.position.x, origin.position.y),
+		);
+
+		// 窗口还原后恢复显示
+		if (containerElement) {
+			containerElement.style.visibility = "";
+		}
 	}, [appWindowRef, getWindowPhysicalSize, scaleRef]);
 
 	const switchDrawCore = useCallback(async () => {
@@ -3057,8 +3105,12 @@ const FixedContentCoreInner: React.FC<{
 	return (
 		<div
 			className="fixed-image-container"
+			ref={fixedContainerRef}
 			style={{
 				position: "absolute",
+				// 编辑全屏时窗口覆盖整个显示器，用偏移保持内容在屏幕上的原视觉位置
+				left: editFullScreenOffset ? `${editFullScreenOffset.x}px` : undefined,
+				top: editFullScreenOffset ? `${editFullScreenOffset.y}px` : undefined,
 				width: `${documentSize.width}px`,
 				height: `${documentSize.height}px`,
 				zIndex: zIndexs.Draw_FixedImage,
@@ -3322,6 +3374,7 @@ const FixedContentCoreInner: React.FC<{
 					switchDraw={switchDraw}
 					isImageLayerReady={isImageLayerReady}
 					onCrop={startCrop}
+					contentOffset={editFullScreenOffset}
 				/>
 			)}
 
@@ -3487,8 +3540,8 @@ const FixedContentCoreInner: React.FC<{
 
                 .fixed-image-container-inner-border {
                     position: fixed;
-                    top: 0;
-                    left: 0;
+                    top: ${editFullScreenOffset ? `${editFullScreenOffset.y}px` : 0};
+                    left: ${editFullScreenOffset ? `${editFullScreenOffset.x}px` : 0};
                     width: calc(${isThumbnail ? "100vw" : `${documentSize.width}px`});
                     height: calc(${isThumbnail ? "100vh" : `${documentSize.height}px`});
                     border: 2px solid ${fixedBorderColor ?? token.colorBorder};
@@ -3501,8 +3554,8 @@ const FixedContentCoreInner: React.FC<{
 
                 .fixed-image-container-inner-resize-window {
                     position: fixed;
-                    top: 0;
-                    left: 0;
+                    top: ${editFullScreenOffset ? `${editFullScreenOffset.y}px` : 0};
+                    left: ${editFullScreenOffset ? `${editFullScreenOffset.x}px` : 0};
                     width: calc(${isThumbnail ? "100vw" : `${documentSize.width}px`});
                     height: calc(${isThumbnail ? "100vh" : `${documentSize.height}px`});
                     pointer-events: none;
