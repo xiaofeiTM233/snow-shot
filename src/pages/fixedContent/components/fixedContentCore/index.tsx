@@ -322,7 +322,7 @@ const FixedContentCoreInner: React.FC<{
 	const [borderRadius, setBorderRadius] = useState(0);
 	const [enableDraw, setEnableDraw, enableDrawRef] = useStateRef(false);
 	const [enableDrawLayer, setEnableDrawLayer] = useState(false);
-	// 绘制模式是否处于全屏
+	// 编辑模式（绘制/裁剪）是否处于全屏
 	const drawFullScreenRef = useRef(false);
 	// 进入全屏绘制前保存的窗口大小与位置，退出时恢复
 	const drawFullScreenOriginRef = useRef<
@@ -1386,45 +1386,66 @@ const FixedContentCoreInner: React.FC<{
 
 		setEnableSelectText((enable) => !enable);
 	}, [fixedContentTypeRef, setEnableSelectText, processImageConfigRef]);
-	const switchDrawCore = useCallback(async () => {
-		const nextEnableDraw = !enableDrawRef.current;
-
+	// 进入编辑（绘制/裁剪）全屏：把窗口扩展到当前显示器，
+	// 这样工具栏/裁剪按钮（position: fixed）就能在整个屏幕范围内任意移动，
+	// 且 calculatedBoundaryRect 会随窗口位置/尺寸自动扩展到整个显示器。
+	const enterEditFullScreen = useCallback(async () => {
 		const appWindow = appWindowRef.current;
-		if (!appWindow) {
-			setEnableDraw((enable) => !enable);
+		if (!appWindow || drawFullScreenRef.current) {
 			return;
 		}
 
+		const [size, position] = await Promise.all([
+			appWindow.outerSize(),
+			appWindow.outerPosition(),
+		]);
+		drawFullScreenOriginRef.current = { size, position };
+		const monitorInfo = await getCurrentMonitorInfo();
+		await appWindow.setPosition(
+			new PhysicalPosition(monitorInfo.monitor_x, monitorInfo.monitor_y),
+		);
+		await appWindow.setSize(
+			new PhysicalSize(monitorInfo.monitor_width, monitorInfo.monitor_height),
+		);
+		drawFullScreenRef.current = true;
+	}, [appWindowRef]);
+
+	// 退出编辑全屏：按当前内容尺寸恢复窗口（编辑期间可能发生裁剪导致内容变化），
+	// 并保持进入全屏前的窗口中心不变
+	const exitEditFullScreen = useCallback(async () => {
+		const appWindow = appWindowRef.current;
+		const origin = drawFullScreenOriginRef.current;
+		drawFullScreenRef.current = false;
+		drawFullScreenOriginRef.current = undefined;
+		if (!appWindow || !origin) {
+			return;
+		}
+
+		const targetSize = getWindowPhysicalSize(scaleRef.current.x);
+		const centerX = origin.position.x + origin.size.width / 2;
+		const centerY = origin.position.y + origin.size.height / 2;
+		await appWindow.setSize(
+			new PhysicalSize(targetSize.width, targetSize.height),
+		);
+		await appWindow.setPosition(
+			new PhysicalPosition(
+				Math.round(centerX - targetSize.width / 2),
+				Math.round(centerY - targetSize.height / 2),
+			),
+		);
+	}, [appWindowRef, getWindowPhysicalSize, scaleRef]);
+
+	const switchDrawCore = useCallback(async () => {
+		const nextEnableDraw = !enableDrawRef.current;
+
 		if (nextEnableDraw) {
-			// 进入绘制模式：把窗口扩展到当前显示器全屏，
-			// 这样工具栏（position: fixed）就能在整个屏幕范围内任意移动，
-			// 且 calculatedBoundaryRect 会随窗口位置/尺寸自动扩展到整个显示器。
-			const [size, position] = await Promise.all([
-				appWindow.outerSize(),
-				appWindow.outerPosition(),
-			]);
-			drawFullScreenOriginRef.current = { size, position };
-			const monitorInfo = await getCurrentMonitorInfo();
-			await appWindow.setPosition(
-				new PhysicalPosition(monitorInfo.monitor_x, monitorInfo.monitor_y),
-			);
-			await appWindow.setSize(
-				new PhysicalSize(monitorInfo.monitor_width, monitorInfo.monitor_height),
-			);
-			drawFullScreenRef.current = true;
+			await enterEditFullScreen();
 		} else {
-			// 退出绘制模式：恢复进入前的窗口大小与位置
-			const origin = drawFullScreenOriginRef.current;
-			drawFullScreenRef.current = false;
-			drawFullScreenOriginRef.current = undefined;
-			if (origin) {
-				await appWindow.setSize(origin.size);
-				await appWindow.setPosition(origin.position);
-			}
+			await exitEditFullScreen();
 		}
 
 		setEnableDraw((enable) => !enable);
-	}, [setEnableDraw, appWindowRef]);
+	}, [setEnableDraw, enterEditFullScreen, exitEditFullScreen]);
 
 	const switchSelectText = useCallback(async () => {
 		if (isThumbnailRef.current) {
@@ -1862,6 +1883,10 @@ const FixedContentCoreInner: React.FC<{
 			return;
 		}
 
+		// 进入裁剪：扩展到全屏，让裁剪控制按钮可在整个屏幕范围内定位
+		// （从绘制模式进入时窗口已全屏，此调用为 no-op）
+		await enterEditFullScreen();
+
 		cropSourceRef.current = canvas;
 		setCropCanvasSize({
 			width: canvas.width,
@@ -1878,12 +1903,22 @@ const FixedContentCoreInner: React.FC<{
 				100,
 		});
 		setEnableCrop(true);
-	}, [isCropSupported, enableCrop, renderToCanvas, contentScaleFactor]);
+	}, [
+		isCropSupported,
+		enableCrop,
+		renderToCanvas,
+		contentScaleFactor,
+		enterEditFullScreen,
+	]);
 
 	const cancelCrop = useCallback(() => {
 		setEnableCrop(false);
 		cropSourceRef.current = undefined;
-	}, []);
+		// 若非绘制模式（右键菜单直接进入裁剪），退出时恢复窗口
+		if (!enableDrawRef.current) {
+			exitEditFullScreen();
+		}
+	}, [enableDrawRef, exitEditFullScreen]);
 
 	const confirmCrop = useCallback(
 		async (cropRect: ElementRect) => {
@@ -1967,8 +2002,13 @@ const FixedContentCoreInner: React.FC<{
 
 			// 保持窗口中心不变，调整窗口大小
 			const appWindow = appWindowRef.current;
-			// 全屏绘制模式下窗口已覆盖整个显示器，无需为工具栏/菜单预留空间，保持全屏即可
-			if (appWindow && !(enableDrawRef.current && drawFullScreenRef.current)) {
+			if (enableDrawRef.current && drawFullScreenRef.current) {
+				// 全屏绘制模式下继续绘制，保持全屏，无需调整窗口
+			} else if (drawFullScreenRef.current) {
+				// 右键菜单直接进入的裁剪（非绘制模式）：退出全屏，
+				// 按裁剪后的内容尺寸恢复窗口并保持原窗口中心
+				await exitEditFullScreen();
+			} else if (appWindow) {
 				const newPhysicalSize = getWindowPhysicalSize(scaleRef.current.x);
 				// 与 updateDrawWindowSize 一致的窗口尺寸计算，确保窗口包含工具栏和绘制菜单空间
 				const toolbarSize =
@@ -2029,7 +2069,14 @@ const FixedContentCoreInner: React.FC<{
 				cropSourceRef.current = undefined;
 			}
 		},
-		[scaleRef, setProcessImageConfig, setWindowSize, appWindowRef],
+		[
+			scaleRef,
+			setProcessImageConfig,
+			setWindowSize,
+			appWindowRef,
+			enableDrawRef,
+			exitEditFullScreen,
+		],
 	);
 
 	const createRightClickMenu = useCallback(async (): Promise<
@@ -2864,9 +2911,10 @@ const FixedContentCoreInner: React.FC<{
 			return;
 		}
 
-		// 全屏绘制模式下窗口已覆盖整个显示器，直接显示绘制层
-		if (enableDraw && drawFullScreenRef.current) {
-			setEnableDrawLayer(true);
+		// 编辑全屏（绘制/裁剪）下窗口已覆盖整个显示器，
+		// 不调整窗口大小（窗口由 enterEditFullScreen/exitEditFullScreen 管理）
+		if (drawFullScreenRef.current) {
+			setEnableDrawLayer(enableDraw);
 			return;
 		}
 
