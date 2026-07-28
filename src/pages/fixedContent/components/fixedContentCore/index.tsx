@@ -332,6 +332,18 @@ const FixedContentCoreInner: React.FC<{
 		  }
 		| undefined
 	>(undefined);
+	// 编辑全屏时内容的偏移，保持内容在屏幕上的视觉位置不变
+	const [editFullScreenOffset, setEditFullScreenOffset] = useState<
+		{ x: number; y: number } | undefined
+	>(undefined);
+	// 编辑全屏时鼠标穿透轮询定时器
+	const editFullScreenMouseThroughTimerRef = useRef<
+		ReturnType<typeof setInterval> | undefined
+	>(undefined);
+	// 当前是否处于忽略鼠标事件状态，避免重复调用
+	const ignoreCursorEventsRef = useRef(false);
+	// 编辑全屏时的显示器信息（用于全局鼠标坐标换算）
+	const editFullScreenMonitorRef = useRef<MonitorInfo | undefined>(undefined);
 	const [enableSelectText, setEnableSelectText, enableSelectTextRef] =
 		useStateRef(false);
 	const [contentOpacity, setContentOpacity, contentOpacityRef] = useStateRef(1);
@@ -1386,9 +1398,71 @@ const FixedContentCoreInner: React.FC<{
 
 		setEnableSelectText((enable) => !enable);
 	}, [fixedContentTypeRef, setEnableSelectText, processImageConfigRef]);
+	// 编辑全屏时的鼠标穿透轮询：
+	// 空白区域（未命中任何交互元素）时忽略鼠标事件，可点击贴图后面的内容；
+	// 命中内容/工具栏/弹出菜单等元素时恢复鼠标事件。
+	const startEditFullScreenMouseThrough = useCallback(() => {
+		const appWindow = appWindowRef.current;
+		if (!appWindow || editFullScreenMouseThroughTimerRef.current) {
+			return;
+		}
+
+		editFullScreenMouseThroughTimerRef.current = setInterval(async () => {
+			const monitorInfo = editFullScreenMonitorRef.current;
+			if (!monitorInfo || !drawFullScreenRef.current) {
+				return;
+			}
+
+			try {
+				const [mouseX, mouseY] = await getMousePosition();
+				// 全局物理坐标 → 窗口内 CSS 坐标（窗口位于显示器原点）
+				const clientX =
+					(mouseX - monitorInfo.monitor_x) / window.devicePixelRatio;
+				const clientY =
+					(mouseY - monitorInfo.monitor_y) / window.devicePixelRatio;
+
+				let shouldIgnore: boolean;
+				if (
+					clientX < 0 ||
+					clientY < 0 ||
+					clientX > document.documentElement.clientWidth ||
+					clientY > document.documentElement.clientHeight
+				) {
+					// 鼠标在其他显示器上
+					shouldIgnore = true;
+				} else {
+					const element = document.elementFromPoint(clientX, clientY);
+					shouldIgnore =
+						!element ||
+						element === document.documentElement ||
+						element === document.body;
+				}
+
+				if (shouldIgnore !== ignoreCursorEventsRef.current) {
+					ignoreCursorEventsRef.current = shouldIgnore;
+					await appWindow.setIgnoreCursorEvents(shouldIgnore);
+				}
+			} catch {
+				// ignore
+			}
+		}, 64);
+	}, [appWindowRef]);
+
+	const stopEditFullScreenMouseThrough = useCallback(async () => {
+		if (editFullScreenMouseThroughTimerRef.current) {
+			clearInterval(editFullScreenMouseThroughTimerRef.current);
+			editFullScreenMouseThroughTimerRef.current = undefined;
+		}
+		if (ignoreCursorEventsRef.current) {
+			ignoreCursorEventsRef.current = false;
+			await appWindowRef.current?.setIgnoreCursorEvents(false);
+		}
+	}, [appWindowRef]);
+
 	// 进入编辑（绘制/裁剪）全屏：把窗口扩展到当前显示器，
 	// 这样工具栏/裁剪按钮（position: fixed）就能在整个屏幕范围内任意移动，
 	// 且 calculatedBoundaryRect 会随窗口位置/尺寸自动扩展到整个显示器。
+	// 内容通过 editFullScreenOffset 保持在屏幕上的原视觉位置。
 	const enterEditFullScreen = useCallback(async () => {
 		const appWindow = appWindowRef.current;
 		if (!appWindow || drawFullScreenRef.current) {
@@ -1401,6 +1475,12 @@ const FixedContentCoreInner: React.FC<{
 		]);
 		drawFullScreenOriginRef.current = { size, position };
 		const monitorInfo = await getCurrentMonitorInfo();
+		editFullScreenMonitorRef.current = monitorInfo;
+		// 内容偏移 = 原窗口位置相对显示器原点（物理 → CSS 像素）
+		setEditFullScreenOffset({
+			x: (position.x - monitorInfo.monitor_x) / window.devicePixelRatio,
+			y: (position.y - monitorInfo.monitor_y) / window.devicePixelRatio,
+		});
 		await appWindow.setPosition(
 			new PhysicalPosition(monitorInfo.monitor_x, monitorInfo.monitor_y),
 		);
@@ -1408,32 +1488,46 @@ const FixedContentCoreInner: React.FC<{
 			new PhysicalSize(monitorInfo.monitor_width, monitorInfo.monitor_height),
 		);
 		drawFullScreenRef.current = true;
-	}, [appWindowRef]);
+		startEditFullScreenMouseThrough();
+	}, [appWindowRef, startEditFullScreenMouseThrough]);
 
-	// 退出编辑全屏：按当前内容尺寸恢复窗口（编辑期间可能发生裁剪导致内容变化），
-	// 并保持进入全屏前的窗口中心不变
+	// 退出编辑全屏：把窗口还原到内容所在的屏幕位置
+	// （内容一直保持在原视觉位置，直接以原窗口左上角为锚点，
+	// 尺寸按当前内容计算——编辑期间可能发生裁剪导致内容变化）
 	const exitEditFullScreen = useCallback(async () => {
 		const appWindow = appWindowRef.current;
 		const origin = drawFullScreenOriginRef.current;
 		drawFullScreenRef.current = false;
 		drawFullScreenOriginRef.current = undefined;
+		editFullScreenMonitorRef.current = undefined;
+		setEditFullScreenOffset(undefined);
+		await stopEditFullScreenMouseThrough();
 		if (!appWindow || !origin) {
 			return;
 		}
 
 		const targetSize = getWindowPhysicalSize(scaleRef.current.x);
-		const centerX = origin.position.x + origin.size.width / 2;
-		const centerY = origin.position.y + origin.size.height / 2;
 		await appWindow.setSize(
 			new PhysicalSize(targetSize.width, targetSize.height),
 		);
 		await appWindow.setPosition(
-			new PhysicalPosition(
-				Math.round(centerX - targetSize.width / 2),
-				Math.round(centerY - targetSize.height / 2),
-			),
+			new PhysicalPosition(origin.position.x, origin.position.y),
 		);
-	}, [appWindowRef, getWindowPhysicalSize, scaleRef]);
+	}, [
+		appWindowRef,
+		getWindowPhysicalSize,
+		scaleRef,
+		stopEditFullScreenMouseThrough,
+	]);
+
+	// 组件卸载时清理轮询
+	useEffect(() => {
+		return () => {
+			if (editFullScreenMouseThroughTimerRef.current) {
+				clearInterval(editFullScreenMouseThroughTimerRef.current);
+			}
+		};
+	}, []);
 
 	const switchDrawCore = useCallback(async () => {
 		const nextEnableDraw = !enableDrawRef.current;
@@ -3061,6 +3155,9 @@ const FixedContentCoreInner: React.FC<{
 			className="fixed-image-container"
 			style={{
 				position: "absolute",
+				// 编辑全屏时窗口覆盖整个显示器，用偏移保持内容在屏幕上的原视觉位置
+				left: editFullScreenOffset ? `${editFullScreenOffset.x}px` : undefined,
+				top: editFullScreenOffset ? `${editFullScreenOffset.y}px` : undefined,
 				width: `${documentSize.width}px`,
 				height: `${documentSize.height}px`,
 				zIndex: zIndexs.Draw_FixedImage,
@@ -3292,6 +3389,7 @@ const FixedContentCoreInner: React.FC<{
 					switchDraw={switchDraw}
 					isImageLayerReady={isImageLayerReady}
 					onCrop={startCrop}
+					contentOffset={editFullScreenOffset}
 				/>
 			)}
 
@@ -3457,8 +3555,8 @@ const FixedContentCoreInner: React.FC<{
 
                 .fixed-image-container-inner-border {
                     position: fixed;
-                    top: 0;
-                    left: 0;
+                    top: ${editFullScreenOffset ? `${editFullScreenOffset.y}px` : 0};
+                    left: ${editFullScreenOffset ? `${editFullScreenOffset.x}px` : 0};
                     width: calc(${isThumbnail ? "100vw" : `${documentSize.width}px`});
                     height: calc(${isThumbnail ? "100vh" : `${documentSize.height}px`});
                     border: 2px solid ${fixedBorderColor ?? token.colorBorder};
@@ -3471,13 +3569,13 @@ const FixedContentCoreInner: React.FC<{
 
                 .fixed-image-container-inner-resize-window {
                     position: fixed;
-                    top: 0;
-                    left: 0;
+                    top: ${editFullScreenOffset ? `${editFullScreenOffset.y}px` : 0};
+                    left: ${editFullScreenOffset ? `${editFullScreenOffset.x}px` : 0};
                     width: calc(${isThumbnail ? "100vw" : `${documentSize.width}px`});
                     height: calc(${isThumbnail ? "100vh" : `${documentSize.height}px`});
                     pointer-events: none;
                     z-index: ${zIndexs.FixedToScreen_ResizeWindow};
-                    display: ${isThumbnail || enableDraw || enableSelectText ? "none" : "block"};
+                    display: ${isThumbnail || enableDraw || enableCrop || enableSelectText ? "none" : "block"};
                 }
 
                 .fixed-image-container-inner:active {
