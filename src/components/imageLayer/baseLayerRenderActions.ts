@@ -507,7 +507,7 @@ const getOrCreateBlurFilter = (
 		newFilter.resolution = 1;
 	} else if (filterType === "kawaseBlur") {
 		const strength = Math.max(1, (blur / 100) * 32);
-		newFilter = new PIXIFilters.KawaseBlurFilter({ strength });
+		newFilter = new PIXIFilters.KawaseBlurFilter({ strength, clamp: true });
 		newFilter.resolution = 0.3;
 	} else if (filterType === "motionBlur") {
 		const kernelSize = Math.max(1, (blur / 100) * 25);
@@ -536,12 +536,14 @@ const getOrCreateBlurFilter = (
 	} else {
 		// 默认使用 blur filter
 		const strength = Math.max(1, (blur / 100) * 42);
-		newFilter = new PIXI.BlurFilter({
+		const blurFilter = new PIXI.BlurFilter({
 			strength,
 			quality: 2,
 			kernelSize: 5,
 		});
-		newFilter.resolution = 0.3;
+		blurFilter.resolution = 0.3;
+		blurFilter.repeatEdgePixels = true;
+		newFilter = blurFilter;
 	}
 
 	blurSpriteFilterMapRef.current.set(filterKey, newFilter);
@@ -720,6 +722,23 @@ export const renderUpdateBlurSpriteAction = (
 			blurProps.angle,
 			blurProps.zoom,
 		);
+	}
+
+	// 将 filterArea 钳制到纹理边界内，避免滤镜采样超出图片范围的透明像素
+	const filterArea = blurSprite.sprite.filterArea;
+	if (filterArea) {
+		const texWidth = blurSprite.sprite.texture.width;
+		const texHeight = blurSprite.sprite.texture.height;
+
+		const clampedX = Math.max(0, filterArea.x);
+		const clampedY = Math.max(0, filterArea.y);
+		const clampedRight = Math.min(filterArea.x + filterArea.width, texWidth);
+		const clampedBottom = Math.min(filterArea.y + filterArea.height, texHeight);
+
+		filterArea.x = clampedX;
+		filterArea.y = clampedY;
+		filterArea.width = Math.max(0, clampedRight - clampedX);
+		filterArea.height = Math.max(0, clampedBottom - clampedY);
 	}
 
 	blurSprite.spriteContainer.alpha =
