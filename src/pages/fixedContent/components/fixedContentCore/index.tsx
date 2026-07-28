@@ -22,6 +22,7 @@ import React, {
 	useRef,
 	useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { isHotkeyPressed, useHotkeys } from "react-hotkeys-hook";
 import { FormattedMessage, useIntl } from "react-intl";
 import { getMousePosition, saveFile } from "@/commands";
@@ -1499,6 +1500,16 @@ const FixedContentCoreInner: React.FC<{
 			const { width: newWidth, height: newHeight } =
 				getWindowPhysicalSize(targetScale);
 
+			// 先同步更新内容缩放状态，确保 DOM 在窗口缩放前已就绪，避免内容滞后于窗口
+			flushSync(() => {
+				setScale({
+					x: targetScale,
+					y: targetScale,
+				});
+			});
+			ocrResultActionRef.current?.setScale(targetScale);
+			showScaleInfoTemporary();
+
 			if (zoomWithMouse && !ignoreMouse) {
 				try {
 					// 获取当前鼠标位置和窗口位置
@@ -1534,13 +1545,6 @@ const FixedContentCoreInner: React.FC<{
 					appWindow.setSize(new PhysicalSize(newWidth, newHeight)),
 				]);
 			}
-
-			setScale({
-				x: targetScale,
-				y: targetScale,
-			});
-			ocrResultActionRef.current?.setScale(targetScale);
-			showScaleInfoTemporary();
 		},
 		[
 			enableDrawRef,
