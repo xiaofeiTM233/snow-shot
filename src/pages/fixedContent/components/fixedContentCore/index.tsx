@@ -1867,31 +1867,54 @@ const FixedContentCoreInner: React.FC<{
 			const appWindow = appWindowRef.current;
 			if (appWindow) {
 				const newPhysicalSize = getWindowPhysicalSize(scaleRef.current.x);
-				// 获取工具栏物理高度，裁剪后窗口需包含工具栏空间以避免工具栏被压回贴图框内部
+				// 与 updateDrawWindowSize 一致的窗口尺寸计算，确保窗口包含工具栏和绘制菜单空间
 				const toolbarSize =
 					drawActionRef.current?.getToolbarSize() ?? {
 						width: 0,
 						height: 0,
 					};
-				const toolbarPhysicalHeight = enableDrawRef.current
-					? Math.ceil(toolbarSize.height * window.devicePixelRatio)
-					: 0;
-				const totalPhysicalHeight =
-					newPhysicalSize.height + toolbarPhysicalHeight;
+				const drawMenuSize =
+					drawActionRef.current?.getDrawMenuSize() ?? {
+						width: 0,
+						height: 0,
+					};
+				const dpr = window.devicePixelRatio;
+				let totalPhysicalWidth = newPhysicalSize.width;
+				let totalPhysicalHeight = newPhysicalSize.height;
+				if (enableDrawRef.current) {
+					const toolbarPhysicalWidth = Math.ceil(
+						toolbarSize.width * dpr,
+					);
+					const toolbarPhysicalHeight = Math.ceil(
+						toolbarSize.height * dpr,
+					);
+					const drawMenuPhysicalWidth = Math.ceil(
+						drawMenuSize.width * dpr,
+					);
+					const drawMenuPhysicalHeight = Math.ceil(
+						drawMenuSize.height * dpr,
+					);
+					totalPhysicalHeight = Math.max(
+						newPhysicalSize.height + toolbarPhysicalHeight,
+						drawMenuPhysicalHeight,
+					);
+					totalPhysicalWidth = Math.max(
+						drawMenuPhysicalWidth + newPhysicalSize.width,
+						toolbarPhysicalWidth,
+					);
+				}
 				const [currentSize, currentPosition] = await Promise.all([
 					appWindow.outerSize(),
 					appWindow.outerPosition(),
 				]);
 				const centerX = currentPosition.x + currentSize.width / 2;
 				const centerY = currentPosition.y + currentSize.height / 2;
-				const newX = Math.round(centerX - newPhysicalSize.width / 2);
-				const newY = Math.round(
-					centerY - totalPhysicalHeight / 2,
-				);
+				const newX = Math.round(centerX - totalPhysicalWidth / 2);
+				const newY = Math.round(centerY - totalPhysicalHeight / 2);
 				await setWindowRect(
 					newX,
 					newY,
-					newX + newPhysicalSize.width,
+					newX + totalPhysicalWidth,
 					newY + totalPhysicalHeight,
 				);
 			}
