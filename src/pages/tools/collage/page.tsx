@@ -791,7 +791,7 @@ const CollageCore = () => {
                     flex-direction: column;
                 }
 
-                .collage-toolbar {
+                :global(.collage-toolbar) {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
@@ -801,13 +801,13 @@ const CollageCore = () => {
                     border-bottom: 1px solid ${token.colorBorderSecondary};
                 }
 
-                .collage-body {
+                :global(.collage-body) {
                     flex: 1;
                     display: flex;
                     min-height: 0;
                 }
 
-                .collage-side {
+                :global(.collage-side) {
                     width: 280px;
                     flex-shrink: 0;
                     padding: ${token.padding}px;
@@ -815,7 +815,7 @@ const CollageCore = () => {
                     overflow: auto;
                 }
 
-                .collage-main {
+                :global(.collage-main) {
                     flex: 1;
                     min-width: 0;
                     overflow: auto;
@@ -823,11 +823,11 @@ const CollageCore = () => {
                     padding: ${token.padding}px;
                 }
 
-                .collage-empty {
+                :global(.collage-empty) {
                     margin: auto;
                 }
 
-                .collage-slider-row {
+                :global(.collage-slider-row) {
                     display: flex;
                     align-items: center;
                     gap: ${token.paddingXS}px;
@@ -835,18 +835,18 @@ const CollageCore = () => {
                     white-space: nowrap;
                 }
 
-                .collage-gap-value {
+                :global(.collage-gap-value) {
                     flex-shrink: 0;
                 }
 
-                .collage-image-list {
+                :global(.collage-image-list) {
                     display: flex;
                     flex-direction: column;
                     gap: ${token.paddingXS}px;
                     margin-top: ${token.paddingXS}px;
                 }
 
-                .collage-image-item {
+                :global(.collage-image-item) {
                     position: relative;
                     border-radius: ${token.borderRadius}px;
                     overflow: hidden;
@@ -858,11 +858,11 @@ const CollageCore = () => {
                     justify-content: center;
                 }
 
-                .collage-image-item.is-selected {
+                :global(.collage-image-item.is-selected) {
                     border-color: ${token.colorPrimary};
                 }
 
-                .collage-image-thumb {
+                :global(.collage-image-thumb) {
                     display: block;
                     max-width: 100%;
                     max-height: 240px;
@@ -871,7 +871,7 @@ const CollageCore = () => {
                     object-fit: contain;
                 }
 
-                .collage-image-item-mask {
+                :global(.collage-image-item-mask) {
                     position: absolute;
                     inset: 0;
                     display: flex;
@@ -884,17 +884,17 @@ const CollageCore = () => {
                     transition: opacity 0.15s;
                 }
 
-                .collage-image-item:hover .collage-image-item-mask {
+                :global(.collage-image-item:hover .collage-image-item-mask) {
                     opacity: 1;
                 }
 
-                .collage-long-preview-wrap {
+                :global(.collage-long-preview-wrap) {
                     margin: auto;
                     max-width: 100%;
                     overflow: auto;
                 }
 
-                .collage-long-preview {
+                :global(.collage-long-preview) {
                     display: flex;
                     width: max-content;
                     max-width: 100%;
@@ -911,15 +911,15 @@ const CollageCore = () => {
                     background-position: 0 0, 0 8px, 8px -8px, -8px 0;
                 }
 
-                .collage-long-preview img {
+                :global(.collage-long-preview) img {
                     display: block;
                 }
 
-                .collage-free-wrap {
+                :global(.collage-free-wrap) {
                     margin: auto;
                 }
 
-                .collage-free-canvas {
+                :global(.collage-free-canvas) {
                     position: relative;
                     background-color: #fff;
                     background-image: linear-gradient(
@@ -935,7 +935,7 @@ const CollageCore = () => {
                     box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);
                 }
 
-                .collage-free-item {
+                :global(.collage-free-item) {
                     position: absolute;
                     box-sizing: border-box;
                     cursor: move;
@@ -943,12 +943,12 @@ const CollageCore = () => {
                     touch-action: none;
                 }
 
-                .collage-free-item.is-selected {
+                :global(.collage-free-item.is-selected) {
                     outline: 2px solid ${token.colorPrimary};
                     outline-offset: 0;
                 }
 
-                .collage-free-item img {
+                :global(.collage-free-item) img {
                     width: 100%;
                     height: 100%;
                     object-fit: fill;
@@ -956,7 +956,7 @@ const CollageCore = () => {
                     display: block;
                 }
 
-                .collage-free-resize {
+                :global(.collage-free-resize) {
                     position: absolute;
                     right: 0;
                     bottom: 0;
