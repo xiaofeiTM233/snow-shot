@@ -7,10 +7,13 @@ import { Button, theme } from "antd";
 import React, {
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
+import { updateElementPosition } from "@/pages/draw/components/drawToolbar/components/dragButton/extra";
+import { MousePosition } from "@/utils/mousePosition";
 import { zIndexs } from "@/utils/zIndex";
 import type { ElementRect } from "@/types/commands/screenshot";
 
@@ -410,6 +413,101 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 
 	const hasSelection = isRectValid(selectRect);
 
+	// 裁剪控制按钮定位：复用工具栏的定位逻辑（相对选区、溢出翻转、屏幕内钳制）
+	const cropButtonsRef = useRef<HTMLDivElement>(null);
+
+	const updateCropButtonsPosition = useCallback(() => {
+		const element = cropButtonsRef.current;
+		const container = containerRef.current;
+		if (!element || !container) {
+			return;
+		}
+
+		const btnW = element.clientWidth;
+		const btnH = element.clientHeight;
+		if (btnW === 0 || btnH === 0) {
+			// 按钮尚未完成布局，下一帧重试
+			requestAnimationFrame(() => {
+				updateCropButtonsPosition();
+			});
+			return;
+		}
+
+		const containerRect = container.getBoundingClientRect();
+		const factor = factorRef.current;
+
+		// 锚定矩形：有选区则相对选区，否则相对整个内容窗口
+		const anchorMinX = hasSelection ? selectRect.min_x : 0;
+		const anchorMinY = hasSelection ? selectRect.min_y : 0;
+		const anchorMaxX = hasSelection ? selectRect.max_x : canvasSize.width;
+		const anchorMaxY = hasSelection ? selectRect.max_y : canvasSize.height;
+
+		const ax = anchorMinX / factor.x;
+		const ay = anchorMinY / factor.y;
+		const aw = (anchorMaxX - anchorMinX) / factor.x;
+		const ah = (anchorMaxY - anchorMinY) / factor.y;
+
+		// 主方案：选区下方，右对齐到选区右侧（与工具栏逻辑一致）
+		const mainOffset = {
+			x: containerRect.left + ax + aw - btnW,
+			y: containerRect.top + ay + ah + token.margin,
+		};
+		const origin = new MousePosition(0, 0);
+		let dragRes = updateElementPosition(
+			element,
+			mainOffset.x,
+			mainOffset.y,
+			origin,
+			origin,
+			undefined,
+			false,
+			1,
+		);
+
+		// 溢出底部时翻转到选区上方（与工具栏溢出回退逻辑一致）
+		if (dragRes.isBeyondMaxY) {
+			const aboveOffset = {
+				x: containerRect.left + ax + aw - btnW,
+				y: containerRect.top + ay - btnH - token.margin,
+			};
+			const temp = updateElementPosition(
+				element,
+				aboveOffset.x,
+				aboveOffset.y,
+				origin,
+				origin,
+				undefined,
+				false,
+				1,
+			);
+			if (!(temp.isBeyondMaxY || temp.isBeyondMinY)) {
+				dragRes = temp;
+			}
+		}
+
+		element.style.opacity = "1";
+	}, [
+		selectRect,
+		canvasSize.width,
+		canvasSize.height,
+		viewSize.width,
+		viewSize.height,
+		token.margin,
+	]);
+
+	// 布局阶段即计算位置，避免按钮在 (0,0) 闪烁
+	useLayoutEffect(() => {
+		updateCropButtonsPosition();
+	}, [updateCropButtonsPosition]);
+
+	// 窗口尺寸变化时重新计算，避免超出屏幕消失
+	useEffect(() => {
+		window.addEventListener("resize", updateCropButtonsPosition);
+		return () => {
+			window.removeEventListener("resize", updateCropButtonsPosition);
+		};
+	}, [updateCropButtonsPosition]);
+
 	return (
 		<div
 			ref={containerRef}
@@ -484,11 +582,12 @@ export const CropLayer: React.FC<CropLayerProps> = ({
 			)}
 
 			<div
+				ref={cropButtonsRef}
 				style={{
-					position: "absolute",
-					top: `calc(100% + ${token.margin}px)`,
-					left: "50%",
-					transform: "translateX(-50%)",
+					position: "fixed",
+					left: 0,
+					top: 0,
+					opacity: 0,
 					display: "flex",
 					gap: token.paddingXS,
 					zIndex: 2,
