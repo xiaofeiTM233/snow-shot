@@ -509,20 +509,22 @@ pub async fn set_window_rect(
     max_x: i32,
     max_y: i32,
 ) -> Result<(), String> {
-    match window.set_size(PhysicalSize::new(max_x - min_x, max_y - min_y)) {
-        Ok(_) => (),
-        Err(e) => {
-            return Err(format!(
-                "[set_window_rect] Failed to set window size: {}",
-                e
-            ));
-        }
-    }
+    // 先设置位置再设置尺寸：位置变更不触发内容重排，
+    // 随后的尺寸变更在正确位置一步到位，减少中间帧闪烁
     match window.set_position(PhysicalPosition::new(min_x, min_y)) {
         Ok(_) => (),
         Err(e) => {
             return Err(format!(
                 "[set_window_rect] Failed to set window position: {}",
+                e
+            ));
+        }
+    }
+    match window.set_size(PhysicalSize::new(max_x - min_x, max_y - min_y)) {
+        Ok(_) => (),
+        Err(e) => {
+            return Err(format!(
+                "[set_window_rect] Failed to set window size: {}",
                 e
             ));
         }

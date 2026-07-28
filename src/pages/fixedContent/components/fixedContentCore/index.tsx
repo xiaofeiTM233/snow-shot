@@ -22,6 +22,7 @@ import React, {
 	useRef,
 	useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { isHotkeyPressed, useHotkeys } from "react-hotkeys-hook";
 import { FormattedMessage, useIntl } from "react-intl";
 import { getMousePosition, saveFile } from "@/commands";
@@ -1535,11 +1536,14 @@ const FixedContentCoreInner: React.FC<{
 				]);
 			}
 
-			setScale({
-				x: targetScale,
-				y: targetScale,
+			// 用 flushSync 强制同步 DOM 更新，消除 React 异步渲染延迟
+			flushSync(() => {
+				setScale({
+					x: targetScale,
+					y: targetScale,
+				});
+				ocrResultActionRef.current?.setScale(targetScale);
 			});
-			ocrResultActionRef.current?.setScale(targetScale);
 			showScaleInfoTemporary();
 		},
 		[
