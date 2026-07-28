@@ -50,7 +50,6 @@ import {
 	fixedContentFocusModeHideOtherWindow,
 	fixedContentFocusModeShowAllWindow,
 } from "@/functions/fixedContent";
-import { useCallbackRender } from "@/hooks/useCallbackRender";
 import { withStatePublisher } from "@/hooks/useStatePublisher";
 import { useStateRef } from "@/hooks/useStateRef";
 import { useStateSubscriber } from "@/hooks/useStateSubscriber";
@@ -239,6 +238,40 @@ const FixedContentCoreInner: React.FC<{
 	const appWindowRef = useRef<AppWindow | undefined>(undefined);
 	useEffect(() => {
 		appWindowRef.current = getCurrentWindow();
+	}, []);
+
+	// 缓存窗口物理位置，避免每次缩放都进行 IPC 往返
+	const windowPhysicalPositionRef = useRef({ x: 0, y: 0 });
+	// 缓存滚轮事件中的鼠标位置（webview CSS 坐标）
+	const wheelMousePositionRef = useRef<{
+		clientX: number;
+		clientY: number;
+	} | null>(null);
+
+	useEffect(() => {
+		const appWindow = appWindowRef.current;
+		if (!appWindow) {
+			return;
+		}
+
+		// 初始化缓存
+		appWindow.outerPosition().then((pos) => {
+			windowPhysicalPositionRef.current = { x: pos.x, y: pos.y };
+		});
+
+		// 监听窗口移动事件，保持缓存同步（处理拖拽等外部移动）
+		let unlisten: (() => void) | undefined;
+		appWindow
+			.onMoved(({ payload: pos }) => {
+				windowPhysicalPositionRef.current = { x: pos.x, y: pos.y };
+			})
+			.then((un) => {
+				unlisten = un;
+			});
+
+		return () => {
+			unlisten?.();
+		};
 	}, []);
 
 	const [getAppSettings] = useStateSubscriber(AppSettingsPublisher, undefined);
@@ -1502,13 +1535,18 @@ const FixedContentCoreInner: React.FC<{
 
 			if (zoomWithMouse && !ignoreMouse) {
 				try {
-					// 获取当前鼠标位置和窗口位置
-					const [[mouseX, mouseY], currentPosition, currentSize] =
-						await Promise.all([
-							getMousePosition(),
-							appWindow.outerPosition(),
-							appWindow.outerSize(),
-						]);
+					// 使用缓存的窗口位置和滚轮事件的鼠标位置，
+					// 替代原来的 3 次 Tauri IPC 往返（getMousePosition +
+					// outerPosition + outerSize），将延迟从 4 次 IPC 降至 1 次
+					const currentPosition = windowPhysicalPositionRef.current;
+					const currentSize = getWindowPhysicalSize(scaleRef.current.x);
+					const dpr = window.devicePixelRatio;
+
+					// 从 webview CSS 坐标转换为物理屏幕坐标
+					const mouseClientX = wheelMousePositionRef.current?.clientX ?? 0;
+					const mouseClientY = wheelMousePositionRef.current?.clientY ?? 0;
+					const mouseX = currentPosition.x + mouseClientX * dpr;
+					const mouseY = currentPosition.y + mouseClientY * dpr;
 
 					// 计算鼠标相对于窗口的位置（比例）
 					const mouseRelativeX =
@@ -1522,12 +1560,14 @@ const FixedContentCoreInner: React.FC<{
 
 					// 同时设置窗口大小和位置
 					await setWindowRect(newX, newY, newX + newWidth, newY + newHeight);
+					// 乐观更新窗口位置缓存，供下次缩放使用
+					windowPhysicalPositionRef.current = { x: newX, y: newY };
 				} catch (error) {
 					appError("[scaleWindow] Error during mouse-centered scaling", error);
 					// 如果出错，回退到普通缩放
-					await Promise.all([
-						appWindow.setSize(new PhysicalSize(newWidth, newHeight)),
-					]);
+					await appWindow.setSize(
+						new PhysicalSize(newWidth, newHeight),
+					);
 				}
 			} else {
 				// 普通缩放，只改变窗口大小
@@ -1557,7 +1597,23 @@ const FixedContentCoreInner: React.FC<{
 			windowSizeRef,
 		],
 	);
-	const scaleWindowRender = useCallbackRender(scaleWindow);
+	// 自定义 delta 累积节流：同一帧内多次滚轮事件的 delta 会被累加，
+	// 而非被 rafSchd 丢弃（rafSchd 只保留最后一次调用的参数）
+	const scaleWindowRender = useMemo(() => {
+		let rafId: number | null = null;
+		let accumulatedDelta = 0;
+		return (delta: number) => {
+			accumulatedDelta += delta;
+			if (rafId === null) {
+				rafId = requestAnimationFrame(() => {
+					rafId = null;
+					const total = accumulatedDelta;
+					accumulatedDelta = 0;
+					void scaleWindow(total);
+				});
+			}
+		};
+	}, [scaleWindow]);
 
 	const getSelectRectParams = useCallback(() => {
 		const currentSelectRectParams = selectRectParamsRef.current;
@@ -2427,6 +2483,10 @@ const FixedContentCoreInner: React.FC<{
 			const delta = deltaY > 0 ? -1 : 1;
 
 			if (scrollActionRef.current === FixedContentScrollAction.Zoom) {
+				wheelMousePositionRef.current = {
+					clientX: event.clientX,
+					clientY: event.clientY,
+				};
 				scaleWindowRender(delta * 10);
 			} else if (scrollActionRef.current === FixedContentScrollAction.RotateX) {
 				setRotateAngles({
@@ -2463,6 +2523,10 @@ const FixedContentCoreInner: React.FC<{
 				return;
 			}
 
+			wheelMousePositionRef.current = {
+				clientX: e.clientX,
+				clientY: e.clientY,
+			};
 			scaleWindow(100 - scaleRef.current.x, false);
 		},
 		[scaleRef, scaleWindow],
