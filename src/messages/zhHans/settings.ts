@@ -81,6 +81,9 @@ export const settings = {
 	"settings.resetSettings": "确定重置“{title}”为默认设置吗？",
 	"settings.antialias": "抗锯齿",
 	"settings.renderSettings": "渲染",
+	"settings.renderBackend": "渲染引擎",
+	"settings.renderBackend.tip":
+		"切换后下次截图生效。若当前环境不支持 WebGPU，将自动回退到 WebGL",
 	"settings.drawLine": "绘制线条",
 	"settings.enableDrawLineSimplify": "启用简化线条",
 	"settings.enableDrawLineSimplify.tip":

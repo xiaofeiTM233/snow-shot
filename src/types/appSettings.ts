@@ -58,6 +58,12 @@ export enum HdrColorAlgorithm {
 	None = "None",
 }
 
+/** 渲染引擎（值与 PIXI ApplicationOptions.preference 保持一致） */
+export enum RenderBackend {
+	WebGL = "webgl",
+	WebGPU = "webgpu",
+}
+
 /** 运行日志级别 */
 export enum RunLogLevel {
 	/** 关闭运行日志 */
@@ -414,6 +420,8 @@ export type AppSettingsData = {
 	[AppSettingsGroup.AppFunction]: Record<AppFunction, AppFunctionConfig>;
 	[AppSettingsGroup.Render]: {
 		antialias: boolean;
+		/** 渲染引擎 */
+		renderBackend: RenderBackend;
 	};
 	[AppSettingsGroup.SystemCommon]: {
 		autoStart: boolean;

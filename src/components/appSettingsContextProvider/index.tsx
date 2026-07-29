@@ -49,6 +49,7 @@ import {
 	type HdrColorAlgorithm,
 	type HistoryValidDuration,
 	OcrDetectAfterAction,
+	RenderBackend,
 	RunLogLevel,
 	type TrayIconClickAction,
 	type TrayIconDefaultIcon,
@@ -709,6 +710,12 @@ const AppSettingsContextProviderCore: React.FC<{
 							? newSettings.antialias
 							: (prevSettings?.antialias ??
 								defaultAppSettingsData[group].antialias),
+					renderBackend:
+						newSettings?.renderBackend === RenderBackend.WebGL ||
+						newSettings?.renderBackend === RenderBackend.WebGPU
+							? newSettings.renderBackend
+							: (prevSettings?.renderBackend ??
+								defaultAppSettingsData[group].renderBackend),
 				};
 			} else if (group === AppSettingsGroup.SystemCommon) {
 				newSettings = newSettings as AppSettingsData[typeof group];

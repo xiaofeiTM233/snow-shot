@@ -40,9 +40,25 @@ export const renderInitCanvasAction = async (
 	renderDisposeCanvasAction(canvasAppRef);
 
 	const canvasApp = new PIXI.Application();
-	await canvasApp.init({
-		...appOptions,
-	});
+	try {
+		await canvasApp.init({
+			...appOptions,
+		});
+	} catch (error) {
+		// WebGPU 初始化失败（WebView/Worker 环境不支持等），自动回退到 WebGL
+		if (appOptions.preference === "webgpu") {
+			console.warn(
+				"[renderInitCanvasAction] WebGPU init failed, fallback to WebGL",
+				error,
+			);
+			await canvasApp.init({
+				...appOptions,
+				preference: "webgl",
+			});
+		} else {
+			throw error;
+		}
+	}
 	canvasAppRef.current = canvasApp;
 	canvasApp.stage.interactiveChildren = false;
 	return canvasApp.canvas;

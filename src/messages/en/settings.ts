@@ -85,6 +85,9 @@ export const settings = {
 		'Are you sure you want to reset "{title}" to default settings?',
 	"settings.antialias": "Antialias",
 	"settings.renderSettings": "Render Settings",
+	"settings.renderBackend": "Render Backend",
+	"settings.renderBackend.tip":
+		"Takes effect on the next screenshot. Falls back to WebGL automatically if WebGPU is not supported",
 	"settings.drawLine": "Draw Line",
 	"settings.enableDrawLineSimplify": "Enable Line Simplification",
 	"settings.enableDrawLineSimplify.tip":

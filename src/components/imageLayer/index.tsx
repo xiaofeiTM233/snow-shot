@@ -16,6 +16,12 @@ import type { ImageSharedBufferData } from "@/pages/draw/tools";
 import type { FixedContentProcessImageConfig } from "@/pages/fixedContent/components/fixedContentCore";
 import type { ElementRect, ImageBuffer } from "@/types/commands/screenshot";
 import type { CaptureHistoryItem } from "@/utils/appStore";
+import { useAppSettingsLoad } from "@/hooks/useAppSettingsLoad";
+import {
+	type AppSettingsData,
+	AppSettingsGroup,
+	RenderBackend,
+} from "@/types/appSettings";
 import { getCaptureHistoryImageAbsPath } from "@/utils/captureHistory";
 import { supportOffscreenCanvas } from "@/utils/environment";
 import { appWarn } from "@/utils/log";
@@ -57,7 +63,10 @@ export type ImageLayerActionType = {
 	/**
 	 * 初始化画布
 	 */
-	initCanvas: (antialias: boolean) => Promise<void>;
+	initCanvas: (
+		antialias: boolean,
+		renderBackend: RenderBackend,
+	) => Promise<void>;
 	resizeCanvas: (width: number, height: number) => void;
 	clearCanvas: () => Promise<void>;
 	getLayerContainerElement: () => HTMLDivElement | null;
@@ -284,7 +293,7 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 	);
 	/** 初始化画布 */
 	const initCanvas = useCallback<ImageLayerActionType["initCanvas"]>(
-		async (antialias: boolean) => {
+		async (antialias: boolean, renderBackend: RenderBackend) => {
 			if (disabled) {
 				return;
 			}
@@ -317,7 +326,7 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 				},
 				autoStart: false,
 				canvas: offscreenCanvasRef.current ?? canvas,
-				preference: "webgl",
+				preference: renderBackend,
 				multiView: false,
 				antialias,
 			};
@@ -334,9 +343,23 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 		[rendererWorker, onInitCanvasReady, disabled, hasInitRendererWorker],
 	);
 
+	const [renderSettings, setRenderSettings] = useState<
+		AppSettingsData[AppSettingsGroup.Render] | undefined
+	>(undefined);
+	useAppSettingsLoad(
+		useCallback((settings: AppSettingsData) => {
+			setRenderSettings(settings[AppSettingsGroup.Render]);
+		}, []),
+		true,
+	);
+
 	useEffect(() => {
-		initCanvas(true);
-	}, [initCanvas]);
+		if (!renderSettings) {
+			return;
+		}
+
+		initCanvas(renderSettings.antialias, renderSettings.renderBackend);
+	}, [initCanvas, renderSettings]);
 
 	/** 调整画布大小 */
 	const resizeCanvas = useCallback(
