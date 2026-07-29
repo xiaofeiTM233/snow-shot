@@ -708,18 +708,18 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 					imageBuffer,
 				);
 			}
-			// 水印层
-			watermarkContainerKeyRef.current = await createNewCanvasContainer(
-				DRAW_LAYER_WATERMARK_CONTAINER_KEY,
-			);
-			// 高亮层
-			highlightContainerKeyRef.current = await createNewCanvasContainer(
-				DRAW_LAYER_HIGHLIGHT_CONTAINER_KEY,
-			);
-			// 模糊层
-			blurContainerKeyRef.current = await createNewCanvasContainer(
-				DRAW_LAYER_BLUR_CONTAINER_KEY,
-			);
+		// 高亮层
+		highlightContainerKeyRef.current = await createNewCanvasContainer(
+			DRAW_LAYER_HIGHLIGHT_CONTAINER_KEY,
+		);
+		// 模糊层
+		blurContainerKeyRef.current = await createNewCanvasContainer(
+			DRAW_LAYER_BLUR_CONTAINER_KEY,
+		);
+		// 水印层（最后创建，确保位于最顶层，避免被高亮层的不透明底图遮挡）
+		watermarkContainerKeyRef.current = await createNewCanvasContainer(
+			DRAW_LAYER_WATERMARK_CONTAINER_KEY,
+		);
 
 			await canvasRender();
 		},
