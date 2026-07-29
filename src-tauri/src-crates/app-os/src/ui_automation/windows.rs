@@ -13,14 +13,13 @@ use uiautomation::types::Point;
 use uiautomation::types::TreeScope;
 use uiautomation::types::UIProperty;
 
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use snow_shot_app_shared::ElementRect;
 use snow_shot_app_utils::monitor_info::MonitorList;
-use std::sync::Arc;
-use windows::Win32::Foundation::{HWND, BOOL};
-use windows::Win32::Foundation::TRUE;
+use std::sync::{Arc, Mutex};
+use windows::core::BOOL;
+use windows::Win32::Foundation::{HWND, LPARAM, RECT, TRUE};
 use windows::Win32::UI::WindowsAndMessaging::{
-	EnumChildWindows, IsWindowVisible, IsWindowEnabled, GetWindowRect, WINDOWENUMPROC,
+	EnumChildWindows, IsWindowVisible, GetWindowRect, WNDENUMPROC,
 };
 use xcap::ImplWindow;
 use xcap::Window;
@@ -149,26 +148,30 @@ impl UIElements {
         self.include_child_windows = include_child_windows;
     }
 
-    fn collect_immediate_child_windows(parent: HWND) -> Vec<HWND> {
-        let children = std::sync::Arc::new(std::sync::Mutex::new(Vec::<HWND>::new()));
-        let captured = children.clone();
-        let proc = WINDOWENUMPROC::new(move |child: HWND| -> BOOL {
-            if let Ok(mut list) = captured.lock() {
-                list.push(child);
-            }
-            TRUE
-        });
-        let _ = unsafe { EnumChildWindows(parent, proc) };
-        match std::sync::Arc::try_unwrap(children) {
-            Ok(mutex) => mutex.into_inner().unwrap_or_default(),
-            Err(_) => Vec::new(),
+    /// EnumChildWindows 的回调：通过 LPARAM 传回的指针把子窗口 HWND 收集进 Mutex。
+    /// 必须是不捕获任何数据的裸函数指针，生命周期由调用方（children Arc）保证。
+    unsafe extern "system" fn enum_child_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let mutex = &*(lparam.0 as *const Mutex<Vec<HWND>>);
+        if let Ok(mut list) = mutex.lock() {
+            list.push(hwnd);
         }
+        TRUE
+    }
+
+    fn collect_immediate_child_windows(parent: HWND) -> Vec<HWND> {
+        let children = Arc::new(Mutex::new(Vec::<HWND>::new()));
+        // 通过 LPARAM 把 Mutex 指针传给回调，回调只依赖 lparam，不捕获 Arc，
+        // 因此调用结束后 children 仍由我们独占，可安全 try_unwrap 取出结果。
+        let lparam = Arc::as_ptr(&children) as LPARAM;
+        let _ = unsafe { EnumChildWindows(Some(parent), WNDENUMPROC(Some(Self::enum_child_proc)), lparam) };
+        Arc::try_unwrap(children)
+            .unwrap_or_else(|_| Mutex::new(Vec::new()))
+            .into_inner()
+            .unwrap_or_default()
     }
 
     fn is_window_selectable(hwnd: HWND) -> bool {
-        let visible = unsafe { IsWindowVisible(hwnd) }.as_bool();
-        let enabled = unsafe { IsWindowEnabled(hwnd) }.as_bool();
-        visible && enabled
+        unsafe { IsWindowVisible(hwnd) }.as_bool()
     }
 
     /**
@@ -348,7 +351,7 @@ impl UIElements {
 
         let automation = self.automation.clone();
         let children_list = windows
-            .par_iter()
+            .iter()
             .filter_map(|window_hwnd| {
                 let window = ImplWindow::new(HWND(*window_hwnd as *mut c_void));
 
@@ -390,12 +393,17 @@ impl UIElements {
                     )
                 {
                     let app_name = window.app_name().unwrap_or_default();
-                    Some((UIElementWrapper { element }, element_rect, app_name, window_hwnd))
+                    Some((
+                        UIElementWrapper { element },
+                        element_rect,
+                        app_name,
+                        HWND(window_hwnd),
+                    ))
                 } else {
                     None
                 }
             })
-            .collect::<Vec<(UIElementWrapper, uiautomation::types::Rect, String)>>();
+            .collect::<Vec<(UIElementWrapper, uiautomation::types::Rect, String, HWND)>>();
 
         // 窗口层级
         current_level.window_index = 0;
@@ -669,7 +677,8 @@ impl UIElements {
 
         // 缓存失效检测：目标窗口位置发生变化则通知上层重建
         if let Some(hwnd) = self.window_index_hwnd_map.get(&parent_level.window_index) {
-            if let Ok(current) = unsafe { GetWindowRect(*hwnd) } {
+            let mut current = RECT::default();
+            if unsafe { GetWindowRect(*hwnd, &mut current) }.is_ok() {
                 let window_level = self
                     .window_index_level_map
                     .get(&parent_level.window_index)
