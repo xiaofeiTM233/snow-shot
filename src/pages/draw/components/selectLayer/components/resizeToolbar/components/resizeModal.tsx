@@ -37,6 +37,7 @@ import {
 } from "@/types/appSettings";
 import type { ElementRect } from "@/types/commands/screenshot";
 import { HotkeysScope } from "@/types/core/appHotKeys";
+import { readPrevSelectRect } from "@/commands/core";
 
 export type ResizeModalActionType = {
 	show: (
@@ -195,12 +196,16 @@ export const ResizeModal: React.FC<{
 	}, [selectRectPresetList, token.colorPrimary]);
 
 	const onQuickSetChange = useCallback(
-		(value: QuickSetType) => {
+		async (value: QuickSetType) => {
 			if (value === "currentSelectRect" || value === "previousSelectRect") {
 				let targetSelectRect: ElementRect | undefined;
 				if (value === "previousSelectRect") {
-					targetSelectRect =
-						getAppSettings()[AppSettingsGroup.Cache].prevSelectRect;
+					targetSelectRect = await readPrevSelectRect() ?? {
+						min_x: 0,
+						min_y: 0,
+						max_x: 0,
+						max_y: 0,
+					};
 				} else {
 					targetSelectRect = currentSelectRectRef.current ?? {
 						min_x: 0,
@@ -308,6 +313,7 @@ export const ResizeModal: React.FC<{
 			currentSelectRectRef,
 			form,
 			getAppSettings,
+			readPrevSelectRect,
 			selectRectPresetListRef,
 		],
 	);

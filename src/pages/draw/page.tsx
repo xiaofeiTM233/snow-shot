@@ -21,6 +21,7 @@ import {
 	closeWindowAfterDelay,
 	createFixedContentWindow,
 	getMonitorsBoundingBox,
+	savePrevSelectRect,
 	setCurrentWindowAlwaysOnTop,
 } from "@/commands/core";
 import { setCaptureState } from "@/commands/globalSate";
@@ -792,17 +793,8 @@ const DrawPageCore: React.FC<{
 				return;
 			}
 
-			updateAppSettings(
-				AppSettingsGroup.Cache,
-				{
-					prevSelectRect: selectRect,
-				},
-				false,
-				true,
-				false,
-				true,
-				false,
-			);
+			// 持久化上一次选定的区域到独立文件，避免被 Cache 组全量回写/重置清空
+			await savePrevSelectRect(selectRect);
 
 			if (
 				!getAppSettings()[AppSettingsGroup.SystemScreenshot]

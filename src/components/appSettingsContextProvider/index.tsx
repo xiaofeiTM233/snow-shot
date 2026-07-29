@@ -330,24 +330,6 @@ const AppSettingsContextProviderCore: React.FC<{
 					| AppSettingsData[typeof group]
 					| undefined;
 
-				let prevSelectRect = newSettings?.prevSelectRect ??
-					prevSettings?.prevSelectRect ?? {
-						min_x: 0,
-						min_y: 0,
-						max_x: 0,
-						max_y: 0,
-					};
-				prevSelectRect = {
-					min_x:
-						typeof prevSelectRect.min_x === "number" ? prevSelectRect.min_x : 0,
-					min_y:
-						typeof prevSelectRect.min_y === "number" ? prevSelectRect.min_y : 0,
-					max_x:
-						typeof prevSelectRect.max_x === "number" ? prevSelectRect.max_x : 0,
-					max_y:
-						typeof prevSelectRect.max_y === "number" ? prevSelectRect.max_y : 0,
-				};
-
 				settings = {
 					menuCollapsed:
 						typeof newSettings?.menuCollapsed === "boolean"
@@ -371,7 +353,6 @@ const AppSettingsContextProviderCore: React.FC<{
 						typeof newSettings?.prevImageFormat === "string"
 							? newSettings.prevImageFormat
 							: (prevSettings?.prevImageFormat ?? ImageFormat.PNG),
-					prevSelectRect,
 					enableMicrophone:
 						typeof newSettings?.enableMicrophone === "boolean"
 							? newSettings.enableMicrophone

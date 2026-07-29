@@ -154,6 +154,45 @@ fn reset_main_window_geometry(app: tauri::AppHandle) {
 	let _ = window.center();
 }
 
+/// 上一次选定的截图区域。
+#[derive(Serialize, Deserialize, Clone, Copy)]
+struct PrevSelectRect {
+    min_x: f64,
+    min_y: f64,
+    max_x: f64,
+    max_y: f64,
+}
+
+const PREV_SELECT_RECT_FILE: &str = "prev-select-rect.json";
+
+/// 将上一次选定的截图区域落盘到独立文件。
+/// 仅当区域有效（min < max）时才写入，避免把空区域持久化。
+#[tauri::command]
+fn save_prev_select_rect(app: tauri::AppHandle, rect: PrevSelectRect) {
+    if rect.min_x >= rect.max_x || rect.min_y >= rect.max_y {
+        return;
+    }
+    let Ok(dir) = app.path().app_config_dir() else {
+        return;
+    };
+    let _ = std::fs::create_dir_all(&dir);
+    if let Ok(content) = serde_json::to_string(&rect) {
+        let _ = std::fs::write(dir.join(PREV_SELECT_RECT_FILE), content);
+    }
+}
+
+/// 读取上一次选定的截图区域；文件不存在或解析失败返回 None。
+#[tauri::command]
+fn read_prev_select_rect(app: tauri::AppHandle) -> Option<PrevSelectRect> {
+    let Ok(dir) = app.path().app_config_dir() else {
+        return None;
+    };
+    let Ok(content) = std::fs::read_to_string(dir.join(PREV_SELECT_RECT_FILE)) else {
+        return None;
+    };
+    serde_json::from_str::<PrevSelectRect>(&content).ok()
+}
+
 #[cfg(feature = "dhat-heap")]
 pub static PROFILER: std::sync::LazyLock<Mutex<Option<dhat::Profiler>>> =
     std::sync::LazyLock::new(|| Mutex::new(None));
@@ -446,6 +485,8 @@ pub fn run() {
             core::get_commit_sha,
             set_remember_window_geometry,
             reset_main_window_geometry,
+            save_prev_select_rect,
+            read_prev_select_rect,
             scroll_screenshot::scroll_screenshot_get_image_data,
             scroll_screenshot::scroll_screenshot_init,
             scroll_screenshot::scroll_screenshot_capture,

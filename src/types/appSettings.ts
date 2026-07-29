@@ -1,4 +1,3 @@
-import type { ElementRect } from "./commands/screenshot";
 import type { AppFunction, AppFunctionConfig } from "./components/appFunction";
 import type {
 	DrawToolbarKeyEventKey,
@@ -374,7 +373,6 @@ export type AppSettingsData = {
 		chatModelEnableThinking: boolean;
 		colorPickerColorFormatIndex: number;
 		prevImageFormat: ImageFormat;
-		prevSelectRect: ElementRect;
 		enableMicrophone: boolean;
 		/** 是否启用锁定绘制工具 */
 		enableLockDrawTool: boolean;

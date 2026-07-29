@@ -93,12 +93,6 @@ export const defaultAppSettingsData: AppSettingsData = {
 		chatModelEnableThinking: false,
 		colorPickerColorFormatIndex: 0,
 		prevImageFormat: ImageFormat.PNG,
-		prevSelectRect: {
-			min_x: 0,
-			min_y: 0,
-			max_x: 0,
-			max_y: 0,
-		},
 		enableMicrophone: false,
 		enableLockDrawTool: false,
 		disableArrowPicker: true,

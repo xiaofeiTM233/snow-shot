@@ -20,6 +20,7 @@ import {
 	getWindowElements,
 	initUiElementsCache,
 } from "@/commands";
+import { readPrevSelectRect } from "@/commands/core";
 import { DrawStatePublisher } from "@/components/drawCore/extra";
 import type { ImageLayerActionType } from "@/components/imageLayer";
 import { AppContext } from "@/contexts/appContext";
@@ -1601,11 +1602,10 @@ const SelectLayerCore: React.FC<SelectLayerProps> = ({ actionRef }) => {
 			return;
 		}
 
-		const onKeyDown = (e: KeyboardEvent) => {
+		const onKeyDown = async (e: KeyboardEvent) => {
 			if (!enableSelectRef.current) {
 				return;
 			}
-
 			if (isHotkeyPressed("Tab")) {
 				updateAppSettings(
 					AppSettingsGroup.Cache,
@@ -1644,16 +1644,15 @@ const SelectLayerCore: React.FC<SelectLayerProps> = ({ actionRef }) => {
 					].hotKey,
 				)
 			) {
-				const prevSelectRect =
-					getAppSettings()[AppSettingsGroup.Cache].prevSelectRect;
+				e.preventDefault();
+				const prevSelectRect = await readPrevSelectRect();
 				if (
+					prevSelectRect &&
 					prevSelectRect.min_x < prevSelectRect.max_x &&
 					prevSelectRect.min_y < prevSelectRect.max_y
 				) {
 					setPrevSelectRect(prevSelectRect);
 				}
-
-				e.preventDefault();
 				return;
 			}
 		};
@@ -1670,6 +1669,7 @@ const SelectLayerCore: React.FC<SelectLayerProps> = ({ actionRef }) => {
 		setPrevSelectRect,
 		enableTabFindChildrenElementsRef,
 		updateAppSettings,
+		readPrevSelectRect,
 	]);
 
 	useEffect(() => {

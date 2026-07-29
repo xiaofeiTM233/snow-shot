@@ -287,3 +287,11 @@ export const setRememberWindowGeometry = async (remember: boolean) => {
 export const resetMainWindowGeometry = async () => {
 	await invoke("reset_main_window_geometry");
 };
+
+export const savePrevSelectRect = async (rect: ElementRect) => {
+	await invoke("save_prev_select_rect", { rect });
+};
+
+export const readPrevSelectRect = async (): Promise<ElementRect | null> => {
+	return await invoke<ElementRect | null>("read_prev_select_rect");
+};
