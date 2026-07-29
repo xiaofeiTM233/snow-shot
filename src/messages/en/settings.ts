@@ -226,6 +226,8 @@ export const settings = {
 		"Cancel screenshot prompt",
 	"settings.functionSettings.screenshotSettings.shortcutCanleTip.tip":
 		"Whether to show a prompt when canceling screenshot via hotkey",
+	"settings.functionSettings.screenshotSettings.longScreenshotAutoScroll":
+		"Scroll screenshot click auto-scroll",
 	"settings.functionSettings.screenshotSettings.lockDrawTool":
 		"Lock Drawing Tool",
 	"settings.functionSettings.screenshotSettings.ocrAfterAction":

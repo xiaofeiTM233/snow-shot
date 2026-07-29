@@ -517,6 +517,8 @@ export type AppSettingsData = {
 		ocrAfterAction: OcrDetectAfterAction;
 		/** OCR 复制时复制文本 */
 		ocrCopyText: boolean;
+		/** 滚动截图单击自动滚动 */
+		longScreenshotAutoScroll: boolean;
 		/** 选区预设 */
 		selectRectPresetList: SelectRectPreset[];
 	};

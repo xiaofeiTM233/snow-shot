@@ -257,6 +257,7 @@ Priority order (highest to lowest):
 		saveFileFormat: ImageFormat.PNG,
 		ocrAfterAction: OcrDetectAfterAction.None,
 		ocrCopyText: true,
+		longScreenshotAutoScroll: true,
 		selectRectPresetList: [],
 	},
 	[AppSettingsGroup.SystemScrollScreenshot]: {

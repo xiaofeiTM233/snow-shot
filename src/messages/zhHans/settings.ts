@@ -214,6 +214,8 @@ export const settings = {
 		"“取消截图”的弹窗提示",
 	"settings.functionSettings.screenshotSettings.shortcutCanleTip.tip":
 		"通过快捷键“取消截图”时，是否弹窗提示",
+	"settings.functionSettings.screenshotSettings.longScreenshotAutoScroll":
+		"滚动截图单击自动滚动",
 	"settings.functionSettings.screenshotSettings.lockDrawTool": "锁定绘制工具",
 	"settings.functionSettings.screenshotSettings.ocrAfterAction":
 		"文本识别后自动执行",
