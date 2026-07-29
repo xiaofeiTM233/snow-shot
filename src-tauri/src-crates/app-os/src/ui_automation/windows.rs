@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::ffi::c_void;
 use std::mem;
@@ -18,12 +17,33 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use snow_shot_app_shared::ElementRect;
 use snow_shot_app_utils::monitor_info::MonitorList;
 use std::sync::Arc;
-use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::{HWND, BOOL};
+use windows::Win32::Foundation::TRUE;
+use windows::Win32::UI::WindowsAndMessaging::{
+	EnumChildWindows, IsWindowVisible, IsWindowEnabled, GetWindowRect, WINDOWENUMPROC,
+};
 use xcap::ImplWindow;
 use xcap::Window;
 
 use super::ElementLevel;
 use super::UIAutomationError;
+
+/// 子元素查找模式：决定使用哪种 UIA 视图，以及是否包含原生子窗口
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ElementFindMode {
+	/// 标准：UIA 内容视图（现有行为，元素最少）
+	Standard,
+	/// 精细：UIA 控件视图（含容器/分组等结构，推荐）
+	Fine,
+	/// 最深：UIA 原始视图（含全部节点，最精细但可能包含无意义的装饰节点）
+	Deepest,
+}
+
+impl Default for ElementFindMode {
+	fn default() -> Self {
+		ElementFindMode::Fine
+	}
+}
 
 enum ElementChildrenNextSiblingCacheItem {
     Element(UIElement, ElementLevel),
@@ -50,6 +70,12 @@ pub struct UIElements {
     window_index_level_map: HashMap<i32, ElementLevel>,
     window_app_name_map: HashMap<i32, String>,
     blacklisted_window_indices: HashSet<i32>,
+    /// 子元素查找模式
+    element_mode: ElementFindMode,
+    /// 是否枚举原生子窗口（HWND）
+    include_child_windows: bool,
+    /// 窗口索引 -> 顶层窗口 HWND 映射，用于缓存失效检测
+    window_index_hwnd_map: HashMap<i32, HWND>,
 }
 
 unsafe impl Send for UIElements {}
@@ -84,6 +110,9 @@ impl UIElements {
             window_index_level_map: HashMap::new(),
             window_app_name_map: HashMap::new(),
             blacklisted_window_indices: HashSet::new(),
+            element_mode: ElementFindMode::Fine,
+            include_child_windows: true,
+            window_index_hwnd_map: HashMap::new(),
         }
     }
 
@@ -113,6 +142,100 @@ impl UIElements {
         self.cache_request = Some(cache_request);
 
         Ok(())
+    }
+
+    pub fn set_mode(&mut self, mode: ElementFindMode, include_child_windows: bool) {
+        self.element_mode = mode;
+        self.include_child_windows = include_child_windows;
+    }
+
+    fn collect_immediate_child_windows(parent: HWND) -> Vec<HWND> {
+        let children = std::sync::Arc::new(std::sync::Mutex::new(Vec::<HWND>::new()));
+        let captured = children.clone();
+        let proc = WINDOWENUMPROC::new(move |child: HWND| -> BOOL {
+            if let Ok(mut list) = captured.lock() {
+                list.push(child);
+            }
+            TRUE
+        });
+        let _ = unsafe { EnumChildWindows(parent, proc) };
+        match std::sync::Arc::try_unwrap(children) {
+            Ok(mutex) => mutex.into_inner().unwrap_or_default(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    fn is_window_selectable(hwnd: HWND) -> bool {
+        let visible = unsafe { IsWindowVisible(hwnd) }.as_bool();
+        let enabled = unsafe { IsWindowEnabled(hwnd) }.as_bool();
+        visible && enabled
+    }
+
+    /**
+     * 递归枚举原生子窗口，并把它们作为可选区域插入缓存。
+     * 原生 HWND 层级与 UIA 树互补，能找回被 ContentView 过滤掉的子区域（如浏览器/Office/Electron 的子窗口）。
+     */
+    fn enumerate_child_windows(
+        &mut self,
+        parent_hwnd: HWND,
+        parent_level: ElementLevel,
+        mut parent_token: Token,
+        automation: &Arc<UIAutomationWrapper>,
+    ) {
+        if !self.include_child_windows {
+            return;
+        }
+
+        let children = Self::collect_immediate_child_windows(parent_hwnd);
+        let mut child_level = parent_level;
+        child_level.next_level();
+
+        for hwnd in children {
+            if !Self::is_window_selectable(hwnd) {
+                continue;
+            }
+
+            let element = match automation
+                .automation
+                .element_from_handle(uiautomation::types::Handle::from(hwnd.0 as isize))
+            {
+                Ok(element) => element,
+                Err(_) => continue,
+            };
+
+            let rect = match element.get_bounding_rectangle() {
+                Ok(rect) => Self::normalize_rect(rect),
+                Err(_) => continue,
+            };
+
+            // 仅保留比窗口区域更小的子窗口，避免把整个客户区再框一遍
+            let window_level = self
+                .window_index_level_map
+                .get(&parent_level.window_index)
+                .cloned()
+                .unwrap_or(parent_level);
+            let parent_rect = match self.window_rect_map.get(&window_level).cloned() {
+                Some(rect) => rect,
+                None => continue,
+            };
+
+            let is_same_as_parent = rect.get_left() >= parent_rect.get_left() - 1
+                && rect.get_top() >= parent_rect.get_top() - 1
+                && rect.get_right() <= parent_rect.get_right() + 1
+                && rect.get_bottom() <= parent_rect.get_bottom() + 1;
+
+            if is_same_as_parent {
+                continue;
+            }
+
+            let (_, token) =
+                self.insert_element_cache(&mut parent_token, element, rect, child_level);
+
+            // 继续递归更深的子窗口
+            self.enumerate_child_windows(hwnd, child_level, token, automation);
+
+            child_level.next_element();
+        }
     }
 
     pub fn convert_element_rect_to_rtree_rect(rect: uiautomation::types::Rect) -> Rect<2, i32> {
@@ -267,7 +390,7 @@ impl UIElements {
                     )
                 {
                     let app_name = window.app_name().unwrap_or_default();
-                    Some((UIElementWrapper { element }, element_rect, app_name))
+                    Some((UIElementWrapper { element }, element_rect, app_name, window_hwnd))
                 } else {
                     None
                 }
@@ -282,12 +405,12 @@ impl UIElements {
             current_level.window_index += 1;
             current_level.next_element();
 
-            let current_child_rect = current_child.1;
-            let app_name = &current_child.2;
+            let (element_wrapper, current_child_rect, app_name, window_hwnd) = current_child;
+            let app_name = &app_name;
 
-            let (current_child_rect, _) = self.insert_element_cache(
+            let (current_child_rect, window_token) = self.insert_element_cache(
                 &mut parent_tree_token,
-                current_child.0.element.clone(),
+                element_wrapper.element.clone(),
                 current_child_rect,
                 current_level,
             );
@@ -298,6 +421,16 @@ impl UIElements {
                 .insert(current_level.window_index, current_level.clone());
             self.window_app_name_map
                 .insert(current_level.window_index, app_name.clone());
+            self.window_index_hwnd_map
+                .insert(current_level.window_index, window_hwnd);
+
+            // 枚举该窗口的原生子窗口，补充 UIA 视图之外的可选区域
+            self.enumerate_child_windows(
+                window_hwnd,
+                current_level,
+                window_token,
+                automation.as_ref().unwrap(),
+            );
         }
 
         Ok(())
@@ -412,21 +545,41 @@ impl UIElements {
             .element_cache
             .search(Rect::new_point([mouse_x, mouse_y]));
 
-        // 获取层级最高的元素
-        let mut max_level = ElementLevel::root();
-        let mut max_level_rect = None;
+        // 收集所有包含该点的候选区域
+        let mut candidates: Vec<(ElementLevel, rtree_rs::Rect<2, i32>)> = Vec::new();
         for rect in element_rect {
-            if max_level.cmp(&rect.data) == Ordering::Less {
-                max_level = rect.data.clone();
-                max_level_rect = Some(rect.rect);
-            }
+            candidates.push((rect.data.clone(), rect.rect));
         }
-        let element_rtree_rect = match max_level_rect {
-            Some(rect) => {
-                uiautomation::types::Rect::new(rect.min[0], rect.min[1], rect.max[0], rect.max[1])
-            }
-            None => return None,
-        };
+
+        if candidates.is_empty() {
+            return None;
+        }
+
+        let point = (mouse_x, mouse_y);
+        // 优先级：面积更小（更精细）> 层级更深 > 离鼠标点更近
+        let best = candidates
+            .iter()
+            .max_by(|a, b| {
+                Self::rect_area(&b.1)
+                    .cmp(&Self::rect_area(&a.1))
+                    .then_with(|| a.0.cmp(&b.0))
+                    .then_with(|| {
+                        Self::rect_center_distance(&a.1, point)
+                            .cmp(&Self::rect_center_distance(&b.1, point))
+                            .reverse()
+                    })
+            })
+            .unwrap();
+
+        let max_level = best.0.clone();
+        let element_rtree_rect = best.1;
+
+        let element_rtree_rect = uiautomation::types::Rect::new(
+            element_rtree_rect.min[0],
+            element_rtree_rect.min[1],
+            element_rtree_rect.max[0],
+            element_rtree_rect.max[1],
+        );
 
         match self.element_level_map.get(&max_level) {
             Some((element, token)) => {
@@ -434,6 +587,20 @@ impl UIElements {
             }
             None => None,
         }
+    }
+
+    fn rect_area(rect: &rtree_rs::Rect<2, i32>) -> i32 {
+        let w = rect.max[0] - rect.min[0];
+        let h = rect.max[1] - rect.min[1];
+        w.max(0) * h.max(0)
+    }
+
+    fn rect_center_distance(rect: &rtree_rs::Rect<2, i32>, point: (i32, i32)) -> i32 {
+        let cx = (rect.min[0] + rect.max[0]) / 2;
+        let cy = (rect.min[1] + rect.max[1]) / 2;
+        let dx = cx - point.0;
+        let dy = cy - point.1;
+        dx * dx + dy * dy
     }
 
     // fn skip_invalid_window(
@@ -476,7 +643,18 @@ impl UIElements {
         mouse_x: i32,
         mouse_y: i32,
     ) -> Result<Vec<ElementRect>, UIAutomationError> {
-        let automation_walker = self.automation_walker.clone().unwrap();
+        // 按当前模式选择 UIA 视图（content/control/raw）
+        let automation = self.automation.clone().unwrap();
+        let automation_walker = match self.element_mode {
+            ElementFindMode::Standard => automation.automation.get_content_view_walker(),
+            ElementFindMode::Fine => automation.automation.get_control_view_walker(),
+            ElementFindMode::Deepest => automation.automation.get_raw_view_walker(),
+        };
+        let automation_walker = match automation_walker {
+            Ok(walker) => walker,
+            Err(_) => self.automation_walker.clone().unwrap(),
+        };
+
         let (parent_element, mut parent_level, parent_rect, mut parent_tree_token) =
             match self.get_element_from_cache(mouse_x, mouse_y) {
                 Some(element) => element,
@@ -488,6 +666,26 @@ impl UIElements {
                         .new_node(uiautomation::types::Rect::new(0, 0, i32::MAX, i32::MAX)),
                 ),
             };
+
+        // 缓存失效检测：目标窗口位置发生变化则通知上层重建
+        if let Some(hwnd) = self.window_index_hwnd_map.get(&parent_level.window_index) {
+            if let Ok(current) = unsafe { GetWindowRect(*hwnd) } {
+                let window_level = self
+                    .window_index_level_map
+                    .get(&parent_level.window_index)
+                    .cloned()
+                    .unwrap_or(parent_level);
+                if let Some(stored) = self.window_rect_map.get(&window_level).cloned() {
+                    if current.left != stored.get_left()
+                        || current.top != stored.get_top()
+                        || current.right != stored.get_right()
+                        || current.bottom != stored.get_bottom()
+                    {
+                        return Err(UIAutomationError::CacheStale);
+                    }
+                }
+            }
+        }
 
         // 检查该窗口是否在黑名单中，如果是则不遍历子元素
         if self

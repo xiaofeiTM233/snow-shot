@@ -126,6 +126,8 @@ const SelectLayerCore: React.FC<SelectLayerProps> = ({ actionRef }) => {
 	const [isEnable, setIsEnable] = useState(false);
 
 	const [findChildrenElements, setFindChildrenElements] = useState(false);
+	const childrenElementsModeRef = useRef<string>("fine");
+	const includeChildWindowsRef = useRef<boolean>(true);
 	const windowAutoSelectBlacklistRef = useRef<string[]>([]);
 	const [
 		enableTabFindChildrenElements,
@@ -152,6 +154,10 @@ const SelectLayerCore: React.FC<SelectLayerProps> = ({ actionRef }) => {
 				setFindChildrenElements(
 					settings[AppSettingsGroup.FunctionScreenshot].findChildrenElements,
 				);
+				childrenElementsModeRef.current =
+					settings[AppSettingsGroup.FunctionScreenshot].childrenElementsMode;
+				includeChildWindowsRef.current =
+					settings[AppSettingsGroup.FunctionScreenshot].includeChildWindows;
 				windowAutoSelectBlacklistRef.current =
 					settings[
 						AppSettingsGroup.FunctionScreenshot
@@ -455,10 +461,12 @@ const SelectLayerCore: React.FC<SelectLayerProps> = ({ actionRef }) => {
 			let elementRectList: ElementRect[] | undefined;
 			if (isEnableFindChildrenElements()) {
 				try {
-					elementRectList = await getElementFromPosition(
-						mousePosition.mouseX,
-						mousePosition.mouseY,
-					);
+				elementRectList = await getElementFromPosition(
+					mousePosition.mouseX,
+					mousePosition.mouseY,
+					childrenElementsModeRef.current,
+					includeChildWindowsRef.current,
+				);
 				} catch {
 					// 获取元素失败，忽略
 				}

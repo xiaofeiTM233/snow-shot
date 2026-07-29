@@ -203,6 +203,19 @@ export const settings = {
 	"settings.functionSettings.screenshotSettings": "Screenshot Settings",
 	"settings.functionSettings.screenshotSettings.findChildrenElements":
 		"Find Window Child Elements",
+	"settings.functionSettings.screenshotSettings.childrenElementsMode":
+		"Detection Granularity",
+	"settings.functionSettings.screenshotSettings.childrenElementsMode.tip":
+		"Standard: UIA content view (fewest elements); Fine: UIA control view (includes containers/groups, recommended); Deepest: UIA raw view (all nodes, most granular)",
+	"settings.functionSettings.screenshotSettings.childrenElementsMode.standard":
+		"Standard",
+	"settings.functionSettings.screenshotSettings.childrenElementsMode.fine": "Fine",
+	"settings.functionSettings.screenshotSettings.childrenElementsMode.deepest":
+		"Deepest",
+	"settings.functionSettings.screenshotSettings.includeChildWindows":
+		"Include Native Child Windows",
+	"settings.functionSettings.screenshotSettings.includeChildWindows.tip":
+		"Enumerate native child windows (HWND) of a window to recover child regions filtered out by UI Automation, such as browsers/Office/Electron sub-windows",
 	"settings.functionSettings.screenshotSettings.windowAutoSelectBlacklist":
 		"Window Auto-Select Blacklist",
 	"settings.functionSettings.screenshotSettings.windowAutoSelectBlacklist.tip":

@@ -7,6 +7,10 @@ use snow_shot_app_os::ui_automation::UIElements;
 use windows::Win32::Foundation::HWND;
 #[cfg(target_os = "windows")]
 use std::ffi::c_void;
+#[cfg(target_os = "windows")]
+use snow_shot_app_os::ui_automation::ElementFindMode;
+#[cfg(target_os = "windows")]
+use snow_shot_app_os::UIAutomationError;
 use snow_shot_app_shared::ElementRect;
 use snow_shot_app_utils::monitor_info::{
     CaptureOption, ColorFormat, CorrectHdrColorAlgorithm, MonitorList,
@@ -566,17 +570,44 @@ pub async fn get_element_from_position(
     ui_elements: tauri::State<'_, Mutex<UIElements>>,
     mouse_x: i32,
     mouse_y: i32,
+    mode: String,
+    include_child_windows: bool,
 ) -> Result<Vec<ElementRect>, ()> {
-    let mut ui_elements = ui_elements.lock().await;
+    #[cfg(target_os = "windows")]
+    {
+        let mode = match mode.as_str() {
+            "standard" => ElementFindMode::Standard,
+            "deepest" => ElementFindMode::Deepest,
+            _ => ElementFindMode::Fine,
+        };
 
-    let element_rect_list = match ui_elements.get_element_from_point_walker(mouse_x, mouse_y) {
-        Ok(element_rect) => element_rect,
-        Err(_) => {
-            return Err(());
+        let mut ui_elements = ui_elements.lock().await;
+        ui_elements.set_mode(mode, include_child_windows);
+
+        match ui_elements.get_element_from_point_walker(mouse_x, mouse_y) {
+            Ok(element_rect) => Ok(element_rect),
+            // 缓存过期，重建后重试一次
+            Err(UIAutomationError::CacheStale) => {
+                if ui_elements.init_cache().is_ok() {
+                    ui_elements
+                        .get_element_from_point_walker(mouse_x, mouse_y)
+                        .map_err(|_| ())
+                } else {
+                    Err(())
+                }
+            }
+            Err(_) => Err(()),
         }
-    };
+    }
 
-    Ok(element_rect_list)
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (&mode, &include_child_windows);
+        let mut ui_elements = ui_elements.lock().await;
+        ui_elements
+            .get_element_from_point_walker(mouse_x, mouse_y)
+            .map_err(|_| ())
+    }
 }
 
 pub async fn get_mouse_position(app: tauri::AppHandle) -> Result<(i32, i32), String> {

@@ -53,10 +53,14 @@ export const initUiElements = async () => {
 export const getElementFromPosition = async (
 	mouseX: number,
 	mouseY: number,
+	mode: string = "fine",
+	includeChildWindows: boolean = true,
 ) => {
 	const result = await invoke<ElementRect[]>("get_element_from_position", {
 		mouseX,
 		mouseY,
+		mode,
+		includeChildWindows,
 	});
 	return result;
 };

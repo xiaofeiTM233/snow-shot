@@ -232,6 +232,8 @@ Priority order (highest to lowest):
 	},
 	[AppSettingsGroup.FunctionScreenshot]: {
 		findChildrenElements: true,
+		childrenElementsMode: "fine",
+		includeChildWindows: true,
 		windowAutoSelectBlacklist: [],
 		shortcutCanleTip: false,
 		autoSaveOnCopy: false,

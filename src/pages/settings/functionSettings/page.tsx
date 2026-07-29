@@ -911,6 +911,60 @@ export const FunctionSettingsPage = () => {
 												/>
 											</ProForm.Item>
 										</Col>
+
+										<Col span={12}>
+											<ProFormSelect
+												name="childrenElementsMode"
+												layout="horizontal"
+												label={
+													<IconLabel
+														label={
+															<FormattedMessage id="settings.functionSettings.screenshotSettings.childrenElementsMode" />
+														}
+														tooltipTitle={
+															<FormattedMessage id="settings.functionSettings.screenshotSettings.childrenElementsMode.tip" />
+														}
+													/>
+												}
+												options={[
+													{
+														label: intl.formatMessage({
+															id: "settings.functionSettings.screenshotSettings.childrenElementsMode.standard",
+														}),
+														value: "standard",
+													},
+													{
+														label: intl.formatMessage({
+															id: "settings.functionSettings.screenshotSettings.childrenElementsMode.fine",
+														}),
+														value: "fine",
+													},
+													{
+														label: intl.formatMessage({
+															id: "settings.functionSettings.screenshotSettings.childrenElementsMode.deepest",
+														}),
+														value: "deepest",
+													},
+												]}
+											/>
+										</Col>
+
+										<Col span={12}>
+											<ProFormSwitch
+												name="includeChildWindows"
+												layout="horizontal"
+												label={
+													<IconLabel
+														label={
+															<FormattedMessage id="settings.functionSettings.screenshotSettings.includeChildWindows" />
+														}
+														tooltipTitle={
+															<FormattedMessage id="settings.functionSettings.screenshotSettings.includeChildWindows.tip" />
+														}
+													/>
+												}
+											/>
+										</Col>
 									</Row>
 								)
 							}

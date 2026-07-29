@@ -191,6 +191,18 @@ export const settings = {
 	"settings.functionSettings.screenshotSettings": "截圖",
 	"settings.functionSettings.screenshotSettings.findChildrenElements":
 		"偵測視窗子元素",
+	"settings.functionSettings.screenshotSettings.childrenElementsMode": "偵測精細度",
+	"settings.functionSettings.screenshotSettings.childrenElementsMode.tip":
+		"標準：僅 UIA 內容視圖（元素最少）；精細：UIA 控制視圖（含容器/分組等結構，推薦）；最深：UIA 原始視圖（含全部節點，最精細）",
+	"settings.functionSettings.screenshotSettings.childrenElementsMode.standard":
+		"標準",
+	"settings.functionSettings.screenshotSettings.childrenElementsMode.fine": "精細",
+	"settings.functionSettings.screenshotSettings.childrenElementsMode.deepest":
+		"最深",
+	"settings.functionSettings.screenshotSettings.includeChildWindows":
+		"包含原生子視窗",
+	"settings.functionSettings.screenshotSettings.includeChildWindows.tip":
+		"列舉視窗的原生子視窗（HWND），可找回被 UI Automation 過濾掉的子區域，如瀏覽器/Office/Electron 的子視窗",
 	"settings.functionSettings.screenshotSettings.windowAutoSelectBlacklist":
 		"視窗自動框選黑名單",
 	"settings.functionSettings.screenshotSettings.windowAutoSelectBlacklist.tip":

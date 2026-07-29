@@ -477,6 +477,10 @@ export type AppSettingsData = {
 	[AppSettingsGroup.FunctionScreenshot]: {
 		/** 选取窗口子元素 */
 		findChildrenElements: boolean;
+		/** 查找窗口子元素的精细度：standard=UIA 内容视图，fine=控件视图，deepest=原始视图 */
+		childrenElementsMode: "standard" | "fine" | "deepest";
+		/** 是否枚举原生子窗口（HWND），可找回被 UIA 过滤掉的子区域 */
+		includeChildWindows: boolean;
 		/** 自动框选窗口黑名单（窗口名称，需完全匹配） */
 		windowAutoSelectBlacklist: string[];
 		/** 截图快捷键提示 */

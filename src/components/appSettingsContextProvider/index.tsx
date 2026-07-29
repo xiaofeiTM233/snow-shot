@@ -944,8 +944,24 @@ const AppSettingsContextProviderCore: React.FC<{
 						: (prevSettings?.findChildrenElements ??
 							defaultAppSettingsData[group].findChildrenElements);
 
+				const childrenElementsMode =
+					newSettings?.childrenElementsMode === "standard" ||
+					newSettings?.childrenElementsMode === "fine" ||
+					newSettings?.childrenElementsMode === "deepest"
+						? newSettings.childrenElementsMode
+						: (prevSettings?.childrenElementsMode ??
+							defaultAppSettingsData[group].childrenElementsMode);
+
+				const includeChildWindows =
+					typeof newSettings?.includeChildWindows === "boolean"
+						? newSettings.includeChildWindows
+						: (prevSettings?.includeChildWindows ??
+							defaultAppSettingsData[group].includeChildWindows);
+
 				settings = {
 					findChildrenElements,
+					childrenElementsMode,
+					includeChildWindows,
 					windowAutoSelectBlacklist: Array.isArray(
 						newSettings?.windowAutoSelectBlacklist,
 					)

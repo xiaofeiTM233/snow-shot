@@ -125,4 +125,6 @@ pub enum UIAutomationError {
     UIAError(#[from] uiautomation::errors::Error),
     #[error("Window is blacklisted")]
     Blacklisted,
+    #[error("UIA cache is stale, need rebuild")]
+    CacheStale,
 }
