@@ -7,7 +7,6 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc,
     },
-    time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::Emitter;
 use tauri::Manager;
