@@ -10,6 +10,16 @@ import type { RefWrap } from "./workers/renderWorkerTypes";
 
 export type RefType<T> = RefWrap<T> | RefObject<T>;
 
+// clamp-to-edge 防止模糊卷积在选区贴边时采样到纹理外的透明像素
+const ensureClampTexture = (texture: PIXI.Texture | undefined): void => {
+	if (!texture?.source) {
+		return;
+	}
+	if (texture.source.wrapMode !== "clamp-to-edge") {
+		texture.source.wrapMode = "clamp-to-edge";
+	}
+};
+
 export const renderInitBaseImageTextureAction = async (
 	baseImageTextureRef: RefType<PIXI.Texture | undefined>,
 	imageUrl: string,
@@ -302,6 +312,8 @@ export const renderAddImageToContainerAction = async (
 		});
 	}
 
+	ensureClampTexture(texture);
+
 	container.removeChildren();
 
 	const image = new PIXI.Sprite(texture);
@@ -372,6 +384,8 @@ const renderGenerateHighlightTextureAction = (
 
 	const renderTexture = PIXI.RenderTexture.create({ width, height });
 
+	ensureClampTexture(renderTexture);
+
 	renderer.render(highlightContainer, { renderTexture });
 
 	return renderTexture;
@@ -415,6 +429,8 @@ export const renderCreateBlurSpriteAction = (
 		spriteMask: new PIXI.Graphics(),
 		customTexture,
 	};
+
+	ensureClampTexture(blurSprite.sprite.texture);
 
 	blurSprite.sprite.filters = undefined;
 	blurSprite.spriteContainer.setMask({
@@ -1303,6 +1319,7 @@ export const renderApplyProcessImageConfigToCanvasAction = (
 		target: canvasApp.stage,
 		frame: new PIXI.Rectangle(0, 0, canvasWidth, canvasHeight),
 	});
+	ensureClampTexture(imageTexture);
 	currentImageTextureRef.current = imageTexture;
 	for (const blurSprite of blurSpriteMapRef.current.values()) {
 		blurSprite.sprite.texture = imageTexture;
