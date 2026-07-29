@@ -433,12 +433,8 @@ export const ScrollScreenshot: React.FC<{
 	}, [captureImageCore, captureImageDebounce]);
 
 	const [showTip, _setShowTip] = useState(false);
-	const touchAreaTipRef = useRef<HTMLDivElement>(null);
 	const setShowTip = useCallback((show: boolean) => {
 		_setShowTip(show);
-		if (touchAreaTipRef.current) {
-			touchAreaTipRef.current.style.opacity = show ? "1" : "0";
-		}
 	}, []);
 	const init = useCallback(
 		async (rect: ElementRect, direction: ScrollDirection) => {
@@ -777,11 +773,13 @@ export const ScrollScreenshot: React.FC<{
 					)}
 				</div>
 
-				<div className="touch-area-tip-container" ref={touchAreaTipRef}>
-					<div className="touch-area-tip">
-						<FormattedMessage id="draw.scrollScreenshot.tip" />
+				{showTip && (
+					<div className="touch-area-tip-container">
+						<div className="touch-area-tip">
+							<FormattedMessage id="draw.scrollScreenshot.tip" />
+						</div>
 					</div>
-				</div>
+				)}
 			</div>
 
 			<div
