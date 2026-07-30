@@ -42,5 +42,15 @@
 				"scope": ["*", "**"]
 			}
 		}
-	}
+	},
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "windows": {
+      "nsis": {
+        "languages": ["zh-CN", "zh-TW", "en-US"],
+        "displayLanguageSelector": true
+			}
+    }
+  }
 }
