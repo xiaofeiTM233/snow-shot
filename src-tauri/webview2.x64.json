@@ -1,6 +1,5 @@
 {
 	"$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-	"identifier": "com.chao.snowshot",
 	"plugins": {
 		"updater": {
 			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMxREY5QjM4RDU5QzBBMEEKUldRS0NwelZPSnZmTVNjeWxydlZFRytwM0tZK1pkVVIzQm1rSlE4bjV3clVucGxyTXIydWZ1cW8K",
@@ -12,39 +11,11 @@
 	},
 	"bundle": {
 		"createUpdaterArtifacts": false,
-		"active": true,
-		"category": "Utility",
-		"shortDescription": "Snow Shot",
-		"longDescription": "Simple and elegant screenshot tool",
-		"macOS": {
-			"minimumSystemVersion": "12.3.0"
-		},
 		"windows": {
-			"certificateThumbprint": null,
-			"digestAlgorithm": "sha256",
 			"webviewInstallMode": {
 				"type": "fixedRuntime",
 				"path": "Microsoft.WebView2.FixedVersionRuntime.130.0.2849.80.x64"
-			},
-			"nsis": {
-				"template": "./build-configs/installer.nsi",
-				"displayLanguageSelector": true,
-				"installerIcon": "icons/icon.ico",
-				"installMode": "perMachine",
-				"languages": ["SimpChinese", "TradChinese", "English"]
 			}
-		},
-		"licenseFile": "../LICENSE-Commercial",
-		"targets": ["nsis"],
-		"icon": [
-			"icons/32x32.png",
-			"icons/128x128.png",
-			"icons/128x128@2x.png",
-			"icons/icon.icns",
-			"icons/icon.ico"
-		],
-		"resources": {
-			"app-icons/": "app-icons/"
 		}
 	}
 }
