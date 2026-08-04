@@ -22,6 +22,7 @@ import React, {
 	useRef,
 	useState,
 } from "react";
+import { flushSync } from "react-dom";
 import { isHotkeyPressed, useHotkeys } from "react-hotkeys-hook";
 import { FormattedMessage, useIntl } from "react-intl";
 import { getMousePosition, saveFile } from "@/commands";
