@@ -46,7 +46,7 @@
   "bundle": {
     "windows": {
       "nsis": {
-        "languages": ["zh-CN", "zh-TW", "en-US"],
+        "languages": ["SimpChinese", "TradChinese", "English"],
         "displayLanguageSelector": true
       }
     }
