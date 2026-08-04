@@ -5,7 +5,9 @@ export enum VideoRecordState {
 }
 
 export const getVideoRecordParams = () => {
-	const urlParams = new URLSearchParams(window.location.search);
+	const hash = window.location.hash;
+	const search = hash.includes("?") ? hash.slice(hash.indexOf("?")) : window.location.search;
+	const urlParams = new URLSearchParams(search);
 
 	const selectRect = {
 		min_x: parseInt(urlParams.get("select_rect_min_x") ?? "0", 10),

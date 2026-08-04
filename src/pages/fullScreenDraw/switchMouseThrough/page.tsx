@@ -18,7 +18,9 @@ export const SwitchMouseThroughPage: React.FC = () => {
 	const [enable, setEnable] = useState(false);
 
 	const init = useCallback(async () => {
-		const urlParams = new URLSearchParams(window.location.search);
+		const hash = window.location.hash;
+		const search = hash.includes("?") ? hash.slice(hash.indexOf("?")) : window.location.search;
+		const urlParams = new URLSearchParams(search);
 		const monitor_x = parseInt(urlParams.get("monitor_x") ?? "0", 10);
 		const monitor_y = parseInt(urlParams.get("monitor_y") ?? "0", 10);
 
