@@ -393,55 +393,34 @@ export const translateTextMicrosoft = async (
 	sourceLanguage: string,
 	targetLanguage: string,
 ): Promise<CustomTranslateResult | undefined> => {
+	// 微软翻译语言代码映射
 	const sl = microsoftLanguageCodeMap[sourceLanguage] ?? sourceLanguage;
 	const tl = microsoftLanguageCodeMap[targetLanguage] ?? targetLanguage;
 
 	const translations: CustomTranslateResult["translations"] = [];
 
-	// 获取 token（每个翻译会话只需要一次）
-	let token: string | null = null;
-	try {
-		const tokenResponse = await fetch(
-			"https://edge.microsoft.com/translate/auth",
-			{
-				method: "GET",
-			},
-		);
-
-		if (tokenResponse.ok) {
-			token = await tokenResponse.text();
-		}
-	} catch (error) {
-		console.error("[translateTextMicrosoft] Failed to get token:", error);
-	}
-
-	if (!token) {
-		console.error("[translateTextMicrosoft] No token available");
-		return undefined;
-	}
-
 	for (const text of sourceContent) {
 		await microsoftRateLimiter.acquire();
 
 		try {
-			const params = new URLSearchParams({
-				"api-version": "3.0",
-				to: tl,
-			});
-
+			const params = new URLSearchParams({ to: tl });
+			// 未指定源语言（auto）时省略 from 参数，由端点自动检测
 			if (sl) {
 				params.set("from", sl);
 			}
 
 			const response = await fetch(
-				`https://api.cognitive.microsofttranslator.com/translate?${params.toString()}`,
+				`https://edge.microsoft.com/translate/translatetext?${params.toString()}`,
 				{
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
-						Authorization: `Bearer ${token}`,
+						"User-Agent":
+							"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0",
+						Origin: "https://www.microsoft.com",
+						Referer: "https://www.microsoft.com/",
 					},
-					body: JSON.stringify([{ Text: text }]),
+					body: JSON.stringify([text]),
 				},
 			);
 
