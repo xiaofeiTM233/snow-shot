@@ -1768,6 +1768,8 @@ export const FunctionSettingsPage = () => {
 											api_uri: "",
 											api_key: "",
 											api_type: TranslationApiType.DeepL,
+											max_requests_per_second: 5,
+											max_paragraph_count: 1,
 										})}
 									>
 										<Row gutter={token.marginLG} style={{ width: "100%" }}>
@@ -1883,6 +1885,7 @@ export const FunctionSettingsPage = () => {
 																				}
 																			/>
 																		}
+																		initialValue={5}
 																		min={1}
 																		max={100}
 																		fieldProps={{
@@ -1903,6 +1906,7 @@ export const FunctionSettingsPage = () => {
 																				}
 																			/>
 																		}
+																		initialValue={1}
 																		min={1}
 																		max={100}
 																		fieldProps={{
@@ -1913,7 +1917,6 @@ export const FunctionSettingsPage = () => {
 															</>
 														);
 													}
-
 													return null;
 												}}
 											</ProFormDependency>
