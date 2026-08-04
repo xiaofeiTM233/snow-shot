@@ -37,7 +37,12 @@ export async function getPixels(
 			reject(error);
 		};
 
-		decodeWorker.postMessage({ imageBuffer, wasmModuleArrayBuffer });
+		// wasm module buffer 在 worker 内 initSync 时可能被底层引擎 detached/消费，
+		// 复用全局单例会导致后续解码全部失败。每次传独立拷贝避免污染原 buffer。
+		decodeWorker.postMessage({
+			imageBuffer,
+			wasmModuleArrayBuffer: wasmModuleArrayBuffer.slice(),
+		});
 	});
 }
 

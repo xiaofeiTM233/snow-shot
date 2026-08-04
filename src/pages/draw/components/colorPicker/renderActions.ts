@@ -1,5 +1,6 @@
 import type { RefType } from "@/components/imageLayer/baseLayerRenderActions";
 import type { ImageSharedBufferData } from "../../tools";
+import { appWarn } from "@/utils/log";
 import { getPixels, terminateWebWorker } from "./workers/getPixels";
 
 export const COLOR_PICKER_PREVIEW_SCALE = 12;
@@ -180,12 +181,20 @@ export async function renderSwitchCaptureHistoryAction(
 		return;
 	}
 
-	const fileBuffer = await fetch(imageSrc).then((res) => res.arrayBuffer());
-	const pixels = await getPixels(
-		decoderWasmModuleArrayBufferRef.current,
-		fileBuffer,
-	);
-	captureHistoryImageDataRef.current = pixels.data;
+	try {
+		const fileBuffer = await fetch(imageSrc).then((res) => res.arrayBuffer());
+		const pixels = await getPixels(
+			decoderWasmModuleArrayBufferRef.current,
+			fileBuffer,
+		);
+		captureHistoryImageDataRef.current = pixels.data;
+	} catch (error) {
+		// 诊断：记录具体是哪张历史截图解码失败，便于定位损坏/不支持格式/fetch 异常
+		appWarn("renderSwitchCaptureHistoryAction decode failed", {
+			imageSrc,
+			error,
+		});
+	}
 }
 
 export function renderPixelsWorkerTerminateAction() {

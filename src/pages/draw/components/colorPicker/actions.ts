@@ -232,6 +232,23 @@ export const switchCaptureHistoryAction = async (
 	imageSrc: string | undefined,
 ): Promise<void> => {
 	return new Promise((resolve) => {
+		// worker 崩溃/无响应时兜底，避免 Promise 永久 pending 卡死切换流程
+		const timer = setTimeout(() => {
+			renderWorker?.removeEventListener("message", handleMessage);
+			resolve(undefined);
+		}, 5000);
+
+		const handleMessage = (
+			event: MessageEvent<ColorPickerRenderSwitchCaptureHistoryResult>,
+		) => {
+			const { type, payload } = event.data;
+			if (type === ColorPickerRenderMessageType.SwitchCaptureHistory) {
+				clearTimeout(timer);
+				resolve(payload);
+				renderWorker?.removeEventListener("message", handleMessage);
+			}
+		};
+
 		if (renderWorker) {
 			const SwitchCaptureHistoryData: ColorPickerRenderSwitchCaptureHistoryData =
 				{
@@ -241,16 +258,6 @@ export const switchCaptureHistoryAction = async (
 					},
 				};
 
-			const handleMessage = (
-				event: MessageEvent<ColorPickerRenderSwitchCaptureHistoryResult>,
-			) => {
-				const { type, payload } = event.data;
-				if (type === ColorPickerRenderMessageType.SwitchCaptureHistory) {
-					resolve(payload);
-					renderWorker.removeEventListener("message", handleMessage);
-				}
-			};
-
 			renderWorker.addEventListener("message", handleMessage);
 
 			renderWorker.postMessage(SwitchCaptureHistoryData);
@@ -259,9 +266,15 @@ export const switchCaptureHistoryAction = async (
 				decoderWasmModuleArrayBufferRef,
 				captureHistoryImageDataRef,
 				imageSrc,
-			).then(() => {
-				resolve(undefined);
-			});
+			)
+				.then(() => {
+					clearTimeout(timer);
+					resolve(undefined);
+				})
+				.catch(() => {
+					clearTimeout(timer);
+					resolve(undefined);
+				});
 		}
 	});
 };

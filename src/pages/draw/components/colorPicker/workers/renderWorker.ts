@@ -86,11 +86,17 @@ const handleSwitchCaptureHistory = async (
 	data: ColorPickerRenderSwitchCaptureHistoryData,
 ) => {
 	const { imageSrc } = data.payload;
-	await renderSwitchCaptureHistoryAction(
-		decoderWasmModuleArrayBufferRef,
-		captureHistoryImageDataRef,
-		imageSrc,
-	);
+	try {
+		await renderSwitchCaptureHistoryAction(
+			decoderWasmModuleArrayBufferRef,
+			captureHistoryImageDataRef,
+			imageSrc,
+		);
+	} catch (error) {
+		// 历史截图解码失败时（如文件损坏/特殊编码），worker 不应崩溃
+		// 保留上一张有效的 captureHistoryImageDataRef，避免污染取色数据
+		console.warn("handleSwitchCaptureHistory error", error);
+	}
 };
 
 const handlePickColor = async (data: ColorPickerRenderPickColorData) => {
