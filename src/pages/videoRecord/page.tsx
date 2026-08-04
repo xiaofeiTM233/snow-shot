@@ -17,7 +17,7 @@ import { useStateRef } from "@/hooks/useStateRef";
 import { AppSettingsGroup } from "@/types/appSettings";
 import type { ListenKeyDownEvent } from "@/types/commands/listenKey";
 import type { ElementRect } from "@/types/commands/screenshot";
-import { appError } from "@/utils/log";
+import { appError, appInfo } from "@/utils/log";
 import { getPlatform } from "@/utils/platform";
 import type { VideoRecordWindowInfo } from "@/utils/types";
 import { setWindowRect } from "@/utils/window";
@@ -179,7 +179,12 @@ export const VideoRecordPage: React.FC = () => {
 
 	const init = useCallback(
 		async (selectRect: ElementRect) => {
+			appInfo("[DIAG] videoRecord init: start", {
+				selectRect,
+				state: videoRecordStateRef.current,
+			});
 			if (videoRecordStateRef.current !== VideoRecordState.Idle) {
+				appInfo("[DIAG] videoRecord init: not idle, skipping");
 				return;
 			}
 
@@ -194,6 +199,9 @@ export const VideoRecordPage: React.FC = () => {
 			const windowX = selectRect.min_x - BORDER_WIDTH / 2 - BORDER_PADDING;
 			const windowY = selectRect.min_y - BORDER_WIDTH / 2 - BORDER_PADDING;
 
+			appInfo("[DIAG] videoRecord init: setting window rect", {
+				windowX, windowY, windowWidth, windowHeight,
+			});
 			await Promise.all([
 				setWindowRect(appWindow, {
 					min_x: windowX,
@@ -204,12 +212,14 @@ export const VideoRecordPage: React.FC = () => {
 				setCurrentWindowAlwaysOnTop(true),
 			]);
 
+			appInfo("[DIAG] videoRecord init: showing window");
 			await appWindow.show();
 
 			setVideoRecordState(VideoRecordState.Idle);
 			drawSelectRect(VideoRecordState.Idle);
 
 			appWindow.setIgnoreCursorEvents(true);
+			appInfo("[DIAG] videoRecord init: done");
 		},
 		[drawSelectRect, setVideoRecordState, videoRecordStateRef],
 	);

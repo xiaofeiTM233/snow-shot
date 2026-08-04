@@ -70,7 +70,7 @@ import {
 	generateImageFileName,
 	getVideoRecordSaveDirectory,
 } from "@/utils/file";
-import { appError } from "@/utils/log";
+import { appError, appInfo } from "@/utils/log";
 import { getPlatformValue } from "@/utils/platform";
 import type { VideoRecordWindowInfo } from "@/utils/types";
 import { setWindowRect } from "@/utils/window";
@@ -182,7 +182,12 @@ export const VideoRecordToolbarPage: React.FC = () => {
 
 	const init = useCallback(
 		async (selectRect: ElementRect) => {
+			appInfo("[DIAG] videoRecordToolbar init: start", {
+				selectRect,
+				state: videoRecordStateRef.current,
+			});
 			if (videoRecordStateRef.current !== VideoRecordState.Idle) {
+				appInfo("[DIAG] videoRecordToolbar init: not idle, skipping");
 				return;
 			}
 
@@ -190,13 +195,17 @@ export const VideoRecordToolbarPage: React.FC = () => {
 
 			const appWindow = getCurrentWindow();
 
+			appInfo("[DIAG] videoRecordToolbar init: getting monitorBounds");
 			const monitorBounds = await getMonitorsBoundingBox(selectRect, true);
+			appInfo("[DIAG] videoRecordToolbar init: monitorBounds done");
 
 			await initWindowRect(appWindow, selectRect, monitorBounds);
 			// 初始化两次，防止窗口位置不正确
 			await initWindowRect(appWindow, selectRect, monitorBounds);
 
+			appInfo("[DIAG] videoRecordToolbar init: showing window");
 			await Promise.all([appWindow.show(), appWindow.setAlwaysOnTop(true)]);
+			appInfo("[DIAG] videoRecordToolbar init: done");
 		},
 		[initWindowRect, videoRecordStateRef],
 	);

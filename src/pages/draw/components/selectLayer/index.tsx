@@ -44,7 +44,7 @@ import type { ElementRect } from "@/types/commands/screenshot";
 import { DrawToolbarKeyEventKey } from "@/types/components/drawToolbar";
 import { DrawState } from "@/types/draw";
 import type { CaptureHistoryItem } from "@/utils/appStore";
-import { appWarn } from "@/utils/log";
+import { appInfo, appWarn } from "@/utils/log";
 import { MousePosition } from "@/utils/mousePosition";
 import { getPlatform } from "@/utils/platform";
 import { TweenAnimation } from "@/utils/tweenAnimation";
@@ -269,6 +269,7 @@ const SelectLayerCore: React.FC<SelectLayerProps> = ({ actionRef }) => {
 			return;
 		}
 
+		appInfo("[DIAG] tryEnableToolbar: enabling toolbar");
 		drawToolbarActionRef.current?.setEnable(true);
 	}, [drawToolbarActionRef, getCaptureEvent]);
 

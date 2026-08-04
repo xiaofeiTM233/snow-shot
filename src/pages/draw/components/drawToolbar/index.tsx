@@ -60,7 +60,7 @@ import {
 import { DrawToolbarKeyEventKey } from "@/types/components/drawToolbar";
 import { DrawState } from "@/types/draw";
 import { getExcalidrawCanvas } from "@/utils/excalidraw";
-import { appWarn } from "@/utils/log";
+import { appInfo, appWarn } from "@/utils/log";
 import { ScreenshotType } from "@/utils/types";
 import { zIndexs } from "@/utils/zIndex";
 import {
@@ -619,7 +619,12 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 			dragButtonActionRef.current?.setEnable(enable);
 
 			if (canHandleScreenshotTypeRef.current) {
-				switch (getScreenshotType()?.type) {
+				const screenshotType = getScreenshotType()?.type;
+				appInfo("[DIAG] onEnableChange: handling screenshotType", {
+					screenshotType,
+					enable,
+				});
+				switch (screenshotType) {
 					case ScreenshotType.Fixed:
 						onFixed();
 						break;
@@ -633,6 +638,7 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 						onCopyToClipboard();
 						break;
 					case ScreenshotType.VideoRecord:
+						appInfo("[DIAG] onEnableChange: triggering VideoRecord");
 						onToolClick(DrawState.VideoRecord);
 						break;
 					case ScreenshotType.TopWindow:
