@@ -115,6 +115,12 @@ export const settings = {
 	"settings.systemSettings.commonSettings.runLog": "运行日志",
 	"settings.systemSettings.commonSettings.runLog.tip":
 		"将日志输出到日志文件中，用于问题反馈",
+	"settings.systemSettings.commonSettings.logRetentionDuration": "日志保留时长",
+	"settings.systemSettings.commonSettings.logRetentionDuration.day": "1 天",
+	"settings.systemSettings.commonSettings.logRetentionDuration.three": "3 天",
+	"settings.systemSettings.commonSettings.logRetentionDuration.week": "7 天",
+	"settings.systemSettings.commonSettings.logRetentionDuration.month": "30 天",
+	"settings.systemSettings.commonSettings.logRetentionDuration.forever": "永久保留",
 	"settings.systemSettings.commonSettings.rememberWindowGeometry": "记住关闭时窗口的位置和大小",
 	"settings.systemSettings.commonSettings.boostProcessPriority": "提升进程优先级",
 	"settings.systemSettings.commonSettings.boostProcessPriority.tip":

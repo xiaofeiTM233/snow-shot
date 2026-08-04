@@ -3,6 +3,7 @@ import { initUiElements } from "@/commands";
 import {
 	autoStartDisable,
 	autoStartEnable,
+	cleanupLogsByRetention,
 	setEnableProxy,
 	setProcessPriority,
 	setRunLog,
@@ -37,6 +38,7 @@ export const InitService = () => {
 	const hasInitAutoStart = useRef(false);
 	const hasInitEnableProxy = useRef(false);
 	const hasInitRunLog = useRef(false);
+	const hasInitLogRetentionDuration = useRef(false);
 	const hasInitBoostProcessPriority = useRef(false);
 	const hasInitHotLoadPage = useRef(false);
 
@@ -143,6 +145,17 @@ export const InitService = () => {
 			hasInitRunLog.current = true;
 
 			setRunLog(appSettings[AppSettingsGroup.SystemCommon].runLog);
+		}
+
+		if (
+			!hasInitLogRetentionDuration.current ||
+			(prevAppSettings &&
+				appSettings[AppSettingsGroup.SystemCommon].logRetentionDuration !==
+					prevAppSettings[AppSettingsGroup.SystemCommon].logRetentionDuration)
+		) {
+			hasInitLogRetentionDuration.current = true;
+
+			cleanupLogsByRetention();
 		}
 
 		if (

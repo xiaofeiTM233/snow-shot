@@ -80,6 +80,15 @@ export enum RunLogLevel {
 	Trace = "trace",
 }
 
+/** 日志保留时长 */
+export enum LogRetentionDuration {
+	Day = 1,
+	Three = 3,
+	Week = 7,
+	Month = 30,
+	Forever = 0,
+}
+
 export type ChatApiConfig = {
 	api_uri: string;
 	api_key: string;
@@ -427,6 +436,8 @@ export type AppSettingsData = {
 		autoStart: boolean;
 		autoCheckVersion: boolean;
 		runLog: RunLogLevel;
+		/** 日志保留时长 */
+		logRetentionDuration: LogRetentionDuration;
 		/** 提升进程优先级（高于正常） */
 		boostProcessPriority: boolean;
 		/** 记住关闭时窗口的位置和大小 */

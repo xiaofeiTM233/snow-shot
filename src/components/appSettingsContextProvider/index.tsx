@@ -50,6 +50,7 @@ import {
 	type HistoryValidDuration,
 	OcrDetectAfterAction,
 	RenderBackend,
+	LogRetentionDuration,
 	RunLogLevel,
 	type TrayIconClickAction,
 	type TrayIconDefaultIcon,
@@ -738,6 +739,11 @@ const AppSettingsContextProviderCore: React.FC<{
 						typeof newSettings?.runLog === "string"
 							? (newSettings.runLog as RunLogLevel)
 							: (prevSettings?.runLog ?? defaultAppSettingsData[group].runLog),
+					logRetentionDuration:
+						typeof newSettings?.logRetentionDuration === "number"
+							? (newSettings.logRetentionDuration as LogRetentionDuration)
+							: (prevSettings?.logRetentionDuration ??
+								defaultAppSettingsData[group].logRetentionDuration),
 					boostProcessPriority:
 						typeof newSettings?.boostProcessPriority === "boolean"
 							? newSettings.boostProcessPriority

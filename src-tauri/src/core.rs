@@ -471,6 +471,13 @@ pub async fn set_run_log(
     Ok(())
 }
 
+/// 根据当前日志保留时长设置清理过期的日志文件。
+#[command]
+pub async fn cleanup_logs_by_retention(app: tauri::AppHandle) -> Result<(), String> {
+    crate::cleanup_old_logs(&app);
+    Ok(())
+}
+
 #[command]
 pub async fn set_exclude_from_capture(window: tauri::Window, enable: bool) -> Result<(), String> {
     snow_shot_app_utils::set_exclude_from_capture(&window, enable).await

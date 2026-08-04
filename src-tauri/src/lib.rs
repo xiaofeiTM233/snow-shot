@@ -404,6 +404,9 @@ pub fn run() {
                 main_window.show().unwrap();
             }
 
+            // 根据设置清理过期的日志文件
+            cleanup_old_logs(app.handle());
+
             Ok(())
         })
         .manage(ui_elements)
@@ -486,6 +489,7 @@ pub fn run() {
             core::retain_dir_files,
             core::is_admin,
             core::set_run_log,
+            core::cleanup_logs_by_retention,
             #[cfg(target_os = "windows")]
             core::set_process_priority,
             core::set_exclude_from_capture,
@@ -647,4 +651,148 @@ fn month_lengths(year: i64) -> [i64; 12] {
         30,
         31,
     ]
+}
+
+/// 根据日志保留时长设置清理过期的日志文件。
+///
+/// 日志文件名格式为 `snow-shot-YYYY-MM-DD_HH-MM-SS.log`，
+/// 解析文件名中的时间戳，删除超过保留期的文件。
+/// `log_retention_duration` 为 0 表示永久保留。
+pub fn cleanup_old_logs(app: &tauri::AppHandle) {
+    let log_dir = match app.path().app_log_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            log::error!("[cleanup_old_logs] Failed to get app_log_dir: {e}");
+            return;
+        }
+    };
+
+    // 读取 systemCommon.json 中的 logRetentionDuration 设置
+    let retention_days = match read_log_retention_duration(app) {
+        Some(days) => days,
+        None => return, // 读取失败或永久保留则跳过
+    };
+
+    if retention_days <= 0 {
+        // 永久保留
+        return;
+    }
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let cutoff_secs = now.saturating_sub((retention_days as u64) * 86_400);
+
+    let entries = match std::fs::read_dir(&log_dir) {
+        Ok(entries) => entries,
+        Err(e) => {
+            log::error!("[cleanup_old_logs] Failed to read log dir {:?}: {e}", log_dir);
+            return;
+        }
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(file_name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+
+        // 只处理 snow-shot-*.log 文件
+        if !file_name.starts_with("snow-shot-") || !file_name.ends_with(".log") {
+            continue;
+        }
+
+        // 解析文件名中的时间戳: snow-shot-YYYY-MM-DD_HH-MM-SS.log
+        let ts_str = &file_name["snow-shot-".len()..file_name.len() - ".log".len()];
+        if let Some(file_secs) = parse_timestamp_tag_to_secs(ts_str) {
+            if file_secs < cutoff_secs {
+                match std::fs::remove_file(&path) {
+                    Ok(()) => {
+                        log::info!("[cleanup_old_logs] Removed old log: {file_name}");
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[cleanup_old_logs] Failed to remove old log {file_name}: {e}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 从 `systemCommon.json` 读取日志保留时长（天）。
+/// 返回 `Some(0)` 表示永久保留，`None` 表示读取失败（不清理）。
+fn read_log_retention_duration(app: &tauri::AppHandle) -> Option<i64> {
+    let config_dir = match app.path().app_config_dir() {
+        Ok(dir) => dir,
+        Err(e) => {
+            log::error!("[read_log_retention_duration] Failed to get app_config_dir: {e}");
+            return None;
+        }
+    };
+
+    let path = config_dir.join("systemCommon.json");
+    let content = match std::fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(_) => {
+            // 文件不存在是正常的（首次启动），不需要报错
+            return None;
+        }
+    };
+
+    let value: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(value) => value,
+        Err(e) => {
+            log::error!("[read_log_retention_duration] Failed to parse systemCommon.json: {e}");
+            return None;
+        }
+    };
+
+    value
+        .get("logRetentionDuration")
+        .and_then(|v| v.as_i64())
+}
+
+/// 将 `YYYY-MM-DD_HH-MM-SS` 格式的时间戳字符串转为 Unix 秒数。
+fn parse_timestamp_tag_to_secs(ts: &str) -> Option<u64> {
+    // 格式: "2025-07-04_12-30-45"
+    if ts.len() != 19 {
+        return None;
+    }
+    let bytes = ts.as_bytes();
+    if bytes[4] != b'-' || bytes[7] != b'-' || bytes[10] != b'_' || bytes[13] != b'-' || bytes[16] != b'-' {
+        return None;
+    }
+
+    let year = parse_u32(&bytes[0..4])? as i64;
+    let month = parse_u32(&bytes[5..7])? as i64;
+    let day = parse_u32(&bytes[8..10])? as i64;
+    let hour = parse_u32(&bytes[11..13])? as u64;
+    let min = parse_u32(&bytes[14..16])? as u64;
+    let sec = parse_u32(&bytes[17..19])? as u64;
+
+    if month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || min > 59 || sec > 59 {
+        return None;
+    }
+
+    // 计算从 1970-01-01 起的天数
+    let mut total_days: i64 = 0;
+    for y in 1970..year {
+        total_days += if is_leap_year(y) { 366 } else { 365 };
+    }
+    let mdays = month_lengths(year);
+    for m in 0..(month - 1) as usize {
+        total_days += mdays[m];
+    }
+    total_days += day - 1;
+
+    Some(total_days as u64 * 86_400 + hour * 3600 + min * 60 + sec)
+}
+
+fn parse_u32(bytes: &[u8]) -> Option<u32> {
+    let s = std::str::from_utf8(bytes).ok()?;
+    s.parse().ok()
 }

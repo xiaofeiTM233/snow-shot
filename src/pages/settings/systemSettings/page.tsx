@@ -46,6 +46,7 @@ import {
 	AppSettingsGroup,
 	HdrColorAlgorithm,
 	HistoryValidDuration,
+	LogRetentionDuration,
 	RenderBackend,
 	RunLogLevel,
 } from "@/types/appSettings";
@@ -271,6 +272,41 @@ export const SystemSettingsPage = () => {
 		];
 	}, []);
 
+	const logRetentionDurationOptions = useMemo((): SelectProps["options"] => {
+		return [
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.commonSettings.logRetentionDuration.day",
+				}),
+				value: LogRetentionDuration.Day,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.commonSettings.logRetentionDuration.three",
+				}),
+				value: LogRetentionDuration.Three,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.commonSettings.logRetentionDuration.week",
+				}),
+				value: LogRetentionDuration.Week,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.commonSettings.logRetentionDuration.month",
+				}),
+				value: LogRetentionDuration.Month,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.commonSettings.logRetentionDuration.forever",
+				}),
+				value: LogRetentionDuration.Forever,
+			},
+		];
+	}, [intl]);
+
 	const [currentPlatform] = usePlatform();
 
 	const [isAdmin, setIsAdmin] = useStateRef<boolean>(false);
@@ -356,6 +392,19 @@ export const SystemSettingsPage = () => {
 								}
 								name="runLog"
 								options={runLogLevelOptions}
+							/>
+						</Col>
+						<Col span={12}>
+							<ProFormSelect
+								label={
+									<IconLabel
+										label={
+											<FormattedMessage id="settings.systemSettings.commonSettings.logRetentionDuration" />
+										}
+									/>
+								}
+								name="logRetentionDuration"
+								options={logRetentionDurationOptions}
 							/>
 						</Col>
 						<Col span={12}>

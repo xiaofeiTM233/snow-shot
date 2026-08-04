@@ -240,6 +240,11 @@ export const setRunLog = async (level: string) => {
 	return result;
 };
 
+export const cleanupLogsByRetention = async () => {
+	const result = await invoke<void>("cleanup_logs_by_retention");
+	return result;
+};
+
 export const setProcessPriority = async (enable: boolean) => {
 	const result = await invoke<void>("set_process_priority", {
 		enable,

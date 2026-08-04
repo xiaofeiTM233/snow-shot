@@ -123,6 +123,12 @@ export const settings = {
 	"settings.systemSettings.commonSettings.runLog": "Run Log",
 	"settings.systemSettings.commonSettings.runLog.tip":
 		"Output logs to a log file for troubleshooting",
+	"settings.systemSettings.commonSettings.logRetentionDuration": "Log Retention Duration",
+	"settings.systemSettings.commonSettings.logRetentionDuration.day": "1 Day",
+	"settings.systemSettings.commonSettings.logRetentionDuration.three": "3 Days",
+	"settings.systemSettings.commonSettings.logRetentionDuration.week": "7 Days",
+	"settings.systemSettings.commonSettings.logRetentionDuration.month": "30 Days",
+	"settings.systemSettings.commonSettings.logRetentionDuration.forever": "Forever",
 	"settings.systemSettings.commonSettings.rememberWindowGeometry":
 		"Remember window position and size on close",
 	"settings.systemSettings.commonSettings.boostProcessPriority":
