@@ -1,6 +1,5 @@
 import type { RefType } from "@/components/imageLayer/baseLayerRenderActions";
 import type { ImageSharedBufferData } from "../../tools";
-import { appWarn } from "@/utils/log";
 import { getPixels, terminateWebWorker } from "./workers/getPixels";
 
 export const COLOR_PICKER_PREVIEW_SCALE = 12;
@@ -190,7 +189,8 @@ export async function renderSwitchCaptureHistoryAction(
 		captureHistoryImageDataRef.current = pixels.data;
 	} catch (error) {
 		// 诊断：记录具体是哪张历史截图解码失败，便于定位损坏/不支持格式/fetch 异常
-		appWarn("renderSwitchCaptureHistoryAction decode failed", {
+		// 注意：此函数在 Worker 内执行，不可用 Tauri 日志（依赖 window），用 console 由入口转发
+		console.warn("renderSwitchCaptureHistoryAction decode failed", {
 			imageSrc,
 			error,
 		});
