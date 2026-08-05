@@ -19,21 +19,37 @@ export async function getPixels(
 	imageBuffer: ArrayBuffer,
 ): Promise<DecodeResult> {
 	return new Promise((resolve, reject) => {
+		// decodeWorker 若彻底无响应（解码异常/worker 静默失败），Promise 会永久 pending，
+		// 导致上层 switchCaptureHistory 干等主线程超时。此处加兜底，超时即 reject，
+		// 让上层走 catch 并立即回传结果，避免切换历史卡满 1 秒。
+		const timer = setTimeout(() => {
+			reject(new Error("getPixels timeout: decodeWorker no response"));
+		}, 800);
+
 		// 如果 worker 未初始化，自动创建
 		if (!decodeWorker) {
 			registerWebWorker();
 		}
 
 		if (!decodeWorker) {
+			clearTimeout(timer);
 			reject(new Error("getPixels: Failed to create decodeWorker"));
 			return;
 		}
 
-		decodeWorker.onmessage = (event: MessageEvent<DecodeResult>) => {
+		// 用一次性 listener 而非覆盖式 onmessage：避免并发调用 getPixels 时
+		// 后一次覆盖前一次的回调，导致前一次的 Promise 永久 pending（进而切换历史干等超时）
+		const handleDecodeMessage = (event: MessageEvent<DecodeResult>) => {
+			clearTimeout(timer);
+			decodeWorker?.removeEventListener("message", handleDecodeMessage);
 			resolve(event.data);
 		};
 
+		decodeWorker.addEventListener("message", handleDecodeMessage);
+
 		decodeWorker.onerror = (error) => {
+			clearTimeout(timer);
+			decodeWorker?.removeEventListener("message", handleDecodeMessage);
 			reject(error);
 		};
 
