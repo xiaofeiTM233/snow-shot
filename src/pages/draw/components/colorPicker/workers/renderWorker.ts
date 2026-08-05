@@ -20,6 +20,25 @@ import {
 	type ColorPickerRenderSwitchCaptureHistoryData,
 } from "./renderWorkerTypes";
 
+// 顶层全局错误监听：renderWorker 内任何未捕获崩溃（含子 Worker 抛出的
+// 错误冒泡、async onmessage 内的 throw）默认只进 Worker 线程 Console，
+// 主线程看不到。统一打出以便定位。
+self.onerror = (event) => {
+	console.error("[renderWorker] onerror", {
+		message: (event as ErrorEvent)?.message,
+		filename: (event as ErrorEvent)?.filename,
+		lineno: (event as ErrorEvent)?.lineno,
+		colno: (event as ErrorEvent)?.colno,
+		error: (event as ErrorEvent)?.error,
+	});
+};
+self.onunhandledrejection = (event) => {
+	console.error(
+		"[renderWorker] unhandledrejection",
+		(event as PromiseRejectionEvent)?.reason,
+	);
+};
+
 const previewCanvasRef: RefType<OffscreenCanvas | null> = {
 	current: null,
 };
