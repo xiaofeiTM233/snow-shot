@@ -233,10 +233,11 @@ export const switchCaptureHistoryAction = async (
 ): Promise<void> => {
 	return new Promise((resolve) => {
 		// worker 崩溃/无响应时兜底，避免 Promise 永久 pending 卡死切换流程
+		// 正常失败已由 worker 的 finally 立即回传结果，此处仅防 decodeWorker 彻底无响应
 		const timer = setTimeout(() => {
 			renderWorker?.removeEventListener("message", handleMessage);
 			resolve(undefined);
-		}, 5000);
+		}, 1000);
 
 		const handleMessage = (
 			event: MessageEvent<ColorPickerRenderSwitchCaptureHistoryResult>,

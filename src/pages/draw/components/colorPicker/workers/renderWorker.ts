@@ -16,6 +16,7 @@ import {
 	type ColorPickerRenderPickColorData,
 	type ColorPickerRenderPutImageDataData,
 	type ColorPickerRenderResult,
+	type ColorPickerRenderSwitchCaptureHistoryResult,
 	type ColorPickerRenderSwitchCaptureHistoryData,
 } from "./renderWorkerTypes";
 
@@ -96,6 +97,13 @@ const handleSwitchCaptureHistory = async (
 		// 历史截图解码失败时（如文件损坏/特殊编码），worker 不应崩溃
 		// 保留上一张有效的 captureHistoryImageDataRef，避免污染取色数据
 		console.warn("handleSwitchCaptureHistory error", error);
+	} finally {
+		// 无论成功失败都回传结果，避免 switchCaptureHistoryAction 干等超时
+		const result: ColorPickerRenderSwitchCaptureHistoryResult = {
+			type: ColorPickerRenderMessageType.SwitchCaptureHistory,
+			payload: undefined,
+		};
+		self.postMessage(result);
 	}
 };
 
@@ -145,12 +153,9 @@ self.onmessage = async ({ data }: MessageEvent<ColorPickerRenderData>) => {
 			break;
 		}
 		case ColorPickerRenderMessageType.SwitchCaptureHistory:
+			// handleSwitchCaptureHistory 内部 finally 已负责回传结果，避免双发
 			await handleSwitchCaptureHistory(data);
-			message = {
-				type: ColorPickerRenderMessageType.SwitchCaptureHistory,
-				payload: undefined,
-			};
-			break;
+			return;
 		case ColorPickerRenderMessageType.PickColor: {
 			const pickColorResult = await handlePickColor(data);
 			message = {
