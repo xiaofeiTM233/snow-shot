@@ -123,6 +123,11 @@ const colorPickerColorFormatList = [
 
 let decoderWasmModuleArrayBuffer: ArrayBuffer =
 	undefined as unknown as ArrayBuffer;
+
+// 切换历史截图解码期间的锁：避免解码未完成时取色/预览绘制读到旧的
+// captureHistoryImageDataRef。用模块级 var 避免构建工具内联导致的 TDZ。
+var isSwitchingHistory = false;
+
 const getDecoderWasmModuleArrayBuffer = async (): Promise<ArrayBuffer> => {
 	if (decoderWasmModuleArrayBuffer) {
 		return decoderWasmModuleArrayBuffer;
@@ -162,10 +167,6 @@ const ColorPickerCore: React.FC<{
 	);
 	const [getAppSettings] = useStateSubscriber(AppSettingsPublisher, undefined);
 	const imageDataReadyRef = useRef(false);
-	/** 切换历史截图期间的锁：异步解码完成前，取色/预览绘制会读到旧的
-	 *  captureHistoryImageDataRef，导致"前 1 秒取色/画面不对"。切换期间
-	 *  直接跳过 update，待解码完成再恢复，避免用旧数据渲染。 */
-	const isSwitchingRef = useRef(false);
 
 	/** 强制启用取色器 */
 	const [, setForceEnable, forceEnableRef] = useStateRef(false);
@@ -637,10 +638,7 @@ const ColorPickerCore: React.FC<{
 			physicalX?: number,
 			physicalY?: number,
 		) => {
-			// 切换历史截图解码期间，跳过取色/预览绘制，避免读到旧 ref 造成前 1 秒画面/取色错误
-			if (isSwitchingRef.current) {
-				return;
-			}
+			if (isSwitchingHistory) return;
 
 			const dragPosition = getDragPosition();
 
@@ -835,7 +833,7 @@ const ColorPickerCore: React.FC<{
 
 	const switchCaptureHistory = useCallback(
 		async (item: CaptureHistoryItem | undefined) => {
-			isSwitchingRef.current = true;
+			isSwitchingHistory = true;
 			try {
 				const fileUri = item
 					? convertFileSrc(await getCaptureHistoryImageAbsPath(item.file_name))
@@ -847,9 +845,8 @@ const ColorPickerCore: React.FC<{
 					fileUri,
 				);
 			} finally {
-				isSwitchingRef.current = false;
+				isSwitchingHistory = false;
 				imageDataReadyRef.current = true;
-				// 解码完成后强制用新 ref 重绘一次，确保画面/取色立即正确
 				refreshMouseMove();
 			}
 		},
