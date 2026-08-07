@@ -3,7 +3,8 @@ import { decode_to_rgba, initSync } from "turbo-png";
 // initSync 不可重复调用：多次调用可能导致 wasm 静默卡死（trap 不抛
 // JS 异常），表现为 decodeWorker 无响应 → getPixels 800ms 超时。
 // 用模块级标志确保整个 worker 生命周期内只初始化一次。
-let wasmInited = false;
+// 注意：必须用 var 而非 let/const，避免构建工具分包时触发 TDZ。
+var wasmInited = false;
 
 // 顶层全局错误监听：Worker 内的同步/异步崩溃（包括 wasm trap、
 // new ImageData 失败、未捕获 rejection）默认只进 Worker 线程专属
