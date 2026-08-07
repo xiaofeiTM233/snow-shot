@@ -32,6 +32,7 @@ import type { ElementRect } from "@/types/commands/screenshot";
 import { DrawState } from "@/types/draw";
 import { ExcalidrawAppStateStore } from "@/utils/appStore";
 import { appWarn } from "@/utils/log";
+import { getExcalidrawCanvas } from "@/utils/excalidraw";
 import { ExcalidrawKeyEventHandler } from "./components/excalidrawKeyEventHandler";
 import { useHistory } from "./components/historyContext";
 import {
@@ -232,6 +233,50 @@ const DrawCoreComponent: React.FC<{
 		  }
 		| undefined
 	>(undefined);
+
+	// [验证] macOS 文字拖动问题诊断：对比 document 层与 canvas 层能否收到 pointermove
+	useEffect(() => {
+		if (currentPlatformRef.current !== "macos") return;
+		// 文档层
+		let docCount = 0;
+		const onDocMove = () => {
+			docCount++;
+			if (docCount % 30 === 1) {
+				console.warn(
+					`[DIAG] document pointermove 收到 ${docCount} 次`,
+				);
+			}
+		};
+		document.addEventListener("pointermove", onDocMove, true);
+
+		// canvas 层：Excalidraw 的交互层
+		let canvasCount = 0;
+		const checkCanvas = () => {
+			const canvas = getExcalidrawCanvas();
+			if (!canvas) return;
+			const onCanvasMove = () => {
+				canvasCount++;
+				if (canvasCount % 30 === 1) {
+					console.warn(
+						`[DIAG] canvas pointermove 收到 ${canvasCount} 次`,
+					);
+				}
+			};
+			canvas.addEventListener("pointermove", onCanvasMove, true);
+			const onCanvasDown = () => {
+				console.warn("[DIAG] canvas pointerdown 命中");
+			};
+			canvas.addEventListener("pointerdown", onCanvasDown, true);
+		};
+		const timer = setInterval(checkCanvas, 500);
+		checkCanvas();
+
+		return () => {
+			document.removeEventListener("pointermove", onDocMove, true);
+			clearInterval(timer);
+		};
+	}, [currentPlatformRef]);
+
 	useEffect(() => {
 		if (excalidrawAppStateStoreRef.current) {
 			return;
