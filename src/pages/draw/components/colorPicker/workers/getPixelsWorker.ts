@@ -1,24 +1,5 @@
 import { decode_to_rgba, initSync } from "turbo-png";
 
-// 顶层全局错误监听：Worker 内的同步/异步崩溃（包括 wasm trap、
-// new ImageData 失败、未捕获 rejection）默认只进 Worker 线程专属
-// Console，主线程看不到。这里统一打出，便于定位崩溃点。
-self.onerror = (event) => {
-	console.error("[getPixelsWorker] onerror", {
-		message: (event as ErrorEvent)?.message,
-		filename: (event as ErrorEvent)?.filename,
-		lineno: (event as ErrorEvent)?.lineno,
-		colno: (event as ErrorEvent)?.colno,
-		error: (event as ErrorEvent)?.error,
-	});
-};
-self.onunhandledrejection = (event) => {
-	console.error(
-		"[getPixelsWorker] unhandledrejection",
-		(event as PromiseRejectionEvent)?.reason,
-	);
-};
-
 self.onmessage = async (
 	event: MessageEvent<{
 		wasmModuleArrayBuffer: ArrayBuffer;
@@ -27,8 +8,26 @@ self.onmessage = async (
 ) => {
 	const { imageBuffer, wasmModuleArrayBuffer } = event.data;
 
+	// 错误监听仅在首次 onmessage 时注册，避免模块顶层赋值被 rsbuild 重排触发 TDZ
+	if (!(self as any).__listenersInited) {
+		(self as any).__listenersInited = true;
+
+		self.onerror = (event: Event | string) => {
+			const e = event as ErrorEvent;
+			console.error("[getPixelsWorker] onerror", {
+				message: e?.message,
+				filename: e?.filename,
+				lineno: e?.lineno,
+				colno: e?.colno,
+				error: e?.error,
+			});
+		};
+		self.onunhandledrejection = (ev: PromiseRejectionEvent) => {
+			console.error("[getPixelsWorker] unhandledrejection", ev?.reason);
+		};
+	}
+
 	// initSync 不可重复调用，多次调用可能导致 wasm 静默卡死。
-	// 用 self 属性而非模块级变量，避免 rsbuild worker chunk 触发 TDZ。
 	if (!(self as any).__wasmInited) {
 		try {
 			initSync({
@@ -47,7 +46,6 @@ self.onmessage = async (
 
 	let imageData: Uint8Array;
 	try {
-		// 后 8 位包含图像的宽高
 		imageData = decode_to_rgba(new Uint8Array(imageBuffer));
 	} catch (error) {
 		console.error("getPixelsWorker decode_to_rgba failed", {
