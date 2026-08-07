@@ -1,5 +1,10 @@
 import { decode_to_rgba, initSync } from "turbo-png";
 
+// initSync 不可重复调用：多次调用可能导致 wasm 静默卡死（trap 不抛
+// JS 异常），表现为 decodeWorker 无响应 → getPixels 800ms 超时。
+// 用模块级标志确保整个 worker 生命周期内只初始化一次。
+let wasmInited = false;
+
 // 顶层全局错误监听：Worker 内的同步/异步崩溃（包括 wasm trap、
 // new ImageData 失败、未捕获 rejection）默认只进 Worker 线程专属
 // Console，主线程 Console 看不到。这里统一打出，便于定位崩溃点。
@@ -27,18 +32,21 @@ self.onmessage = async (
 ) => {
 	const { imageBuffer, wasmModuleArrayBuffer } = event.data;
 
-	try {
-		initSync({
-			module: wasmModuleArrayBuffer,
-		});
-	} catch (error) {
-		// 诊断：wasm 实例化失败，通常是 wasmModuleArrayBuffer 已 detached/损坏
-		console.error("getPixelsWorker initSync failed", {
-			wasmByteLength: wasmModuleArrayBuffer?.byteLength,
-			imageByteLength: imageBuffer?.byteLength,
-			error,
-		});
-		throw error;
+	if (!wasmInited) {
+		try {
+			initSync({
+				module: wasmModuleArrayBuffer,
+			});
+			wasmInited = true;
+		} catch (error) {
+			// 诊断：wasm 实例化失败，通常是 wasmModuleArrayBuffer 已 detached/损坏
+			console.error("getPixelsWorker initSync failed", {
+				wasmByteLength: wasmModuleArrayBuffer?.byteLength,
+				imageByteLength: imageBuffer?.byteLength,
+				error,
+			});
+			throw error;
+		}
 	}
 
 	let imageData: Uint8Array;
