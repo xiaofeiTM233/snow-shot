@@ -125,17 +125,45 @@ let decoderWasmModuleArrayBuffer: ArrayBuffer =
 	undefined as unknown as ArrayBuffer;
 // 切换历史截图解码期间的锁，避免旧 ref 被取色/预览绘制读到
 var isSwitchingHistory = false;
+
+// 用 import ?url 让 rspack 把 wasm 当静态资源 emit 并返回最终 URL。
+// 之前的 `new URL("turbo-png/turbo_png_bg.wasm", import.meta.url)` 依赖
+// rspack 识别"裸包名+import.meta.url"模式，但 rspack 对裸包名的识别不稳定，
+// 导致部分构建产物里 wasm 未被 emit、运行时 fetch 404 拿到 HTML 错误页，
+// 被当成"合法 buffer"永久缓存，后续所有解码静默崩溃（decodeWorker no response）。
+// `import turboPngWasmUrl from "turbo-png/turbo_png_bg.wasm?url"` 是 rspack
+// 官方支持的可靠写法，会把文件 emit 到 dist 并替换为正确 URL。
+import turboPngWasmUrl from "turbo-png/turbo_png_bg.wasm?url";
+
 const getDecoderWasmModuleArrayBuffer = async (): Promise<ArrayBuffer> => {
 	if (decoderWasmModuleArrayBuffer) {
 		return decoderWasmModuleArrayBuffer;
 	}
 
-	decoderWasmModuleArrayBuffer =
-		typeof window !== "undefined"
-			? await fetch(
-					new URL("turbo-png/turbo_png_bg.wasm", import.meta.url),
-				).then((res) => res.arrayBuffer())
-			: (undefined as unknown as ArrayBuffer);
+	if (typeof window === "undefined") {
+		return undefined as unknown as ArrayBuffer;
+	}
+
+	const res = await fetch(turboPngWasmUrl);
+	if (!res.ok) {
+		throw new Error(
+			`getDecoderWasmModuleArrayBuffer: fetch wasm failed: ${res.status} ${res.statusText} (url=${turboPngWasmUrl})`,
+		);
+	}
+	decoderWasmModuleArrayBuffer = await res.arrayBuffer();
+
+	// 校验：wasm 文件应以 \0asm 魔数开头。防止 fetch 拿到 HTML 错误页/空响应
+	// 被当成合法 buffer 缓存，导致后续 initSync 永久失败（这是"部分用户必现"的根因）。
+	const magic = new Uint32Array(decoderWasmModuleArrayBuffer, 0, 1)[0];
+	// 0x6d736100 = "asm\0"（小端序），即 WebAssembly 魔数
+	if (magic !== 0x6d736100) {
+		const preview = Array.from(
+			new Uint8Array(decoderWasmModuleArrayBuffer.slice(0, 16)),
+		);
+		throw new Error(
+			`getDecoderWasmModuleArrayBuffer: invalid wasm magic (got 0x${magic.toString(16)}, first 16 bytes=${JSON.stringify(preview)}, url=${turboPngWasmUrl})`,
+		);
+	}
 
 	return decoderWasmModuleArrayBuffer;
 };
@@ -666,6 +694,18 @@ const ColorPickerCore: React.FC<{
 				? previewCanvasElement.transferControlToOffscreen()
 				: null;
 
+		// wasm 加载失败时（如构建产物缺失/路径错误）不应让整个取色器崩溃，
+		// 这里捕获后仅打日志，后续取色会走 decoderWasmModuleArrayBufferRef.current 为 null 的降级路径。
+		let wasmBuffer: ArrayBuffer | undefined;
+		try {
+			wasmBuffer = await getDecoderWasmModuleArrayBuffer();
+		} catch (error) {
+			console.error(
+				"initPreviewCanvas: getDecoderWasmModuleArrayBuffer failed",
+				error,
+			);
+		}
+
 		await initPreviewCanvasAction(
 			renderWorker,
 			previewCanvasRef,
@@ -673,7 +713,7 @@ const ColorPickerCore: React.FC<{
 			previewOffscreenCanvasRef,
 			previewCanvasCtxRef,
 			decoderWasmModuleArrayBufferRef,
-			await getDecoderWasmModuleArrayBuffer(),
+			wasmBuffer ?? (undefined as unknown as ArrayBuffer),
 			previewOffscreenCanvasRef.current
 				? [previewOffscreenCanvasRef.current]
 				: undefined,
