@@ -36,7 +36,7 @@ export function renderInitImageDataAction(
 	decoderWasmModuleArrayBufferRef: RefType<ArrayBuffer | null>,
 	imageSrc: ArrayBuffer | ImageSharedBufferData,
 ): Promise<void> {
-	return new Promise((resolve) => {
+	return new Promise((resolve, reject) => {
 		if ("sharedBuffer" in imageSrc) {
 			previewImageDataRef.current = new ImageData(
 				imageSrc.sharedBuffer,
@@ -59,11 +59,18 @@ export function renderInitImageDataAction(
 		getPixels(
 			decoderWasmModuleArrayBufferRef.current,
 			imageSrc as ArrayBuffer,
-		).then((pixels) => {
-			previewImageDataRef.current = pixels.data;
+		)
+			.then((pixels) => {
+				previewImageDataRef.current = pixels.data;
 
-			resolve(undefined);
-		});
+				resolve(undefined);
+			})
+			.catch((error) => {
+				// 解码失败时清理 previewImageData，避免使用过期数据
+				previewImageDataRef.current = null;
+				console.warn("renderInitImageDataAction decode failed", { error });
+				resolve(undefined);
+			});
 	});
 }
 
