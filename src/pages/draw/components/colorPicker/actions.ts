@@ -43,6 +43,7 @@ export const initPreviewCanvasAction = async (
 				appWarn(
 					"[initPreviewCanvasAction] previewOffscreenCanvasRef.current is null",
 				);
+				resolve(undefined);
 				return;
 			}
 			const InitPreviewCanvasData: ColorPickerRenderInitPreviewCanvasData = {
