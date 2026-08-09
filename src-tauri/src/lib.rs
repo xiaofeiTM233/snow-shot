@@ -575,9 +575,16 @@ pub fn run() {
         app_builder = app_builder.manage(shared_buffer_service);
     }
 
-    let app = app_builder
-        .build(tauri::generate_context!())
-        .expect("error while building tauri application");
+    let app = match app_builder.build(tauri::generate_context!()) {
+        Ok(app) => app,
+        Err(e) => {
+            // WebView2 创建失败（如开机自启时环境未就绪）时优雅退出，
+            // 避免 panic 产生「只有进程、没有托盘」的僵尸进程。
+            log::error!("error while building tauri application: {}", e);
+            eprintln!("[snow-shot] failed to create application: {}", e);
+            std::process::exit(1);
+        }
+    };
 
     app.run(move |app, event| {
         // 应用退出时持久化主窗口几何信息，确保即使未触发关闭按钮也能保存

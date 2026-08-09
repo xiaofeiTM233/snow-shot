@@ -17,12 +17,6 @@ async fn main() {
     snow_shot_lib::run();
 }
 
-#[cfg(target_os = "windows")]
-const DELAY_SECONDS: u64 = 10;
-
-#[cfg(target_os = "macos")]
-const DELAY_SECONDS: u64 = 3;
-
 #[cfg(not(feature = "dhat-heap"))]
 fn main() {
     let default_panic = std::panic::take_hook();
@@ -35,14 +29,24 @@ fn main() {
     }));
 
     // 检测命令行参数是否包含 --auto_start
-    // 如果是自动启动可能会失败，尝试延迟一段时间再启动
+    // 如果是自动启动可能会失败（登录早期 WebView2 环境未就绪，报
+    // HRESULT(0x80070490)「找不到元素」），需等待桌面外壳就绪后再启动。
     let args: Vec<String> = std::env::args().collect();
     if args.contains(&"--auto_start".to_string()) {
         println!(
-            "[main] --auto_start parameter detected, delaying {} seconds before starting",
-            DELAY_SECONDS
+            "[main] --auto_start parameter detected, waiting for desktop shell to be ready"
         );
-        std::thread::sleep(std::time::Duration::from_secs(DELAY_SECONDS));
+        // 等桌面外壳就绪再启动（最多 120s，就绪即返回），避免 WebView2 创建失败。
+        #[cfg(target_os = "windows")]
+        {
+            let ready = snow_shot_app_os::utils::wait_for_desktop_ready(120_000);
+            if !ready {
+                // 超时仍继续，build 失败时有优雅退出兜底。
+                eprintln!(
+                    "[main] desktop shell not ready within timeout, proceeding anyway (app may fail to start)"
+                );
+            }
+        }
     }
 
     // 在创建 WebView2 渲染子进程之前设置主进程优先级。

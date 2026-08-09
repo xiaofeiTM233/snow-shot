@@ -634,3 +634,47 @@ pub fn set_process_priority(enable: bool) -> Result<(), String> {
 
     Ok(())
 }
+
+/// 等待 Windows 桌面外壳就绪（用于开机自启场景）。
+///
+/// 登录早期外壳未初始化，创建 WebView2 会因 0x80070490 失败。
+/// 轮询 `GetShellWindow` 直到就绪（同时初始化 COM），外壳就绪后即可正常启动。
+///
+/// * `max_wait_ms`：最长等待时间（毫秒）。返回是否在超时前就绪。
+pub fn wait_for_desktop_ready(max_wait_ms: u64) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::GetShellWindow;
+    use std::time::Duration;
+
+    // 初始化 COM（WebView2 依赖），失败仅记录，不影响轮询。
+    unsafe {
+        let hr = CoInitializeEx(None, COINIT_MULTITHREADED);
+        if hr.is_err() {
+            log::warn!("[wait_for_desktop_ready] CoInitializeEx: {:?}", hr);
+        }
+    }
+
+    let start = std::time::Instant::now();
+    let poll = Duration::from_millis(500);
+
+    loop {
+        // GetShellWindow 在非空时表示桌面外壳已存在、用户会话环境就绪。
+        let shell_hwnd = unsafe { GetShellWindow() };
+        if !shell_hwnd.is_invalid() {
+            log::info!(
+                "[wait_for_desktop_ready] desktop shell ready after {:?}",
+                start.elapsed()
+            );
+            return true;
+        }
+
+        if start.elapsed().as_millis() as u64 >= max_wait_ms {
+            log::warn!(
+                "[wait_for_desktop_ready] timed out after {}ms waiting for desktop shell",
+                max_wait_ms
+            );
+            return false;
+        }
+
+        std::thread::sleep(poll);
+    }
+}
