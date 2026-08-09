@@ -35,8 +35,6 @@ export const initPreviewCanvasAction = async (
 	previewCanvasCtxRef: RefType<
 		OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null
 	>,
-	decoderWasmModuleArrayBufferRef: RefType<ArrayBuffer | null>,
-	decoderWasmModuleArrayBuffer: ArrayBuffer,
 	transfer: Transferable[] | undefined,
 ) => {
 	return new Promise((resolve) => {
@@ -51,7 +49,6 @@ export const initPreviewCanvasAction = async (
 				type: ColorPickerRenderMessageType.InitPreviewCanvas,
 				payload: {
 					previewCanvas: previewOffscreenCanvasRef.current,
-					decoderWasmModuleArrayBuffer: decoderWasmModuleArrayBuffer,
 				},
 			};
 
@@ -77,8 +74,6 @@ export const initPreviewCanvasAction = async (
 				previewCanvasRef,
 				previewCanvas,
 				previewCanvasCtxRef,
-				decoderWasmModuleArrayBufferRef,
-				decoderWasmModuleArrayBuffer,
 			);
 			resolve(undefined);
 		}
@@ -89,7 +84,6 @@ export const initImageDataAction = async (
 	renderWorker: Worker | undefined,
 	previewCanvasRef: RefType<OffscreenCanvas | HTMLCanvasElement | null>,
 	previewImageDataRef: RefType<ImageData | null>,
-	decoderWasmModuleArrayBufferRef: RefType<ArrayBuffer | null>,
 	imageBuffer: ImageBuffer | ImageSharedBufferData,
 ) => {
 	return new Promise((resolve) => {
@@ -125,7 +119,6 @@ export const initImageDataAction = async (
 			renderInitImageDataAction(
 				previewCanvasRef,
 				previewImageDataRef,
-				decoderWasmModuleArrayBufferRef,
 				"sharedBuffer" in imageBuffer ? imageBuffer : imageBuffer.buffer,
 			).then(() => {
 				resolve(undefined);
@@ -227,11 +220,27 @@ export const getPreviewImageDataAction = async (
 
 export const switchCaptureHistoryAction = async (
 	renderWorker: Worker | undefined,
-	decoderWasmModuleArrayBufferRef: RefType<ArrayBuffer | null>,
 	captureHistoryImageDataRef: RefType<ImageData | undefined>,
 	imageSrc: string | undefined,
 ): Promise<void> => {
 	return new Promise((resolve) => {
+		// 兜底：worker 彻底无响应时避免 Promise 永久 pending
+		const timer = setTimeout(() => {
+			renderWorker?.removeEventListener("message", handleMessage);
+			resolve(undefined);
+		}, 1000);
+
+		const handleMessage = (
+			event: MessageEvent<ColorPickerRenderSwitchCaptureHistoryResult>,
+		) => {
+			const { type, payload } = event.data;
+			if (type === ColorPickerRenderMessageType.SwitchCaptureHistory) {
+				clearTimeout(timer);
+				resolve(payload);
+				renderWorker?.removeEventListener("message", handleMessage);
+			}
+		};
+
 		if (renderWorker) {
 			const SwitchCaptureHistoryData: ColorPickerRenderSwitchCaptureHistoryData =
 				{
@@ -241,27 +250,22 @@ export const switchCaptureHistoryAction = async (
 					},
 				};
 
-			const handleMessage = (
-				event: MessageEvent<ColorPickerRenderSwitchCaptureHistoryResult>,
-			) => {
-				const { type, payload } = event.data;
-				if (type === ColorPickerRenderMessageType.SwitchCaptureHistory) {
-					resolve(payload);
-					renderWorker.removeEventListener("message", handleMessage);
-				}
-			};
-
 			renderWorker.addEventListener("message", handleMessage);
 
 			renderWorker.postMessage(SwitchCaptureHistoryData);
 		} else {
 			renderSwitchCaptureHistoryAction(
-				decoderWasmModuleArrayBufferRef,
 				captureHistoryImageDataRef,
 				imageSrc,
-			).then(() => {
-				resolve(undefined);
-			});
+			)
+				.then(() => {
+					clearTimeout(timer);
+					resolve(undefined);
+				})
+				.catch(() => {
+					clearTimeout(timer);
+					resolve(undefined);
+				});
 		}
 	});
 };

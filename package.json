@@ -75,7 +75,6 @@
 		"styled-jsx": "^5.1.7",
 		"tauri-plugin-clipboard-api": "^2.1.11",
 		"tauri-plugin-macos-permissions-api": "^2.3.0",
-		"turbo-png": "0.1.0",
 		"url-join": "^5.0.0",
 		"use-interval": "^1.4.0"
 	},

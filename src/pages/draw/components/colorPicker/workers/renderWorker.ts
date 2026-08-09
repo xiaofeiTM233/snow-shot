@@ -16,6 +16,7 @@ import {
 	type ColorPickerRenderPickColorData,
 	type ColorPickerRenderPutImageDataData,
 	type ColorPickerRenderResult,
+	type ColorPickerRenderSwitchCaptureHistoryResult,
 	type ColorPickerRenderSwitchCaptureHistoryData,
 } from "./renderWorkerTypes";
 
@@ -28,9 +29,6 @@ const previewCanvasCtxRef: RefType<OffscreenCanvasRenderingContext2D | null> = {
 const previewImageDataRef: RefType<ImageData | null> = {
 	current: null,
 };
-const decoderWasmModuleArrayBufferRef: RefType<ArrayBuffer | null> = {
-	current: null,
-};
 const captureHistoryImageDataRef: RefType<ImageData | undefined> = {
 	current: undefined,
 };
@@ -38,14 +36,12 @@ const captureHistoryImageDataRef: RefType<ImageData | undefined> = {
 const handleInitPreviewCanvas = async (
 	data: ColorPickerRenderInitPreviewCanvasData,
 ) => {
-	const { previewCanvas, decoderWasmModuleArrayBuffer } = data.payload;
+	const { previewCanvas } = data.payload;
 
 	renderInitPreviewCanvasAction(
 		previewCanvasRef,
 		previewCanvas,
 		previewCanvasCtxRef,
-		decoderWasmModuleArrayBufferRef,
-		decoderWasmModuleArrayBuffer,
 	);
 };
 
@@ -56,7 +52,6 @@ const handleInitImageData = async (
 	await renderInitImageDataAction(
 		previewCanvasRef,
 		previewImageDataRef,
-		decoderWasmModuleArrayBufferRef,
 		imageBuffer,
 	);
 };
@@ -86,11 +81,22 @@ const handleSwitchCaptureHistory = async (
 	data: ColorPickerRenderSwitchCaptureHistoryData,
 ) => {
 	const { imageSrc } = data.payload;
-	await renderSwitchCaptureHistoryAction(
-		decoderWasmModuleArrayBufferRef,
-		captureHistoryImageDataRef,
-		imageSrc,
-	);
+	try {
+		await renderSwitchCaptureHistoryAction(
+			captureHistoryImageDataRef,
+			imageSrc,
+		);
+	} catch (error) {
+		// 解码失败时不崩溃 worker，保留上一张有效数据
+		console.warn("handleSwitchCaptureHistory error", error);
+	} finally {
+		// 无论成功失败都回传结果，避免 switchCaptureHistoryAction 干等超时
+		const result: ColorPickerRenderSwitchCaptureHistoryResult = {
+			type: ColorPickerRenderMessageType.SwitchCaptureHistory,
+			payload: undefined,
+		};
+		self.postMessage(result);
+	}
 };
 
 const handlePickColor = async (data: ColorPickerRenderPickColorData) => {
@@ -104,6 +110,27 @@ const handlePickColor = async (data: ColorPickerRenderPickColorData) => {
 };
 
 self.onmessage = async ({ data }: MessageEvent<ColorPickerRenderData>) => {
+	// 错误监听仅在首次 onmessage 时注册，避免模块顶层赋值被 rsbuild 重排触发 TDZ
+	if (!(self as any).__listenersInited) {
+		(self as any).__listenersInited = true;
+
+		self.onerror = (event) => {
+			console.error("[renderWorker] onerror", {
+				message: (event as ErrorEvent)?.message,
+				filename: (event as ErrorEvent)?.filename,
+				lineno: (event as ErrorEvent)?.lineno,
+				colno: (event as ErrorEvent)?.colno,
+				error: (event as ErrorEvent)?.error,
+			});
+		};
+		self.onunhandledrejection = (event) => {
+			console.error(
+				"[renderWorker] unhandledrejection",
+				(event as PromiseRejectionEvent)?.reason,
+			);
+		};
+	}
+
 	let message: ColorPickerRenderResult;
 	switch (data.type) {
 		case ColorPickerRenderMessageType.InitPreviewCanvas:
@@ -139,12 +166,9 @@ self.onmessage = async ({ data }: MessageEvent<ColorPickerRenderData>) => {
 			break;
 		}
 		case ColorPickerRenderMessageType.SwitchCaptureHistory:
+			// handleSwitchCaptureHistory 内部 finally 已负责回传结果，避免双发
 			await handleSwitchCaptureHistory(data);
-			message = {
-				type: ColorPickerRenderMessageType.SwitchCaptureHistory,
-				payload: undefined,
-			};
-			break;
+			return;
 		case ColorPickerRenderMessageType.PickColor: {
 			const pickColorResult = await handlePickColor(data);
 			message = {

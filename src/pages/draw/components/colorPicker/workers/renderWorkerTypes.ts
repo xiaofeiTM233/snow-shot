@@ -13,7 +13,6 @@ export type ColorPickerRenderInitPreviewCanvasData = {
 	type: ColorPickerRenderMessageType.InitPreviewCanvas;
 	payload: {
 		previewCanvas: OffscreenCanvas;
-		decoderWasmModuleArrayBuffer: ArrayBuffer;
 	};
 };
 

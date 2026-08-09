@@ -13,8 +13,6 @@ export const renderInitPreviewCanvasAction = (
 	previewCanvasCtxRef: RefType<
 		OffscreenCanvasRenderingContext2D | RenderingContext | null
 	>,
-	decoderWasmModuleArrayBufferRef: RefType<ArrayBuffer | null>,
-	decoderWasmModuleArrayBuffer: ArrayBuffer | null,
 ) => {
 	previewCanvasRef.current = previewCanvas;
 
@@ -26,14 +24,11 @@ export const renderInitPreviewCanvasAction = (
 	previewCanvasCtxRef.current = ctx;
 	previewCanvas.width = COLOR_PICKER_PREVIEW_PICKER_SIZE;
 	previewCanvas.height = COLOR_PICKER_PREVIEW_PICKER_SIZE;
-
-	decoderWasmModuleArrayBufferRef.current = decoderWasmModuleArrayBuffer;
 };
 
 export function renderInitImageDataAction(
 	_previewCanvasRef: RefType<OffscreenCanvas | HTMLCanvasElement | null>,
 	previewImageDataRef: RefType<ImageData | null>,
-	decoderWasmModuleArrayBufferRef: RefType<ArrayBuffer | null>,
 	imageSrc: ArrayBuffer | ImageSharedBufferData,
 ): Promise<void> {
 	return new Promise((resolve) => {
@@ -48,22 +43,17 @@ export function renderInitImageDataAction(
 			return;
 		}
 
-		if (!decoderWasmModuleArrayBufferRef.current) {
-			console.error(
-				"renderInitImageDataAction: decoderWasmModuleArrayBufferRef.current is not set",
-			);
-			resolve(undefined);
-			return;
-		}
+		getPixels(imageSrc as ArrayBuffer)
+			.then((pixels) => {
+				previewImageDataRef.current = pixels.data;
 
-		getPixels(
-			decoderWasmModuleArrayBufferRef.current,
-			imageSrc as ArrayBuffer,
-		).then((pixels) => {
-			previewImageDataRef.current = pixels.data;
-
-			resolve(undefined);
-		});
+				resolve(undefined);
+			})
+			.catch((error) => {
+				previewImageDataRef.current = null;
+				console.warn("renderInitImageDataAction decode failed", { error });
+				resolve(undefined);
+			});
 	});
 }
 
@@ -164,7 +154,6 @@ export function renderGetPreviewImageDataAction(
 }
 
 export async function renderSwitchCaptureHistoryAction(
-	decoderWasmModuleArrayBufferRef: RefType<ArrayBuffer | null>,
 	captureHistoryImageDataRef: RefType<ImageData | undefined>,
 	imageSrc: string | undefined,
 ): Promise<void> {
@@ -173,19 +162,17 @@ export async function renderSwitchCaptureHistoryAction(
 		return;
 	}
 
-	if (!decoderWasmModuleArrayBufferRef.current) {
-		console.error(
-			"renderSwitchCaptureHistoryAction: decoderWasmModuleArrayBufferRef.current is not set",
-		);
-		return;
+	try {
+		const fileBuffer = await fetch(imageSrc).then((res) => res.arrayBuffer());
+		const pixels = await getPixels(fileBuffer);
+		captureHistoryImageDataRef.current = pixels.data;
+	} catch (error) {
+		// 解码失败时保留上一张有效数据
+		console.warn("renderSwitchCaptureHistoryAction decode failed", {
+			imageSrc,
+			error,
+		});
 	}
-
-	const fileBuffer = await fetch(imageSrc).then((res) => res.arrayBuffer());
-	const pixels = await getPixels(
-		decoderWasmModuleArrayBufferRef.current,
-		fileBuffer,
-	);
-	captureHistoryImageDataRef.current = pixels.data;
 }
 
 export function renderPixelsWorkerTerminateAction() {

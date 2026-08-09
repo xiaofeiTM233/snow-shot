@@ -121,22 +121,8 @@ const colorPickerColorFormatList = [
 	ColorPickerColorFormat.HSL,
 ];
 
-let decoderWasmModuleArrayBuffer: ArrayBuffer =
-	undefined as unknown as ArrayBuffer;
-const getDecoderWasmModuleArrayBuffer = async (): Promise<ArrayBuffer> => {
-	if (decoderWasmModuleArrayBuffer) {
-		return decoderWasmModuleArrayBuffer;
-	}
-
-	decoderWasmModuleArrayBuffer =
-		typeof window !== "undefined"
-			? await fetch(
-					new URL("turbo-png/turbo_png_bg.wasm", import.meta.url),
-				).then((res) => res.arrayBuffer())
-			: (undefined as unknown as ArrayBuffer);
-
-	return decoderWasmModuleArrayBuffer;
-};
+// 切换历史截图解码期间的锁，避免旧 ref 被取色/预览绘制读到
+var isSwitchingHistory = false;
 
 const ColorPickerCore: React.FC<{
 	onCopyColor?: () => void;
@@ -283,7 +269,6 @@ const ColorPickerCore: React.FC<{
 	const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 	const previewOffscreenCanvasRef = useRef<OffscreenCanvas>(null);
 	const previewCanvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
-	const decoderWasmModuleArrayBufferRef = useRef<ArrayBuffer | null>(null);
 	const pickerPositionRef = useRef<MousePosition>(new MousePosition(0, 0));
 	const updatePickerPosition = useCallback(
 		(
@@ -633,6 +618,8 @@ const ColorPickerCore: React.FC<{
 			physicalX?: number,
 			physicalY?: number,
 		) => {
+			if (isSwitchingHistory) return;
+
 			const dragPosition = getDragPosition();
 
 			updateTransformRender(mouseX, mouseY, dragPosition);
@@ -664,8 +651,6 @@ const ColorPickerCore: React.FC<{
 			previewCanvasElement,
 			previewOffscreenCanvasRef,
 			previewCanvasCtxRef,
-			decoderWasmModuleArrayBufferRef,
-			await getDecoderWasmModuleArrayBuffer(),
 			previewOffscreenCanvasRef.current
 				? [previewOffscreenCanvasRef.current]
 				: undefined,
@@ -687,7 +672,6 @@ const ColorPickerCore: React.FC<{
 				renderWorker,
 				previewCanvasRef,
 				previewImageDataRef,
-				decoderWasmModuleArrayBufferRef,
 				imageBuffer,
 			);
 			imageDataReadyRef.current = true;
@@ -826,17 +810,21 @@ const ColorPickerCore: React.FC<{
 
 	const switchCaptureHistory = useCallback(
 		async (item: CaptureHistoryItem | undefined) => {
-			const fileUri = item
-				? convertFileSrc(await getCaptureHistoryImageAbsPath(item.file_name))
-				: undefined;
+			isSwitchingHistory = true;
+			try {
+				const fileUri = item
+					? convertFileSrc(await getCaptureHistoryImageAbsPath(item.file_name))
+					: undefined;
 			await switchCaptureHistoryAction(
 				renderWorker,
-				decoderWasmModuleArrayBufferRef,
 				captureHistoryImageDataRef,
 				fileUri,
 			);
-			imageDataReadyRef.current = true;
-			refreshMouseMove();
+			} finally {
+				isSwitchingHistory = false;
+				imageDataReadyRef.current = true;
+				refreshMouseMove();
+			}
 		},
 		[renderWorker, refreshMouseMove],
 	);

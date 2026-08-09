@@ -155,9 +155,6 @@ importers:
       tauri-plugin-macos-permissions-api:
         specifier: ^2.3.0
         version: 2.3.0
-      turbo-png:
-        specifier: 0.1.0
-        version: 0.1.0
       url-join:
         specifier: ^5.0.0
         version: 5.0.0
@@ -3080,6 +3077,7 @@ packages:
   git-raw-commits@5.0.1:
     resolution: {integrity: sha512-Y+csSm2GD/PCSh6Isd/WiMjNAydu0VBiG9J7EdQsNA5P9uXvLayqjmTsNlK5Gs9IhblFZqOU0yid5Il5JPoLiQ==}
     engines: {node: '>=18'}
+    deprecated: Deprecated and no longer maintained. Use @conventional-changelog/git-client instead.
     hasBin: true
 
   github-markdown-css@5.9.0:
@@ -4506,9 +4504,6 @@ packages:
 
   tunnel-rat@0.1.2:
     resolution: {integrity: sha512-lR5VHmkPhzdhrM092lI2nACsLO4QubF0/yoOhzX7c+wIpbN1GjHNzCc91QlpxBi+cnx8vVJ+Ur6vL5cEoQPFpQ==}
-
-  turbo-png@0.1.0:
-    resolution: {integrity: sha512-ChhFz/iDRmcm621PYLjHeeb2y2qGIehTDksdk4fgkzl/LekDYgU4d/g9ZOTP2Ug1bXLHnQq+fojZRyBB3/yovA==}
 
   type-detect@4.1.0:
     resolution: {integrity: sha512-Acylog8/luQ8L7il+geoSxhEkazvkslg7PSNKOX59mbB9cOveP5aq9h74Y7YU8yDpJwetzQQrfIwtf4Wp4LKcw==}
@@ -9900,8 +9895,6 @@ snapshots:
       - '@types/react'
       - immer
       - react
-
-  turbo-png@0.1.0: {}
 
   type-detect@4.1.0: {}
 
