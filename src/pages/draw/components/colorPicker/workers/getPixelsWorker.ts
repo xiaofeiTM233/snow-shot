@@ -27,23 +27,27 @@ self.onmessage = async (
 ) => {
 	const { imageBuffer, wasmModuleArrayBuffer } = event.data;
 
-	// initSync 不可重复调用，多次调用可能导致 wasm 静默卡死。
-	// 用 self 属性而非模块级变量，避免 rsbuild worker chunk 触发 TDZ。
-	if (!(self as any).__wasmInited) {
-		try {
-			initSync({
-				module: wasmModuleArrayBuffer,
-			});
-			(self as any).__wasmInited = true;
-		} catch (error) {
-			console.error("getPixelsWorker initSync failed", {
-				wasmByteLength: wasmModuleArrayBuffer?.byteLength,
-				imageByteLength: imageBuffer?.byteLength,
-				error,
-			});
-			throw error;
-		}
+	// initSync 不可重复调用：多次调用可能导致 wasm 静默卡死（trap 不抛 JS 异常）。
+	// 用 self 属性存 promise 避免模块级变量触发构建 TDZ，同时防止并发 initSync。
+	const me = self as any;
+	if (!me.__initPromise) {
+		me.__initPromise = (async () => {
+			try {
+				initSync({
+					module: wasmModuleArrayBuffer,
+				});
+			} catch (error) {
+				// 诊断：wasm 实例化失败，通常是 wasmModuleArrayBuffer 已 detached/损坏
+				console.error("getPixelsWorker initSync failed", {
+					wasmByteLength: wasmModuleArrayBuffer?.byteLength,
+					imageByteLength: imageBuffer?.byteLength,
+					error,
+				});
+				throw error;
+			}
+		})();
 	}
+	await me.__initPromise;
 
 	let imageData: Uint8Array;
 	try {
