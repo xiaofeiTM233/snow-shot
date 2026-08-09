@@ -53,6 +53,24 @@ export default defineConfig({
 				}),
 			],
 			optimization: {},
+			module: {
+				// rspack 内置把 .wasm 识别为 webassembly/async 模块，会尝试解析
+				// wasm 的 import 段（wbg），并且没有 default 导出，导致
+				// `import url from "xxx.wasm?url"` 构建失败。
+				// 这里用 rule[].type = "asset/resource" 强制覆盖内置处理，
+				// 让带 ?url 的 wasm 只作为静态资源 emit 并返回 URL。
+				rules: [
+					{
+						test: /\.wasm$/,
+						resourceQuery: /url/,
+						type: "asset/resource",
+						// 关闭内置 wasm parser 行为
+						generator: {
+							filename: "static/wasm/[name].[hash:8].wasm",
+						},
+					},
+				],
+			},
 		},
 	},
 });
