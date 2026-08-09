@@ -109,28 +109,10 @@ const handlePickColor = async (data: ColorPickerRenderPickColorData) => {
 	);
 };
 
-self.onmessage = async ({ data }: MessageEvent<ColorPickerRenderData>) => {
-	// 错误监听仅在首次 onmessage 时注册，避免模块顶层赋值被 rsbuild 重排触发 TDZ
-	if (!(self as any).__listenersInited) {
-		(self as any).__listenersInited = true;
-
-		self.onerror = (event) => {
-			console.error("[renderWorker] onerror", {
-				message: (event as ErrorEvent)?.message,
-				filename: (event as ErrorEvent)?.filename,
-				lineno: (event as ErrorEvent)?.lineno,
-				colno: (event as ErrorEvent)?.colno,
-				error: (event as ErrorEvent)?.error,
-			});
-		};
-		self.onunhandledrejection = (event) => {
-			console.error(
-				"[renderWorker] unhandledrejection",
-				(event as PromiseRejectionEvent)?.reason,
-			);
-		};
-	}
-
+// 处理单条消息，返回是否已自行回传结果（SwitchCaptureHistory 在 finally 里回传）
+const processMessage = async (
+	data: ColorPickerRenderData,
+): Promise<boolean> => {
 	let message: ColorPickerRenderResult;
 	switch (data.type) {
 		case ColorPickerRenderMessageType.InitPreviewCanvas:
@@ -168,7 +150,7 @@ self.onmessage = async ({ data }: MessageEvent<ColorPickerRenderData>) => {
 		case ColorPickerRenderMessageType.SwitchCaptureHistory:
 			// handleSwitchCaptureHistory 内部 finally 已负责回传结果，避免双发
 			await handleSwitchCaptureHistory(data);
-			return;
+			return true;
 		case ColorPickerRenderMessageType.PickColor: {
 			const pickColorResult = await handlePickColor(data);
 			message = {
@@ -180,6 +162,54 @@ self.onmessage = async ({ data }: MessageEvent<ColorPickerRenderData>) => {
 	}
 
 	self.postMessage(message);
+	return false;
+};
+
+// 串行消息队列：确保前一条消息处理完成后再处理下一条
+let processing = false;
+const messageQueue: ColorPickerRenderData[] = [];
+
+const flushQueue = async () => {
+	if (processing) return;
+	const next = messageQueue.shift();
+	if (!next) return;
+	processing = true;
+	try {
+		await processMessage(next);
+	} catch (error) {
+		console.error("[renderWorker] processMessage error", error);
+	} finally {
+		processing = false;
+		if (messageQueue.length > 0) {
+			flushQueue();
+		}
+	}
+};
+
+self.onmessage = ({ data }: MessageEvent<ColorPickerRenderData>) => {
+	// 错误监听仅在首次 onmessage 时注册，避免模块顶层赋值被 rsbuild 重排触发 TDZ
+	if (!(self as any).__listenersInited) {
+		(self as any).__listenersInited = true;
+
+		self.onerror = (event) => {
+			console.error("[renderWorker] onerror", {
+				message: (event as ErrorEvent)?.message,
+				filename: (event as ErrorEvent)?.filename,
+				lineno: (event as ErrorEvent)?.lineno,
+				colno: (event as ErrorEvent)?.colno,
+				error: (event as ErrorEvent)?.error,
+			});
+		};
+		self.onunhandledrejection = (event) => {
+			console.error(
+				"[renderWorker] unhandledrejection",
+				(event as PromiseRejectionEvent)?.reason,
+			);
+		};
+	}
+
+	messageQueue.push(data);
+	flushQueue();
 };
 
 // 父 Worker 终止前，必须手动终止子 Worker
