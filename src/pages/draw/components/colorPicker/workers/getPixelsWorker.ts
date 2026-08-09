@@ -1,8 +1,7 @@
-import { decode_to_rgba, initSync } from "turbo-png";
-
 type RequestPayload = {
 	id?: number;
-	wasmModuleArrayBuffer: ArrayBuffer;
+	// wasmModuleArrayBuffer 已不再使用，保留字段仅为接口兼容
+	wasmModuleArrayBuffer?: ArrayBuffer;
 	imageBuffer: ArrayBuffer;
 };
 
@@ -20,8 +19,7 @@ type ErrorResponse = {
 	error: string;
 };
 
-// 顶层全局错误监听：Worker 内的同步/异步崩溃（包括 wasm trap、
-// new ImageData 失败、未捕获 rejection）默认只进 Worker 线程专属
+// 顶层全局错误监听：Worker 内的同步/异步崩溃默认只进 Worker 线程专属
 // Console，主线程 Console 看不到。这里统一打出，便于定位崩溃点。
 self.onerror = (event) => {
 	console.error("[getPixelsWorker] onerror", {
@@ -39,78 +37,82 @@ self.onunhandledrejection = (event) => {
 	);
 };
 
-// 标记 wasm 是否已成功初始化。失败时清空，允许下次重试，
-// 避免 rejected promise 永久缓存导致后续所有调用都死锁无响应。
-let wasmInitialized = false;
-let initPromise: Promise<void> | undefined;
+/**
+ * 用浏览器原生 createImageBitmap 解码 PNG/任意图像格式为 RGBA 像素数据。
+ *
+ * 之前用 turbo-png 的 decode_to_rgba（wasm）解码，存在两个问题：
+ * 1. 对非 RGB/RGBA 的 PNG 有内存越界 bug，会触发 wasm trap，导致 worker
+ *    静默卡死（trap 不被 try/catch 捕获，wasm 实例直接损坏无法再调用）
+ * 2. wasm 模块的加载/初始化在某些用户环境下可能失败，且失败后原版
+ *    __initPromise 永久缓存 rejected 状态，导致后续所有解码都死锁
+ *
+ * 浏览器原生 createImageBitmap + OffscreenCanvas 方案：
+ * - 支持所有标准图像格式（PNG 所有 color type / bit depth / interlacing、
+ *   WebP、JPEG、BMP 等）
+ * - 绝不会 trap，任何格式错误都会抛 JS 异常被 try/catch 捕获
+ * - 不依赖 wasm，消除了 wasm 加载/初始化的所有环境相关问题
+ * - WebView2 138 完全支持 createImageBitmap 和 OffscreenCanvas
+ */
+async function decodeWithBrowser(
+	imageBuffer: ArrayBuffer,
+): Promise<{ data: Uint8ClampedArray; width: number; height: number }> {
+	const blob = new Blob([imageBuffer], { type: "image/png" });
+	const bitmap = await createImageBitmap(blob);
+	const width = bitmap.width;
+	const height = bitmap.height;
 
-async function ensureWasmInit(wasmModuleArrayBuffer: ArrayBuffer): Promise<void> {
-	if (wasmInitialized) return;
-	if (!initPromise) {
-		initPromise = (async () => {
-			try {
-				initSync({ module: wasmModuleArrayBuffer });
-				wasmInitialized = true;
-			} catch (error) {
-				// 诊断：wasm 实例化失败，通常是 wasmModuleArrayBuffer 已 detached/损坏
-				console.error("getPixelsWorker initSync failed", {
-					wasmByteLength: wasmModuleArrayBuffer?.byteLength,
-					error,
-				});
-				// 关键：清空 initPromise，允许下次重试，避免永久死锁
-				initPromise = undefined;
-				throw error;
-			}
-		})();
+	const offscreen = new OffscreenCanvas(width, height);
+	const ctx = offscreen.getContext("2d", { willReadFrequently: true });
+	if (!ctx) {
+		bitmap.close();
+		throw new Error("decodeWithBrowser: failed to get 2d context");
 	}
-	await initPromise;
+
+	ctx.drawImage(bitmap, 0, 0);
+	bitmap.close();
+
+	const imageData = ctx.getImageData(0, 0, width, height);
+	return { data: imageData.data, width, height };
 }
 
 self.onmessage = async (event: MessageEvent<RequestPayload>) => {
-	const { id, imageBuffer, wasmModuleArrayBuffer } = event.data;
+	const { id, imageBuffer } = event.data;
 
 	const fail = (message: string) => {
 		const resp: ErrorResponse = { id, error: message };
 		self.postMessage(resp);
 	};
 
-	// 1. wasm 初始化（失败时回传错误，绝不静默）
-	try {
-		await ensureWasmInit(wasmModuleArrayBuffer);
-	} catch (error) {
-		fail(`initSync failed: ${(error as Error)?.message ?? String(error)}`);
-		return;
-	}
+	// 解码：用浏览器原生 createImageBitmap（支持所有 PNG 格式，不会 trap）
+	let rgbaData: Uint8ClampedArray;
+	let imageWidth: number;
+	let imageHeight: number;
 
-	// 2. 解码
-	let imageData: Uint8Array;
 	try {
-		// 后 8 位包含图像的宽高
-		imageData = decode_to_rgba(new Uint8Array(imageBuffer));
+		const decoded = await decodeWithBrowser(imageBuffer);
+		rgbaData = decoded.data;
+		imageWidth = decoded.width;
+		imageHeight = decoded.height;
 	} catch (error) {
-		// 诊断：解码失败，通常是 imageBuffer 不是合法 PNG 或文件损坏
-		console.error("getPixelsWorker decode_to_rgba failed", {
-			wasmByteLength: wasmModuleArrayBuffer?.byteLength,
+		console.error("[getPixelsWorker] decodeWithBrowser failed", {
 			imageByteLength: imageBuffer?.byteLength,
-			// 打印 PNG 文件头签名（前 8 字节）便于判断是否为合法 PNG
 			pngSignature: Array.from(new Uint8Array(imageBuffer.slice(0, 8))),
 			error,
 		});
-		fail(`decode_to_rgba failed: ${(error as Error)?.message ?? String(error)}`);
+		fail(`decode failed: ${(error as Error)?.message ?? String(error)}`);
 		return;
 	}
 
-	// 3. 解析宽高并回传
+	// 构造 ImageData 并回传
 	try {
-		const dataView = new DataView(imageData.buffer, imageData.byteLength - 8);
-		const imageWidth = dataView.getUint32(0, true);
-		const imageHeight = dataView.getUint32(4, true);
+		// 复制到独立 buffer 以便 transfer 所有权，避免结构化克隆拷贝大图
+		const pixelBuffer = rgbaData.buffer.slice(0, rgbaData.byteLength);
 
 		const result: SuccessResponse = {
 			id,
 			result: {
 				data: new ImageData(
-					imageData.subarray(0, imageData.byteLength - 8) as ImageDataArray,
+					new Uint8ClampedArray(pixelBuffer),
 					imageWidth,
 					imageHeight,
 				),
@@ -118,7 +120,7 @@ self.onmessage = async (event: MessageEvent<RequestPayload>) => {
 				height: imageHeight,
 			},
 		};
-		self.postMessage(result);
+		self.postMessage(result, [pixelBuffer]);
 	} catch (error) {
 		fail(
 			`build ImageData failed: ${(error as Error)?.message ?? String(error)}`,
