@@ -56,10 +56,7 @@ export function renderInitImageDataAction(
 			return;
 		}
 
-		getPixels(
-			decoderWasmModuleArrayBufferRef.current,
-			imageSrc as ArrayBuffer,
-		)
+		getPixels(imageSrc as ArrayBuffer)
 			.then((pixels) => {
 				previewImageDataRef.current = pixels.data;
 
@@ -189,10 +186,7 @@ export async function renderSwitchCaptureHistoryAction(
 
 	try {
 		const fileBuffer = await fetch(imageSrc).then((res) => res.arrayBuffer());
-		const pixels = await getPixels(
-			decoderWasmModuleArrayBufferRef.current,
-			fileBuffer,
-		);
+		const pixels = await getPixels(fileBuffer);
 		captureHistoryImageDataRef.current = pixels.data;
 	} catch (error) {
 		// 诊断：记录具体是哪张历史截图解码失败，便于定位损坏/不支持格式/fetch 异常

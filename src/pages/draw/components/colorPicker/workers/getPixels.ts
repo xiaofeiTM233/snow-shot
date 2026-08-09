@@ -86,7 +86,6 @@ export function registerWebWorker() {
 }
 
 export async function getPixels(
-	wasmModuleArrayBuffer: ArrayBuffer,
 	imageBuffer: ArrayBuffer,
 ): Promise<DecodeResult> {
 	// 如果 worker 未初始化，自动创建
@@ -101,7 +100,7 @@ export async function getPixels(
 	const worker = decodeWorker;
 
 	return new Promise((resolve, reject) => {
-		// 超时：worker 静默卡死（wasm trap 或脚本错误未抛出），kill 重建
+		// 超时：worker 静默卡死（脚本错误未抛出等），kill 重建
 		const timer = setTimeout(() => {
 			pendingTasks.delete(id);
 			// 整个 worker 可能已经卡死，直接销毁，避免后续请求继续堆积
@@ -111,19 +110,8 @@ export async function getPixels(
 
 		pendingTasks.set(id, { resolve, reject, timer });
 
-		// wasm module buffer 在 worker 内 initSync 时可能被底层引擎 detached/消费，
-		// 复用全局单例会导致后续解码全部失败。每次传独立拷贝避免污染原 buffer。
-		const wasmCopy = wasmModuleArrayBuffer.slice();
-		worker.postMessage(
-			{
-				id,
-				imageBuffer,
-				wasmModuleArrayBuffer: wasmCopy,
-			},
-			// 用 transfer list 转移 buffer 所有权，减少拷贝开销
-			// 注意：wasmModuleArrayBuffer 已 slice 出独立副本 wasmCopy，可安全 transfer
-			[imageBuffer, wasmCopy],
-		);
+		// 用 transfer list 转移 imageBuffer 所有权，减少拷贝开销
+		worker.postMessage({ id, imageBuffer }, [imageBuffer]);
 	});
 }
 
