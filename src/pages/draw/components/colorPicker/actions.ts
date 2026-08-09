@@ -228,6 +228,7 @@ export const switchCaptureHistoryAction = async (
 		// 兜底：worker 彻底无响应时避免 Promise 永久 pending
 		const timer = setTimeout(() => {
 			renderWorker?.removeEventListener("message", handleMessage);
+			console.warn("[CP-DIAG] switchCaptureHistoryAction: TIMER TIMEOUT (1000ms)", { imageSrc });
 			resolve(undefined);
 		}, 1000);
 
@@ -236,6 +237,7 @@ export const switchCaptureHistoryAction = async (
 		) => {
 			const { type, payload } = event.data;
 			if (type === ColorPickerRenderMessageType.SwitchCaptureHistory) {
+				console.log("[CP-DIAG] switchCaptureHistoryAction: worker replied", { imageSrc });
 				clearTimeout(timer);
 				resolve(payload);
 				renderWorker?.removeEventListener("message", handleMessage);

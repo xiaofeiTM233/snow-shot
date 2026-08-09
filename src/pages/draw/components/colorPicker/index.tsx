@@ -811,15 +811,21 @@ const ColorPickerCore: React.FC<{
 	const switchCaptureHistory = useCallback(
 		async (item: CaptureHistoryItem | undefined) => {
 			isSwitchingHistory = true;
+			console.log("[CP-DIAG] switchCaptureHistory start", {
+				hasItem: !!item,
+				fileName: item?.file_name,
+			});
 			try {
 				const fileUri = item
 					? convertFileSrc(await getCaptureHistoryImageAbsPath(item.file_name))
 					: undefined;
-			await switchCaptureHistoryAction(
-				renderWorker,
-				captureHistoryImageDataRef,
-				fileUri,
-			);
+				console.log("[CP-DIAG] switchCaptureHistory fileUri", fileUri);
+				await switchCaptureHistoryAction(
+					renderWorker,
+					captureHistoryImageDataRef,
+					fileUri,
+				);
+				console.log("[CP-DIAG] switchCaptureHistory action resolved");
 			} finally {
 				isSwitchingHistory = false;
 				imageDataReadyRef.current = true;

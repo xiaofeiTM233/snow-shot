@@ -70,8 +70,20 @@ export function renderPutImageDataAction(
 	centerAuxiliaryLineColor: string | undefined,
 ): { color: [red: number, green: number, blue: number] } {
 	const ctx = previewCanvasCtxRef.current;
+	const useHistory = !!captureHistoryImageDataRef.current;
 	const imageData =
 		captureHistoryImageDataRef.current ?? previewImageDataRef.current;
+	console.log("[CP-DIAG] renderPutImageDataAction", {
+		useHistory,
+		historyW: captureHistoryImageDataRef.current?.width,
+		historyH: captureHistoryImageDataRef.current?.height,
+		previewW: previewImageDataRef.current?.width,
+		previewH: previewImageDataRef.current?.height,
+		x,
+		y,
+		colorX,
+		colorY,
+	});
 	if (!ctx || !imageData) {
 		return {
 			color: [0, 0, 0],
@@ -159,16 +171,26 @@ export async function renderSwitchCaptureHistoryAction(
 ): Promise<void> {
 	if (!imageSrc) {
 		captureHistoryImageDataRef.current = undefined;
+		console.log("[CP-DIAG] renderSwitchCaptureHistoryAction: cleared (no imageSrc)");
 		return;
 	}
 
 	try {
 		const fileBuffer = await fetch(imageSrc).then((res) => res.arrayBuffer());
+		console.log("[CP-DIAG] renderSwitchCaptureHistoryAction: fetched", {
+			imageSrc,
+			byteLength: fileBuffer.byteLength,
+		});
 		const pixels = await getPixels(fileBuffer);
 		captureHistoryImageDataRef.current = pixels.data;
+		console.log("[CP-DIAG] renderSwitchCaptureHistoryAction: decoded", {
+			width: pixels.width,
+			height: pixels.height,
+			dataLen: pixels.data.data.length,
+		});
 	} catch (error) {
 		// 解码失败时保留上一张有效数据
-		console.warn("renderSwitchCaptureHistoryAction decode failed", {
+		console.warn("[CP-DIAG] renderSwitchCaptureHistoryAction decode failed", {
 			imageSrc,
 			error,
 		});
