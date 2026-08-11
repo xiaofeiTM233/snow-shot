@@ -1,5 +1,7 @@
 use image::{DynamicImage, GenericImageView};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{
+    IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+};
 use serde::{Deserialize, Serialize};
 use snow_shot_app_shared::ElementRect;
 use xcap::Monitor;
