@@ -181,14 +181,16 @@ impl MonitorInfo {
             use crate::windows_capture_image;
 
             let mut capture_hdr_image: Option<image::DynamicImage> = None;
-            if self.monitor_hdr_info.hdr_enabled
-                && capture_option.correct_hdr_color_algorithm != CorrectHdrColorAlgorithm::None
-            {
+            // HDR 显示器始终使用 windows-capture（Graphics Capture API），
+            // 因为 xcap 在 HDR/宽色域显示器上会截到黑帧。
+            // 是否做 HDR 亮度校正由 algorithm 决定（在 process_captured_image 内处理）。
+            if self.monitor_hdr_info.hdr_enabled {
                 capture_hdr_image = match windows_capture_image::capture_monitor_image(
                     &self,
                     None,
                     crop_area,
                     capture_option.color_format,
+                    capture_option.correct_hdr_color_algorithm,
                 ) {
                     Ok(image) => Some(image),
                     Err(e) => {
@@ -224,6 +226,9 @@ pub enum CorrectHdrColorAlgorithm {
 }
 
 impl MonitorList {
+    // ignore_sdr_info 仅作保留参数（历史语义为"是否跳过 HDR 信息读取"），
+    // 现在 HDR 显示器识别始终进行，是否做亮度校正改由 CaptureOption 中的 algorithm 控制，
+    // 以避免 xcap 在 HDR/宽色域显示器上截到黑帧。
     fn get_monitors(
         region: Option<ElementRect>,
         #[allow(unused_variables)] ignore_sdr_info: bool,
@@ -241,18 +246,14 @@ impl MonitorList {
         };
 
         #[cfg(target_os = "windows")]
-        let monitor_hdr_info_map = if ignore_sdr_info {
-            None
-        } else {
-            match monitor_hdr_info::get_all_monitors_sdr_info() {
-                Ok(monitor_hdr_info_map) => Some(monitor_hdr_info_map),
-                Err(e) => {
-                    log::error!(
-                        "[MonitorList::get_monitors] Failed to get monitor HDR info: {:?}",
-                        e
-                    );
-                    None
-                }
+        let monitor_hdr_info_map = match monitor_hdr_info::get_all_monitors_sdr_info() {
+            Ok(monitor_hdr_info_map) => Some(monitor_hdr_info_map),
+            Err(e) => {
+                log::error!(
+                    "[MonitorList::get_monitors] Failed to get monitor HDR info: {:?}",
+                    e
+                );
+                None
             }
         };
 
