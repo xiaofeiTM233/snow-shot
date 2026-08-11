@@ -19,10 +19,6 @@ use crate::monitor_info::{ColorFormat, CorrectHdrColorAlgorithm, MonitorInfo};
 /// 默认值为 true，当遇到 BorderConfigUnsupported 错误时会设置为 false
 static SUPPORTS_WITHOUT_BORDER: AtomicBool = AtomicBool::new(true);
 
-/// 全局标志：标记系统是否支持 HDR 图像捕获
-/// 默认值为 true，当遇到 HDR 捕获错误时会设置为 false
-static SUPPORT_HDR_IMAGE: AtomicBool = AtomicBool::new(true);
-
 struct CaptureFlags {
     on_frame_arrived: Sender<(Vec<u8>, usize, usize)>,
     crop_area: Option<ElementRect>,
@@ -363,13 +359,6 @@ pub fn capture_monitor_image(
         capture_is_rgba8
     );
 
-    // 检查系统是否支持 HDR 图像捕获
-    if !SUPPORT_HDR_IMAGE.load(Ordering::Relaxed) {
-        return Err(format!(
-            "[windows_capture_image::capture_monitor_image] HDR image capture is not supported on this system"
-        ));
-    }
-
     let (sender, receiver) = channel();
 
     // 根据全局标志选择边框设置
@@ -459,6 +448,7 @@ pub fn capture_monitor_image(
                             CaptureFlags {
                                 on_frame_arrived: retry_sender,
                                 crop_area,
+                                capture_is_rgba8,
                             },
                         );
 
@@ -476,6 +466,7 @@ pub fn capture_monitor_image(
                             CaptureFlags {
                                 on_frame_arrived: retry_sender,
                                 crop_area,
+                                capture_is_rgba8,
                             },
                         );
 
@@ -490,11 +481,9 @@ pub fn capture_monitor_image(
                         process_captured_image(retry_receiver, monitor, color_format, algorithm, capture_is_rgba8)
                     }
                     Err(retry_e) => {
-                        // 重试失败，标记系统不支持 HDR 图像捕获
-                        SUPPORT_HDR_IMAGE.store(false, Ordering::Relaxed);
-
+                        // 重试失败，本次回退到 xcap（由上层处理），不永久禁用 WGC
                         log::error!(
-                            "[windows_capture_image::capture_monitor_image] HDR image capture failed after retry, marking as unsupported: {:?}",
+                            "[windows_capture_image::capture_monitor_image] HDR image capture failed after retry: {:?}",
                             retry_e
                         );
 
@@ -506,11 +495,9 @@ pub fn capture_monitor_image(
                 }
             }
             _ => {
-                // 标记系统不支持 HDR 图像捕获，后续请求将直接返回错误
-                SUPPORT_HDR_IMAGE.store(false, Ordering::Relaxed);
-
+                // 本次 WGC 启动失败，回退到 xcap（由上层处理），不永久禁用 WGC
                 log::error!(
-                    "[windows_capture_image::capture_monitor_image] HDR image capture failed, marking as unsupported: {:?}",
+                    "[windows_capture_image::capture_monitor_image] HDR image capture failed: {:?}",
                     e
                 );
 
