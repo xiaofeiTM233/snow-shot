@@ -13,23 +13,23 @@ use windows_capture::settings::{
     SecondaryWindowSettings, Settings,
 };
 
-use crate::monitor_info::{ColorFormat, MonitorInfo};
+use crate::monitor_info::{ColorFormat, CorrectHdrColorAlgorithm, MonitorInfo};
 
 /// 全局标志：标记系统是否支持 DrawBorderSettings::WithoutBorder
 /// 默认值为 true，当遇到 BorderConfigUnsupported 错误时会设置为 false
 static SUPPORTS_WITHOUT_BORDER: AtomicBool = AtomicBool::new(true);
 
-/// 全局标志：标记系统是否支持 HDR 图像捕获
-/// 默认值为 true，当遇到 HDR 捕获错误时会设置为 false
-static SUPPORT_HDR_IMAGE: AtomicBool = AtomicBool::new(true);
-
 struct CaptureFlags {
     on_frame_arrived: Sender<(Vec<u8>, usize, usize)>,
     crop_area: Option<ElementRect>,
+    capture_is_rgba8: bool,
 }
 
 struct WindowsCaptureImage {
     capture_info: Option<CaptureFlags>,
+    // 已收到的帧数。切换 capture engine / 颜色格式后 WGC 会话会重建，
+    // 首帧常为冷启动空帧（全黑/全零），需丢弃并从后续稳定帧取图。
+    frames_seen: u32,
 }
 
 impl GraphicsCaptureApiHandler for WindowsCaptureImage {
@@ -39,6 +39,7 @@ impl GraphicsCaptureApiHandler for WindowsCaptureImage {
     fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
         Ok(Self {
             capture_info: Some(ctx.flags),
+            frames_seen: 0,
         })
     }
 
@@ -47,6 +48,12 @@ impl GraphicsCaptureApiHandler for WindowsCaptureImage {
         frame: &mut Frame,
         capture_control: InternalCaptureControl,
     ) -> Result<(), Self::Error> {
+        self.frames_seen += 1;
+        // 丢弃冷启动首帧，避免「切换配置后首次截图黑屏」
+        if self.frames_seen == 1 {
+            return Ok(());
+        }
+
         capture_control.stop();
 
         let capture_info = match self.capture_info.take() {
@@ -84,8 +91,8 @@ impl GraphicsCaptureApiHandler for WindowsCaptureImage {
         let crop_height = (max_y - min_y) as usize;
         let pixels_count = crop_width * crop_height;
 
-        // Rgba16F 每个像素占 8 字节
-        let pixel_byte_count = 8;
+        // Rgba16F 每个像素占 8 字节，Rgba8 每个像素占 4 字节
+        let pixel_byte_count = if capture_info.capture_is_rgba8 { 4 } else { 8 };
         let mut pixels: Vec<u8> = unsafe {
             let mut pixels = Vec::with_capacity(pixels_count * pixel_byte_count);
             pixels.set_len(pixels_count * pixel_byte_count);
@@ -208,10 +215,6 @@ pub fn write_rgba16f_linear_to_rgba8(
         ))
         .to_f32()
             * hdr_scale;
-        let alpha_f = f16::from_bits(u16::from_le(
-            *(rgba16f_image.add(pixel_index * 8 + 6) as *const u16),
-        ))
-        .to_f32();
 
         // 使用快速饱和转换
         rgba8_image
@@ -223,18 +226,21 @@ pub fn write_rgba16f_linear_to_rgba8(
         rgba8_image
             .add(pixel_index * 4 + 2)
             .write(linear_to_srgb_byte(blue_f));
-        // Alpha 通道不需要 linear_to_srgb 转换，直接钳位到 [0, 1] 范围
-        rgba8_image
-            .add(pixel_index * 4 + 3)
-            .write((alpha_f.clamp(0.0, 1.0) * 255.0) as u8);
+        // 截图不需要透明通道。HDR(WGC Rgba16F) 捕获帧的 Alpha 通常为 0，
+        // 若直接写入会导致整幅图像透明、预览/保存显示为黑屏，因此强制不透明。
+        rgba8_image.add(pixel_index * 4 + 3).write(255);
     }
 }
 
 /// 处理捕获的图像数据
+/// capture_is_rgba8 表示底层 windows-capture 捕获到的是 Rgba8（普通 SDR 显示器）而非 Rgba16F（HDR），
+/// 此时无需做 HDR 线性转换，直接按 RGBA8 复制即可。
 fn process_captured_image(
     receiver: std::sync::mpsc::Receiver<(Vec<u8>, usize, usize)>,
     monitor: &MonitorInfo,
     color_format: ColorFormat,
+    algorithm: CorrectHdrColorAlgorithm,
+    capture_is_rgba8: bool,
 ) -> Result<image::DynamicImage, String> {
     let (rgba16f_image, image_width, image_height) = match receiver.recv() {
         Ok(image) => image,
@@ -258,10 +264,44 @@ fn process_captured_image(
         image_pixels
     };
 
-    let hdr_scale = 1000.0 / (monitor.monitor_hdr_info.sdr_white_level as f32);
+    // hdr_scale 决定 HDR 亮度如何压回 SDR 显示范围：
+    // - 软件未开启 HDR 颜色校正（algorithm == None）时不缩放（视为普通 SDR 渲染）
+    // - sdr_white_level == 0 表示 HDR 未真正激活（宽色域 SDR 或读取失败）时也不缩放
+    // - 真正开启 HDR 校正且白电平有效时用 1000 / sdr_white_level 压缩
+    let hdr_scale = if algorithm == CorrectHdrColorAlgorithm::None
+        || monitor.monitor_hdr_info.sdr_white_level == 0
+    {
+        1.0
+    } else {
+        1000.0 / (monitor.monitor_hdr_info.sdr_white_level as f32)
+    };
 
     let image_pixels_ptr = image_pixels.as_mut_ptr() as usize;
     let rgba16f_image_ptr = rgba16f_image.as_ptr() as usize;
+
+    // 走系统合成的 Rgba8 捕获（未开启 HDR 颜色校正，或开启但系统 HDR 当前关闭）：
+    // 数据是普通 8 位 RGBA（已是显示就绪的 sRGB），无需 HDR 线性转换，直接构造图像返回。
+    if capture_is_rgba8 {
+        let rgba8 = match image::RgbaImage::from_raw(
+            image_width as u32,
+            image_height as u32,
+            rgba16f_image,
+        ) {
+            Some(img) => img,
+            None => {
+                return Err(format!(
+                    "[windows_capture_image::process_captured_image] Failed to create rgba8 image from Rgba8 capture"
+                ));
+            }
+        };
+        // 同理强制不透明：系统合成 Rgba8 帧的 Alpha 偶尔为 0，会导致黑屏。
+        let mut rgba8 = rgba8;
+        for p in rgba8.pixels_mut() {
+            p.0[3] = 255;
+        }
+        return Ok(image::DynamicImage::ImageRgba8(rgba8));
+    }
+
     match color_format {
         ColorFormat::Rgb8 => {
             (0..result_image_pixels_count)
@@ -296,7 +336,9 @@ fn process_captured_image(
 
             match image::RgbaImage::from_raw(image_width as u32, image_height as u32, image_pixels)
             {
-                Some(rgba8_image) => Ok(image::DynamicImage::ImageRgba8(rgba8_image)),
+                Some(rgba8_image) => {
+                    Ok(image::DynamicImage::ImageRgba8(rgba8_image))
+                }
                 None => Err(format!(
                     "[windows_capture_image::process_captured_image] Failed to create rgba8 image"
                 )),
@@ -310,13 +352,29 @@ pub fn capture_monitor_image(
     window: Option<HWND>,
     crop_area: Option<ElementRect>,
     color_format: ColorFormat,
+    algorithm: CorrectHdrColorAlgorithm,
 ) -> Result<image::DynamicImage, String> {
-    // 检查系统是否支持 HDR 图像捕获
-    if !SUPPORT_HDR_IMAGE.load(Ordering::Relaxed) {
-        return Err(format!(
-            "[windows_capture_image::capture_monitor_image] HDR image capture is not supported on this system"
-        ));
-    }
+    // 是否使用 Rgba16F 取决于"是否开启 HDR 颜色校正"且"系统 HDR 当前开启"：
+    // - 未开启校正（algorithm == None）：全部走系统合成的 Rgba8 直拷，损失就损失，简单稳定；
+    // - 开启校正且系统 HDR 开启：用 Rgba16F 捕获线性帧并做亮度校正，不损失 HDR 信息；
+    // - 开启校正但系统 HDR 关闭：退化 Rgba8 直拷（避免 windows-capture 在 SDR 模式用
+    //   Rgba16F 截到黑帧，这是关闭系统 HDR 后黑屏的根因）。
+    // 注意：不能用 sdr_white_level 判断，它返回的是面板硬件能力（与系统 HDR 开关无关，
+    // 关掉 HDR 后仍为硬件固定值 > 0），无法反映"当前是否为 SDR 模式"。
+    let capture_is_rgba8 = !(algorithm != CorrectHdrColorAlgorithm::None
+        && monitor.monitor_hdr_info.hdr_enabled);
+    let capture_color_format = if capture_is_rgba8 {
+        windows_capture::settings::ColorFormat::Rgba8
+    } else {
+        windows_capture::settings::ColorFormat::Rgba16F
+    };
+
+    log::info!(
+        "[windows_capture_image::capture_monitor_image] hdr_enabled: {}, sdr_white_level: {}, capture_is_rgba8: {}",
+        monitor.monitor_hdr_info.hdr_enabled,
+        monitor.monitor_hdr_info.sdr_white_level,
+        capture_is_rgba8
+    );
 
     let (sender, receiver) = channel();
 
@@ -343,10 +401,11 @@ pub fn capture_monitor_image(
                 SecondaryWindowSettings::Default,
                 MinimumUpdateIntervalSettings::Default,
                 DirtyRegionSettings::Default,
-                windows_capture::settings::ColorFormat::Rgba16F,
+                capture_color_format,
                 CaptureFlags {
                     on_frame_arrived: sender,
                     crop_area,
+                    capture_is_rgba8,
                 },
             );
 
@@ -360,10 +419,11 @@ pub fn capture_monitor_image(
                 SecondaryWindowSettings::Default,
                 MinimumUpdateIntervalSettings::Default,
                 DirtyRegionSettings::Default,
-                windows_capture::settings::ColorFormat::Rgba16F,
+                capture_color_format,
                 CaptureFlags {
                     on_frame_arrived: sender,
                     crop_area,
+                    capture_is_rgba8,
                 },
             );
 
@@ -376,7 +436,7 @@ pub fn capture_monitor_image(
     match start_result {
         Ok(_capturer) => {
             // 启动成功，处理捕获的图像
-            process_captured_image(receiver, monitor, color_format)
+            process_captured_image(receiver, monitor, color_format, algorithm, capture_is_rgba8)
         }
         Err(e) => match e {
             GraphicsCaptureApiError::GraphicsCaptureApiError(
@@ -401,10 +461,11 @@ pub fn capture_monitor_image(
                             SecondaryWindowSettings::Default,
                             MinimumUpdateIntervalSettings::Default,
                             DirtyRegionSettings::Default,
-                            windows_capture::settings::ColorFormat::Rgba16F,
+                            capture_color_format,
                             CaptureFlags {
                                 on_frame_arrived: retry_sender,
                                 crop_area,
+                                capture_is_rgba8,
                             },
                         );
 
@@ -418,10 +479,11 @@ pub fn capture_monitor_image(
                             SecondaryWindowSettings::Default,
                             MinimumUpdateIntervalSettings::Default,
                             DirtyRegionSettings::Default,
-                            windows_capture::settings::ColorFormat::Rgba16F,
+                            capture_color_format,
                             CaptureFlags {
                                 on_frame_arrived: retry_sender,
                                 crop_area,
+                                capture_is_rgba8,
                             },
                         );
 
@@ -433,14 +495,12 @@ pub fn capture_monitor_image(
                 match start_result {
                     Ok(_capturer) => {
                         // 重试成功，处理捕获的图像
-                        process_captured_image(retry_receiver, monitor, color_format)
+                        process_captured_image(retry_receiver, monitor, color_format, algorithm, capture_is_rgba8)
                     }
                     Err(retry_e) => {
-                        // 重试失败，标记系统不支持 HDR 图像捕获
-                        SUPPORT_HDR_IMAGE.store(false, Ordering::Relaxed);
-
+                        // 重试失败，本次回退到 xcap（由上层处理），不永久禁用 WGC
                         log::error!(
-                            "[windows_capture_image::capture_monitor_image] HDR image capture failed after retry, marking as unsupported: {:?}",
+                            "[windows_capture_image::capture_monitor_image] HDR image capture failed after retry: {:?}",
                             retry_e
                         );
 
@@ -452,11 +512,9 @@ pub fn capture_monitor_image(
                 }
             }
             _ => {
-                // 标记系统不支持 HDR 图像捕获，后续请求将直接返回错误
-                SUPPORT_HDR_IMAGE.store(false, Ordering::Relaxed);
-
+                // 本次 WGC 启动失败，回退到 xcap（由上层处理），不永久禁用 WGC
                 log::error!(
-                    "[windows_capture_image::capture_monitor_image] HDR image capture failed, marking as unsupported: {:?}",
+                    "[windows_capture_image::capture_monitor_image] HDR image capture failed: {:?}",
                     e
                 );
 

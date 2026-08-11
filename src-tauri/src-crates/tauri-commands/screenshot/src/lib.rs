@@ -141,7 +141,10 @@ pub async fn capture_all_monitors(
 }
 
 #[cfg(target_os = "windows")]
-pub fn capture_window_hdr_image(window: &xcap::Window) -> Option<image::DynamicImage> {
+pub fn capture_window_hdr_image(
+    window: &xcap::Window,
+    algorithm: CorrectHdrColorAlgorithm,
+) -> Option<image::DynamicImage> {
     use snow_shot_app_utils::monitor_hdr_info::get_all_monitors_sdr_info;
     use snow_shot_app_utils::monitor_info::MonitorInfo;
     use snow_shot_app_utils::windows_capture_image;
@@ -182,6 +185,7 @@ pub fn capture_window_hdr_image(window: &xcap::Window) -> Option<image::DynamicI
         Some(HWND(window.hwnd().unwrap())),
         None,
         ColorFormat::Rgba8,
+        algorithm,
     ) {
         Ok(image) => Some(image),
         Err(error) => {
@@ -206,11 +210,7 @@ pub async fn capture_focused_window(
 
         let focused_window = xcap::Window::new(xcap::ImplWindow::new(hwnd));
 
-        let hdr_image = if correct_hdr_color_algorithm != CorrectHdrColorAlgorithm::None {
-            capture_window_hdr_image(&focused_window)
-        } else {
-            None
-        };
+        let hdr_image = capture_window_hdr_image(&focused_window, correct_hdr_color_algorithm);
 
         image = match hdr_image {
             Some(image) => image,
