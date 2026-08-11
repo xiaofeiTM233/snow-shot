@@ -173,7 +173,7 @@ pub fn capture_window_hdr_image(window: &xcap::Window) -> Option<image::DynamicI
         None => return None,
     };
 
-    if !hdr_info.hdr_enabled {
+    if !hdr_info.hdr_enabled || hdr_info.sdr_white_level == 0 {
         return None;
     }
 

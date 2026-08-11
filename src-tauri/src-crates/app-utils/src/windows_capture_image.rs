@@ -258,7 +258,8 @@ fn process_captured_image(
         image_pixels
     };
 
-    let hdr_scale = 1000.0 / (monitor.monitor_hdr_info.sdr_white_level as f32);
+    let sdr_white_level = monitor.monitor_hdr_info.sdr_white_level.max(1) as f32;
+    let hdr_scale = 1000.0 / sdr_white_level;
 
     let image_pixels_ptr = image_pixels.as_mut_ptr() as usize;
     let rgba16f_image_ptr = rgba16f_image.as_ptr() as usize;

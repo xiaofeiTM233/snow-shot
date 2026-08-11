@@ -182,6 +182,7 @@ impl MonitorInfo {
 
             let mut capture_hdr_image: Option<image::DynamicImage> = None;
             if self.monitor_hdr_info.hdr_enabled
+                && self.monitor_hdr_info.sdr_white_level > 0
                 && capture_option.correct_hdr_color_algorithm != CorrectHdrColorAlgorithm::None
             {
                 capture_hdr_image = match windows_capture_image::capture_monitor_image(
