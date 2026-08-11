@@ -1,6 +1,6 @@
 use image::{DynamicImage, GenericImageView};
 use rayon::iter::{
-    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+    IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
 use serde::{Deserialize, Serialize};
 use snow_shot_app_shared::ElementRect;
@@ -181,14 +181,18 @@ impl MonitorInfo {
             use crate::windows_capture_image;
 
             let mut capture_hdr_image: Option<image::DynamicImage> = None;
-            if self.monitor_hdr_info.hdr_enabled
-                && capture_option.correct_hdr_color_algorithm != CorrectHdrColorAlgorithm::None
-            {
+            // HDR / 宽色域显示器始终使用 windows-capture（Graphics Capture API），
+            // 因为 xcap 在 HDR/宽色域显示器上会截到黑帧。
+            // 判定条件：hdr_enabled（系统 HDR 开启）或 sdr_white_level>0（显示器为 HDR-capable，
+            // 即使关闭系统 HDR 也仍应用 WGC 的 Rgba8 路径避免黑帧）。
+            // 是否做 HDR 亮度校正由 algorithm 决定（在 process_captured_image 内处理）。
+            if self.monitor_hdr_info.hdr_enabled || self.monitor_hdr_info.sdr_white_level > 0 {
                 capture_hdr_image = match windows_capture_image::capture_monitor_image(
                     &self,
                     None,
                     crop_area,
                     capture_option.color_format,
+                    capture_option.correct_hdr_color_algorithm,
                 ) {
                     Ok(image) => Some(image),
                     Err(e) => {
@@ -224,6 +228,9 @@ pub enum CorrectHdrColorAlgorithm {
 }
 
 impl MonitorList {
+    // ignore_sdr_info 仅作保留参数（历史语义为"是否跳过 HDR 信息读取"），
+    // 现在 HDR 显示器识别始终进行，是否做亮度校正改由 CaptureOption 中的 algorithm 控制，
+    // 以避免 xcap 在 HDR/宽色域显示器上截到黑帧。
     fn get_monitors(
         region: Option<ElementRect>,
         #[allow(unused_variables)] ignore_sdr_info: bool,
@@ -241,18 +248,14 @@ impl MonitorList {
         };
 
         #[cfg(target_os = "windows")]
-        let monitor_hdr_info_map = if ignore_sdr_info {
-            None
-        } else {
-            match monitor_hdr_info::get_all_monitors_sdr_info() {
-                Ok(monitor_hdr_info_map) => Some(monitor_hdr_info_map),
-                Err(e) => {
-                    log::error!(
-                        "[MonitorList::get_monitors] Failed to get monitor HDR info: {:?}",
-                        e
-                    );
-                    None
-                }
+        let monitor_hdr_info_map = match monitor_hdr_info::get_all_monitors_sdr_info() {
+            Ok(monitor_hdr_info_map) => Some(monitor_hdr_info_map),
+            Err(e) => {
+                log::error!(
+                    "[MonitorList::get_monitors] Failed to get monitor HDR info: {:?}",
+                    e
+                );
+                None
             }
         };
 
@@ -391,25 +394,63 @@ impl MonitorList {
         }
 
         // 将每个显示器截取的图像，绘制到该图像上
+        // 注意：多显示器必须串行捕获，不能并行。
+        // 每个 monitor.capture() 内部会通过 windows-capture 启动一个 Graphics Capture (WGC) session，
+        // 而 WGC 的 D3D11 设备/帧缓冲在进程内共享，同时启动多个 session 会互相冲突导致黑屏。
+        // 单显示器因为只有 1 个 session 所以正常，多显示器并行就会黑屏。
+        // 这里同时把原始 monitor 引用一起携带，避免后续用过滤后 Vec 的 index 反查原始列表导致 offset 错位。
+        // 诊断日志：输出参与捕获的显示器数量、裁剪区域、目标色彩格式
+        log::info!(
+            "[MonitorInfoList::capture] multi-monitor capture start: monitors={}, color_format={:?}, crop_region={:?}",
+            monitors.len(),
+            capture_option.color_format,
+            crop_region
+        );
+
         let monitor_image_list = monitors
-            .par_iter()
+            .iter()
             .filter(|monitor| monitor.rect.overlaps(&crop_region.unwrap_or(ElementRect {
                 min_x: i32::MIN,
                 min_y: i32::MIN,
                 max_x: i32::MAX,
                 max_y: i32::MAX,
             })))
-            .map(|monitor| {
+            .filter_map(|monitor| {
                 let monitor_crop_region = if let Some(crop_region) = crop_region {
                     Some(monitor.get_monitor_crop_region(crop_region))
                 } else {
                     None
                 };
 
+                // 诊断日志：本次走 WGC 还是 xcap 回退
+                let capture_source = if monitor.monitor_hdr_info.hdr_enabled
+                    || monitor.monitor_hdr_info.sdr_white_level > 0
+                {
+                    "WGC(HDR)"
+                } else {
+                    "xcap(SDR/回退)"
+                };
+                log::info!(
+                    "[MonitorInfoList::capture] capturing monitor: name={:?}, rect={:?}, hdr_enabled={}, source={}",
+                    monitor.monitor.name(),
+                    monitor.rect,
+                    monitor.monitor_hdr_info.hdr_enabled,
+                    capture_source
+                );
+
                 let capture_image = monitor.capture(monitor_crop_region, exclude_window, capture_option);
 
                 match capture_image {
-                    Some(image) => Some((image, monitor_crop_region)),
+                    Some(image) => {
+                        log::info!(
+                            "[MonitorInfoList::capture] captured monitor OK: name={:?}, image_size={}x{}, color={:?}",
+                            monitor.monitor.name(),
+                            image.width(),
+                            image.height(),
+                            image.color()
+                        );
+                        Some((monitor, image, monitor_crop_region))
+                    }
                     None => {
                         log::warn!(
                             "[MonitorInfoList::capture] Failed to capture monitor image, monitor rect: {:?}",
@@ -420,11 +461,7 @@ impl MonitorList {
                     }
                 }
             })
-            .filter_map(|result| match result {
-                Some((image, monitor_crop_region)) => Some((image, monitor_crop_region)),
-                None => None,
-            })
-            .collect::<Vec<(image::DynamicImage, Option<ElementRect>)>>();
+            .collect::<Vec<(&MonitorInfo, image::DynamicImage, Option<ElementRect>)>>();
 
         if monitor_image_list.is_empty() {
             return Err(format!(
@@ -459,10 +496,8 @@ impl MonitorList {
 
         let capture_image_pixels_ptr = capture_image_pixels.as_mut_ptr() as usize;
 
-        monitor_image_list.par_iter().enumerate().for_each(
-            |(index, (monitor_image, monitor_crop_region))| {
-                let monitor = &monitors[index];
-
+        monitor_image_list.par_iter().for_each(
+            |(monitor, monitor_image, monitor_crop_region)| {
                 // 计算显示器在合并图像中的位置
                 let offset_x: i32;
                 let offset_y: i32;
@@ -478,6 +513,16 @@ impl MonitorList {
                     offset_x = monitor.rect.min_x - monitors_bounding_box.min_x;
                     offset_y = monitor.rect.min_y - monitors_bounding_box.min_y;
                 }
+
+                // 诊断日志：当前显示器在合并图中的偏移与尺寸
+                log::info!(
+                    "[MonitorInfoList::capture] overlay monitor: name={:?}, offset=({},{}) image_size={}x{}",
+                    monitor.monitor.name(),
+                    offset_x,
+                    offset_y,
+                    monitor_image.width(),
+                    monitor_image.height()
+                );
 
                 if offset_x < 0 || offset_y < 0 {
                     log::error!(
@@ -517,6 +562,14 @@ impl MonitorList {
                 .unwrap(),
             ),
         };
+
+        // 诊断日志：合成完成，输出最终尺寸
+        log::info!(
+            "[MonitorInfoList::capture] multi-monitor composite done: final_size={}x{}, monitors_composited={}",
+            capture_image.width(),
+            capture_image.height(),
+            monitor_image_list.len()
+        );
 
         Ok(capture_image)
     }
@@ -799,7 +852,10 @@ impl MonitorList {
                     && self
                         .0
                         .iter()
-                        .any(|monitor| monitor.monitor_hdr_info.hdr_enabled)
+                        .any(|monitor| {
+                            monitor.monitor_hdr_info.hdr_enabled
+                                || monitor.monitor_hdr_info.sdr_white_level > 0
+                        })
             }
 
             #[cfg(target_os = "macos")]
