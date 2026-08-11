@@ -397,6 +397,14 @@ impl MonitorList {
         // 而 WGC 的 D3D11 设备/帧缓冲在进程内共享，同时启动多个 session 会互相冲突导致黑屏。
         // 单显示器因为只有 1 个 session 所以正常，多显示器并行就会黑屏。
         // 这里同时把原始 monitor 引用一起携带，避免后续用过滤后 Vec 的 index 反查原始列表导致 offset 错位。
+        // 诊断日志：输出参与捕获的显示器数量、裁剪区域、目标色彩格式
+        log::info!(
+            "[MonitorInfoList::capture] multi-monitor capture start: monitors={}, color_format={:?}, crop_region={:?}",
+            monitors.len(),
+            capture_option.color_format,
+            crop_region
+        );
+
         let monitor_image_list = monitors
             .iter()
             .filter(|monitor| monitor.rect.overlaps(&crop_region.unwrap_or(ElementRect {
@@ -412,10 +420,33 @@ impl MonitorList {
                     None
                 };
 
+                // 诊断日志：本次走 WGC 还是 xcap 回退
+                let capture_source = if monitor.monitor_hdr_info.hdr_enabled {
+                    "WGC(HDR)"
+                } else {
+                    "xcap(SDR/回退)"
+                };
+                log::info!(
+                    "[MonitorInfoList::capture] capturing monitor: name={:?}, rect={:?}, hdr_enabled={}, source={}",
+                    monitor.monitor.name(),
+                    monitor.rect,
+                    monitor.monitor_hdr_info.hdr_enabled,
+                    capture_source
+                );
+
                 let capture_image = monitor.capture(monitor_crop_region, exclude_window, capture_option);
 
                 match capture_image {
-                    Some(image) => Some((image, monitor_crop_region, monitor)),
+                    Some(image) => {
+                        log::info!(
+                            "[MonitorInfoList::capture] captured monitor OK: name={:?}, image_size={}x{}, color={:?}",
+                            monitor.monitor.name(),
+                            image.width(),
+                            image.height(),
+                            image.color()
+                        );
+                        Some((image, monitor_crop_region, monitor))
+                    }
                     None => {
                         log::warn!(
                             "[MonitorInfoList::capture] Failed to capture monitor image, monitor rect: {:?}",
@@ -479,6 +510,16 @@ impl MonitorList {
                     offset_y = monitor.rect.min_y - monitors_bounding_box.min_y;
                 }
 
+                // 诊断日志：当前显示器在合并图中的偏移与尺寸
+                log::info!(
+                    "[MonitorInfoList::capture] overlay monitor: name={:?}, offset=({},{}) image_size={}x{}",
+                    monitor.monitor.name(),
+                    offset_x,
+                    offset_y,
+                    monitor_image.width(),
+                    monitor_image.height()
+                );
+
                 if offset_x < 0 || offset_y < 0 {
                     log::error!(
                         "[MonitorInfoList::capture] offset_x or offset_y is less than 0, offset_x: {:?}, offset_y: {:?}",
@@ -517,6 +558,14 @@ impl MonitorList {
                 .unwrap(),
             ),
         };
+
+        // 诊断日志：合成完成，输出最终尺寸
+        log::info!(
+            "[MonitorInfoList::capture] multi-monitor composite done: final_size={}x{}, monitors_composited={}",
+            capture_image.width(),
+            capture_image.height(),
+            monitor_image_list.len()
+        );
 
         Ok(capture_image)
     }
