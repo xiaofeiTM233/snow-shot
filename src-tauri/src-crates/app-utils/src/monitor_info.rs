@@ -392,15 +392,20 @@ impl MonitorList {
         }
 
         // 将每个显示器截取的图像，绘制到该图像上
+        // 注意：多显示器必须串行捕获，不能并行。
+        // 每个 monitor.capture() 内部会通过 windows-capture 启动一个 Graphics Capture (WGC) session，
+        // 而 WGC 的 D3D11 设备/帧缓冲在进程内共享，同时启动多个 session 会互相冲突导致黑屏。
+        // 单显示器因为只有 1 个 session 所以正常，多显示器并行就会黑屏。
+        // 这里同时把原始 monitor 引用一起携带，避免后续用过滤后 Vec 的 index 反查原始列表导致 offset 错位。
         let monitor_image_list = monitors
-            .par_iter()
+            .iter()
             .filter(|monitor| monitor.rect.overlaps(&crop_region.unwrap_or(ElementRect {
                 min_x: i32::MIN,
                 min_y: i32::MIN,
                 max_x: i32::MAX,
                 max_y: i32::MAX,
             })))
-            .map(|monitor| {
+            .filter_map(|monitor| {
                 let monitor_crop_region = if let Some(crop_region) = crop_region {
                     Some(monitor.get_monitor_crop_region(crop_region))
                 } else {
@@ -410,7 +415,7 @@ impl MonitorList {
                 let capture_image = monitor.capture(monitor_crop_region, exclude_window, capture_option);
 
                 match capture_image {
-                    Some(image) => Some((image, monitor_crop_region)),
+                    Some(image) => Some((image, monitor_crop_region, monitor)),
                     None => {
                         log::warn!(
                             "[MonitorInfoList::capture] Failed to capture monitor image, monitor rect: {:?}",
@@ -421,11 +426,7 @@ impl MonitorList {
                     }
                 }
             })
-            .filter_map(|result| match result {
-                Some((image, monitor_crop_region)) => Some((image, monitor_crop_region)),
-                None => None,
-            })
-            .collect::<Vec<(image::DynamicImage, Option<ElementRect>)>>();
+            .collect::<Vec<(&MonitorInfo, image::DynamicImage, Option<ElementRect>)>>();
 
         if monitor_image_list.is_empty() {
             return Err(format!(
@@ -460,10 +461,8 @@ impl MonitorList {
 
         let capture_image_pixels_ptr = capture_image_pixels.as_mut_ptr() as usize;
 
-        monitor_image_list.par_iter().enumerate().for_each(
-            |(index, (monitor_image, monitor_crop_region))| {
-                let monitor = &monitors[index];
-
+        monitor_image_list.par_iter().for_each(
+            |(monitor, monitor_image, monitor_crop_region)| {
                 // 计算显示器在合并图像中的位置
                 let offset_x: i32;
                 let offset_y: i32;
