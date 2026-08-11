@@ -1,7 +1,5 @@
 use image::{DynamicImage, GenericImageView};
-use rayon::iter::{
-    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
-};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use snow_shot_app_shared::ElementRect;
 use xcap::Monitor;
@@ -445,7 +443,7 @@ impl MonitorList {
                             image.height(),
                             image.color()
                         );
-                        Some((image, monitor_crop_region, monitor))
+                        Some((monitor, image, monitor_crop_region))
                     }
                     None => {
                         log::warn!(
