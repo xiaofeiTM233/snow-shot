@@ -26,6 +26,7 @@ static SUPPORT_HDR_IMAGE: AtomicBool = AtomicBool::new(true);
 struct CaptureFlags {
     on_frame_arrived: Sender<(Vec<u8>, usize, usize)>,
     crop_area: Option<ElementRect>,
+    capture_is_rgba8: bool,
 }
 
 struct WindowsCaptureImage {
@@ -84,8 +85,8 @@ impl GraphicsCaptureApiHandler for WindowsCaptureImage {
         let crop_height = (max_y - min_y) as usize;
         let pixels_count = crop_width * crop_height;
 
-        // Rgba16F 每个像素占 8 字节
-        let pixel_byte_count = 8;
+        // Rgba16F 每个像素占 8 字节，Rgba8 每个像素占 4 字节
+        let pixel_byte_count = if capture_info.capture_is_rgba8 { 4 } else { 8 };
         let mut pixels: Vec<u8> = unsafe {
             let mut pixels = Vec::with_capacity(pixels_count * pixel_byte_count);
             pixels.set_len(pixels_count * pixel_byte_count);
@@ -231,11 +232,14 @@ pub fn write_rgba16f_linear_to_rgba8(
 }
 
 /// 处理捕获的图像数据
+/// capture_is_rgba8 表示底层 windows-capture 捕获到的是 Rgba8（普通 SDR 显示器）而非 Rgba16F（HDR），
+/// 此时无需做 HDR 线性转换，直接按 RGBA8 复制即可。
 fn process_captured_image(
     receiver: std::sync::mpsc::Receiver<(Vec<u8>, usize, usize)>,
     monitor: &MonitorInfo,
     color_format: ColorFormat,
     algorithm: CorrectHdrColorAlgorithm,
+    capture_is_rgba8: bool,
 ) -> Result<image::DynamicImage, String> {
     let (rgba16f_image, image_width, image_height) = match receiver.recv() {
         Ok(image) => image,
@@ -273,6 +277,25 @@ fn process_captured_image(
 
     let image_pixels_ptr = image_pixels.as_mut_ptr() as usize;
     let rgba16f_image_ptr = rgba16f_image.as_ptr() as usize;
+
+    // 非真 HDR 显示器（sdr_white_level == 0，宽色域 SDR / HDR 系统开关关闭）使用 Rgba8 捕获，
+    // 数据为普通 8 位 RGBA，无需 HDR 线性转换，直接构造图像返回。
+    if capture_is_rgba8 {
+        let rgba8 = match image::RgbaImage::from_raw(
+            image_width as u32,
+            image_height as u32,
+            rgba16f_image,
+        ) {
+            Some(img) => img,
+            None => {
+                return Err(format!(
+                    "[windows_capture_image::process_captured_image] Failed to create rgba8 image from Rgba8 capture"
+                ));
+            }
+        };
+        return Ok(image::DynamicImage::ImageRgba8(rgba8));
+    }
+
     match color_format {
         ColorFormat::Rgb8 => {
             (0..result_image_pixels_count)
@@ -323,6 +346,23 @@ pub fn capture_monitor_image(
     color_format: ColorFormat,
     algorithm: CorrectHdrColorAlgorithm,
 ) -> Result<image::DynamicImage, String> {
+    // 非真 HDR 显示器（sdr_white_level == 0，宽色域 SDR / HDR 系统开关关闭）使用 Rgba8 捕获，
+    // 因为 windows-capture 在 SDR 显示器上使用 Rgba16F 会截到黑帧；
+    // 真正 HDR 显示器（白电平有效）才使用 Rgba16F 并做亮度校正。
+    let capture_is_rgba8 = monitor.monitor_hdr_info.sdr_white_level == 0;
+    let capture_color_format = if capture_is_rgba8 {
+        windows_capture::settings::ColorFormat::Rgba8
+    } else {
+        windows_capture::settings::ColorFormat::Rgba16F
+    };
+
+    log::info!(
+        "[windows_capture_image::capture_monitor_image] hdr_enabled: {}, sdr_white_level: {}, capture_is_rgba8: {}",
+        monitor.monitor_hdr_info.hdr_enabled,
+        monitor.monitor_hdr_info.sdr_white_level,
+        capture_is_rgba8
+    );
+
     // 检查系统是否支持 HDR 图像捕获
     if !SUPPORT_HDR_IMAGE.load(Ordering::Relaxed) {
         return Err(format!(
@@ -355,10 +395,11 @@ pub fn capture_monitor_image(
                 SecondaryWindowSettings::Default,
                 MinimumUpdateIntervalSettings::Default,
                 DirtyRegionSettings::Default,
-                windows_capture::settings::ColorFormat::Rgba16F,
+                capture_color_format,
                 CaptureFlags {
                     on_frame_arrived: sender,
                     crop_area,
+                    capture_is_rgba8,
                 },
             );
 
@@ -372,10 +413,11 @@ pub fn capture_monitor_image(
                 SecondaryWindowSettings::Default,
                 MinimumUpdateIntervalSettings::Default,
                 DirtyRegionSettings::Default,
-                windows_capture::settings::ColorFormat::Rgba16F,
+                capture_color_format,
                 CaptureFlags {
                     on_frame_arrived: sender,
                     crop_area,
+                    capture_is_rgba8,
                 },
             );
 
@@ -388,7 +430,7 @@ pub fn capture_monitor_image(
     match start_result {
         Ok(_capturer) => {
             // 启动成功，处理捕获的图像
-            process_captured_image(receiver, monitor, color_format, algorithm)
+            process_captured_image(receiver, monitor, color_format, algorithm, capture_is_rgba8)
         }
         Err(e) => match e {
             GraphicsCaptureApiError::GraphicsCaptureApiError(
@@ -413,7 +455,7 @@ pub fn capture_monitor_image(
                             SecondaryWindowSettings::Default,
                             MinimumUpdateIntervalSettings::Default,
                             DirtyRegionSettings::Default,
-                            windows_capture::settings::ColorFormat::Rgba16F,
+                            capture_color_format,
                             CaptureFlags {
                                 on_frame_arrived: retry_sender,
                                 crop_area,
@@ -430,7 +472,7 @@ pub fn capture_monitor_image(
                             SecondaryWindowSettings::Default,
                             MinimumUpdateIntervalSettings::Default,
                             DirtyRegionSettings::Default,
-                            windows_capture::settings::ColorFormat::Rgba16F,
+                            capture_color_format,
                             CaptureFlags {
                                 on_frame_arrived: retry_sender,
                                 crop_area,
@@ -445,7 +487,7 @@ pub fn capture_monitor_image(
                 match start_result {
                     Ok(_capturer) => {
                         // 重试成功，处理捕获的图像
-                        process_captured_image(retry_receiver, monitor, color_format, algorithm)
+                        process_captured_image(retry_receiver, monitor, color_format, algorithm, capture_is_rgba8)
                     }
                     Err(retry_e) => {
                         // 重试失败，标记系统不支持 HDR 图像捕获
