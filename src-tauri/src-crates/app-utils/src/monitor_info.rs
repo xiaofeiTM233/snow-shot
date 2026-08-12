@@ -875,21 +875,21 @@ impl MonitorList {
             }
         };
 
-        // 如果启用了 HDR，并且显示器开启了 HDR 信息
-        let mut need_reset_exclude_window = false;
+        // 设置截图窗口不参与捕获（WGC 下才需要）。
+        // 注意：这里设置后【不复位】为 WDA_NONE。截图窗口在存活期间
+        // 应始终保持排除状态，避免快速连续截图时「复位 false」与「下一次
+        // 设置 true」产生竞态，导致某一帧把截图控件也截进去。
+        // 窗口被 close_window_after_delay 销毁时，系统会自动清除该标记。
         if enable_exclude_window {
             if let Some(exclude_window) = exclude_window {
-                match crate::set_exclude_from_capture(exclude_window, true).await {
-                    Ok(_) => {
-                        need_reset_exclude_window = true;
-                    }
-                    Err(e) => {
-                        return Err(format!(
+                crate::set_exclude_from_capture(exclude_window, true)
+                    .await
+                    .map_err(|e| {
+                        format!(
                             "[MonitorInfoList::capture_core] failed to set exclude from capture: {:?}",
                             e
-                        ));
-                    }
-                }
+                        )
+                    })?;
             }
         }
 
@@ -897,20 +897,6 @@ impl MonitorList {
             self.capture_future(crop_region, exclude_window, capture_option,),
             Self::get_mag_color_effect_inverse(capture_option.correct_color_filter)
         );
-
-        if need_reset_exclude_window {
-            if let Some(exclude_window) = exclude_window {
-                match crate::set_exclude_from_capture(exclude_window, false).await {
-                    Ok(_) => (),
-                    Err(e) => {
-                        return Err(format!(
-                            "[MonitorInfoList::capture_core] failed to reset exclude from capture: {:?}",
-                            e
-                        ));
-                    }
-                }
-            }
-        }
 
         match result {
             Ok((mut image, color_effect)) => {
