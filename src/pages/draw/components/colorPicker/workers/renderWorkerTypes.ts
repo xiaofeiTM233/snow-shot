@@ -51,6 +51,7 @@ export type ColorPickerRenderSwitchCaptureHistoryData = {
 	type: ColorPickerRenderMessageType.SwitchCaptureHistory;
 	payload: {
 		imageSrc: string | undefined;
+		imageBuffer: ArrayBuffer | undefined;
 	};
 };
 

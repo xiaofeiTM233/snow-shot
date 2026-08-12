@@ -224,11 +224,24 @@ export const switchCaptureHistoryAction = async (
 	captureHistoryImageDataRef: RefType<ImageData | undefined>,
 	imageSrc: string | undefined,
 ): Promise<void> => {
+	// 主线程先 fetch 历史截图（worker 中 fetch asset URL 会挂起），
+	// 再把 ArrayBuffer transfer 给 worker 解码
+	let imageBuffer: ArrayBuffer | undefined;
+	if (imageSrc) {
+		try {
+			imageBuffer = await fetch(imageSrc).then((res) => res.arrayBuffer());
+		} catch (error) {
+			console.warn("switchCaptureHistoryAction: fetch imageSrc failed", {
+				imageSrc,
+				error,
+			});
+		}
+	}
+
 	return new Promise((resolve) => {
 		// 兜底：worker 彻底无响应时避免 Promise 永久 pending
 		const timer = setTimeout(() => {
 			renderWorker?.removeEventListener("message", handleMessage);
-			console.warn("[CP-DIAG] switchCaptureHistoryAction: TIMER TIMEOUT (1000ms)", { imageSrc });
 			resolve(undefined);
 		}, 1000);
 
@@ -237,7 +250,6 @@ export const switchCaptureHistoryAction = async (
 		) => {
 			const { type, payload } = event.data;
 			if (type === ColorPickerRenderMessageType.SwitchCaptureHistory) {
-				console.log("[CP-DIAG] switchCaptureHistoryAction: worker replied", { imageSrc });
 				clearTimeout(timer);
 				resolve(payload);
 				renderWorker?.removeEventListener("message", handleMessage);
@@ -250,16 +262,23 @@ export const switchCaptureHistoryAction = async (
 					type: ColorPickerRenderMessageType.SwitchCaptureHistory,
 					payload: {
 						imageSrc,
+						imageBuffer,
 					},
 				};
 
 			renderWorker.addEventListener("message", handleMessage);
 
-			renderWorker.postMessage(SwitchCaptureHistoryData);
+			// transfer ArrayBuffer 所有权，避免拷贝大图
+			if (imageBuffer) {
+				renderWorker.postMessage(SwitchCaptureHistoryData, [imageBuffer]);
+			} else {
+				renderWorker.postMessage(SwitchCaptureHistoryData);
+			}
 		} else {
 			renderSwitchCaptureHistoryAction(
 				captureHistoryImageDataRef,
 				imageSrc,
+				imageBuffer,
 			)
 				.then(() => {
 					clearTimeout(timer);

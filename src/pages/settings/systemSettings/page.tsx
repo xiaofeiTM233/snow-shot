@@ -253,7 +253,10 @@ export const SystemSettingsPage = () => {
 					id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.off",
 				}),
 				value: HdrColorCorrection.Off,
-			},
+				tooltipTitle: intl.formatMessage({
+					id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.off.tip",
+				}),
+				},
 		];
 	}, [intl]);
 
@@ -601,7 +604,7 @@ export const SystemSettingsPage = () => {
 													<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection" />
 												}
 												tooltipTitle={
-													<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection.tip" />
+													<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection.linear.tip" />
 												}
 											/>
 										}

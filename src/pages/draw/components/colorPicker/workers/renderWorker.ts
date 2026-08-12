@@ -80,11 +80,12 @@ const handleGetPreviewImageData = async () => {
 const handleSwitchCaptureHistory = async (
 	data: ColorPickerRenderSwitchCaptureHistoryData,
 ) => {
-	const { imageSrc } = data.payload;
+	const { imageSrc, imageBuffer } = data.payload;
 	try {
 		await renderSwitchCaptureHistoryAction(
 			captureHistoryImageDataRef,
 			imageSrc,
+			imageBuffer,
 		);
 	} catch (error) {
 		// 解码失败时不崩溃 worker，保留上一张有效数据
