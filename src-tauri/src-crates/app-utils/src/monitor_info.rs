@@ -183,14 +183,12 @@ impl MonitorInfo {
 
             let mut capture_hdr_image: Option<image::DynamicImage> = None;
             // 实际使用的采集方式：
-            //   Auto -> 根据当前显示器的 HDR 能力决定（HDR/宽色域走 WGC，否则 xcap）
+            //   Auto -> 仅当系统 HDR 真正开启（hdr_enabled）时走 WGC
             //   Wgc  -> 始终 windows-capture
             //   Xcap -> 始终 xcap
             let effective_method = match capture_option.capture_method {
                 CaptureMethod::Auto => {
-                    if self.monitor_hdr_info.hdr_enabled
-                        || self.monitor_hdr_info.sdr_white_level > 0
-                    {
+                    if self.monitor_hdr_info.hdr_enabled {
                         CaptureMethod::Wgc
                     } else {
                         CaptureMethod::Xcap
@@ -883,15 +881,15 @@ impl MonitorList {
             {
                 // 排除窗口（WDA_EXCLUDEFROMCAPTURE）仅在 WGC 下有效（xcap 不支持）。
                 //   Wgc  -> 始终排除截图自身窗口
-                //   Auto -> 仅当存在 HDR-capable 显示器（Auto 下这些屏会走 WGC）时排除
+                //   Auto -> 仅当存在系统 HDR 已开启的显示器（Auto 下这些屏会走 WGC）时排除
                 //   Xcap -> 不排除
                 // 排除可避免截太快把截图控件也截进去。
                 match capture_option.capture_method {
                     CaptureMethod::Wgc => true,
-                    CaptureMethod::Auto => self.0.iter().any(|monitor| {
-                        monitor.monitor_hdr_info.hdr_enabled
-                            || monitor.monitor_hdr_info.sdr_white_level > 0
-                    }),
+                    CaptureMethod::Auto => self
+                        .0
+                        .iter()
+                        .any(|monitor| monitor.monitor_hdr_info.hdr_enabled),
                     CaptureMethod::Xcap => false,
                 }
             }
