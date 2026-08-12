@@ -600,6 +600,9 @@ pub fn overlay_image_ptr(
 
     let target_image_width = target_image.width() as usize;
     let target_image_height = target_image.height() as usize;
+    // 源图像自身的真实通道数（如 Rgba8 为 4），必须与步进字节数一致，
+    // 不能用目标合并图的 channel_count，否则源每像素步长算错导致逐行错位（花屏）。
+    let target_image_channel_count = target_image.color().channel_count() as usize;
     let target_image_pixels = target_image.as_bytes();
     let target_image_pixels_ptr = target_image_pixels.as_ptr() as usize;
 
@@ -612,8 +615,8 @@ pub fn overlay_image_ptr(
         .for_each(|y| unsafe {
             let image_row_ptr = (image_pixels_ptr as *mut u8)
                 .add(image_base_index + y * image_width * channel_count);
-            let target_image_row_ptr =
-                (target_image_pixels_ptr as *mut u8).add(y * target_image_width * channel_count);
+            let target_image_row_ptr = (target_image_pixels_ptr as *mut u8)
+                .add(y * target_image_width * target_image_channel_count);
 
             std::ptr::copy_nonoverlapping(
                 target_image_row_ptr,
