@@ -26,6 +26,7 @@ pub async fn capture_all_monitors(
     enable_multiple_monitor: bool,
     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
     correct_color_filter: bool,
+    capture_method: CaptureMethod,
 ) -> Result<Response, String> {
     snow_shot_tauri_commands_screenshot::capture_all_monitors(
         app,
@@ -35,6 +36,7 @@ pub async fn capture_all_monitors(
         enable_multiple_monitor,
         correct_hdr_color_algorithm,
         correct_color_filter,
+        capture_method,
     )
     .await
 }
@@ -45,9 +47,11 @@ pub async fn capture_all_monitors(
 #[command]
 pub async fn capture_focused_window(
     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
+    capture_method: CaptureMethod,
 ) -> Result<Response, String> {
     snow_shot_tauri_commands_screenshot::capture_focused_window(
         correct_hdr_color_algorithm,
+        capture_method,
     )
     .await
 }
