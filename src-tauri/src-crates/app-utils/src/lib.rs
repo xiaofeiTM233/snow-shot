@@ -600,6 +600,9 @@ pub fn overlay_image_ptr(
 
     let target_image_width = target_image.width() as usize;
     let target_image_height = target_image.height() as usize;
+    // 源图像自身的真实通道数（如 Rgba8 为 4），必须与步进字节数一致，
+    // 不能用目标合并图的 channel_count，否则源每像素步长算错导致逐行错位（花屏）。
+    let target_image_channel_count = target_image.color().channel_count() as usize;
     let target_image_pixels = target_image.as_bytes();
     let target_image_pixels_ptr = target_image_pixels.as_ptr() as usize;
 
@@ -612,8 +615,8 @@ pub fn overlay_image_ptr(
         .for_each(|y| unsafe {
             let image_row_ptr = (image_pixels_ptr as *mut u8)
                 .add(image_base_index + y * image_width * channel_count);
-            let target_image_row_ptr =
-                (target_image_pixels_ptr as *mut u8).add(y * target_image_width * channel_count);
+            let target_image_row_ptr = (target_image_pixels_ptr as *mut u8)
+                .add(y * target_image_width * target_image_channel_count);
 
             std::ptr::copy_nonoverlapping(
                 target_image_row_ptr,
@@ -759,18 +762,30 @@ pub async fn write_bitmap_image_to_clipboard(
                 ));
             }
         };
-        let (image_width, image_height) = decoder.dimensions();
-        let image_width = image_width as usize;
-        let image_height = image_height as usize;
-        let image_total_bytes = decoder.total_bytes() as usize;
-        let mut rgba_image = Vec::with_capacity(image_total_bytes);
-        unsafe {
-            rgba_image.set_len(image_total_bytes);
-        }
-        decoder.read_image(&mut rgba_image).unwrap();
+        let _ = decoder.dimensions();
 
-        write_bitmap_image_to_clipboard_core(rgba_image.as_ref(), image_width, image_height)
-            .await?;
+        // 解码出的像素可能是 RGB8（如全屏截图生成的 Rgb8 PNG），但 DIB 写入函数
+        // 始终按 RGBA（4 字节/像素）解析，直接透传会导致逐行错位花屏。
+        // 因此统一转成 RGBA8 再交给 DIB 写入。
+        let dynamic_image = match image::DynamicImage::from_decoder(
+            image::codecs::png::PngDecoder::new(std::io::Cursor::new(image_data.clone())).unwrap(),
+        ) {
+            Ok(img) => img,
+            Err(_) => {
+                return Err(String::from(
+                    "[write_bitmap_image_to_clipboard] Failed to decode PNG to dynamic image",
+                ));
+            }
+        };
+        let rgba_image = dynamic_image.to_rgba8();
+        let (rgba_width, rgba_height) = rgba_image.dimensions();
+
+        write_bitmap_image_to_clipboard_core(
+            rgba_image.as_raw().as_ref(),
+            rgba_width as usize,
+            rgba_height as usize,
+        )
+        .await?;
 
         Ok(())
     }

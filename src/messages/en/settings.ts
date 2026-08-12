@@ -614,16 +614,21 @@ export const settings = {
 		"Correct Color Filter",
 	"settings.systemSettings.screenshotSettings.correctColorFilter.tip":
 		"When system applies color filter, captured image will also apply it. When enabled, will capture original colors",
-	"settings.systemSettings.screenshotSettings.enableCorrectHdrColor":
-		"Correct HDR Color",
-	"settings.systemSettings.screenshotSettings.enableCorrectHdrColor.tip":
-		"When HDR is enabled on monitor, captured screenshot will be converted to SDR color via specified algorithm. Different algorithms suit different color needs. Requires Windows 10 2004 or later on Windows",
-	"settings.systemSettings.screenshotSettings.enableCorrectHdrColor.algorithm":
-		"HDR Color Conversion Algorithm",
-	"settings.systemSettings.screenshotSettings.enableCorrectHdrColor.algorithm.linear":
+	"settings.systemSettings.screenshotSettings.captureMethod":
+		"Capture Method",
+	"settings.systemSettings.screenshotSettings.captureMethod.auto": "Auto",
+	"settings.systemSettings.screenshotSettings.captureMethod.wgc": "WGC",
+	"settings.systemSettings.screenshotSettings.captureMethod.xcap": "xcap",
+	"settings.systemSettings.screenshotSettings.hdrColorCorrection":
+		"HDR Color Correction",
+	"settings.systemSettings.screenshotSettings.hdrColorCorrection.linear":
 		"Linear",
-	"settings.systemSettings.screenshotSettings.enableCorrectHdrColor.algorithm.linear.tip":
-		"Suitable for converting SDR content in HDR to SDR, but when SDR content brightness in Windows HDR settings is not equal to 50%, HDR content may be severely distorted",
+	"settings.systemSettings.screenshotSettings.hdrColorCorrection.linear.tip":
+		"Capture a linear frame with Rgba16F and apply brightness correction to convert SDR content in HDR to SDR; but when SDR content brightness in Windows HDR settings is not equal to 50%, HDR content may be severely distorted. Only takes effect when system HDR is enabled. Requires Windows 10 2004 or later on Windows",
+	"settings.systemSettings.screenshotSettings.hdrColorCorrection.off":
+		"Off",
+	"settings.systemSettings.screenshotSettings.hdrColorCorrection.off.tip":
+		"Captures the system-composited SDR image directly (may look darker)",
 	"settings.systemSettings.screenshotSettings.enableBrowserClipboard.tip":
 		"Try using browser interface to quickly write clipboard content. If clipboard copy fails, disable this feature",
 	"settings.systemSettings.screenshotSettings.historyValidDuration.day":

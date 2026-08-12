@@ -39,6 +39,7 @@ pub struct CaptureOption {
     pub color_format: ColorFormat,
     pub correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
     pub correct_color_filter: bool,
+    pub capture_method: CaptureMethod,
 }
 
 impl MonitorInfo {
@@ -181,27 +182,42 @@ impl MonitorInfo {
             use crate::windows_capture_image;
 
             let mut capture_hdr_image: Option<image::DynamicImage> = None;
-            // HDR / 宽色域显示器始终使用 windows-capture（Graphics Capture API），
-            // 因为 xcap 在 HDR/宽色域显示器上会截到黑帧。
-            // 判定条件：hdr_enabled（系统 HDR 开启）或 sdr_white_level>0（显示器为 HDR-capable，
-            // 即使关闭系统 HDR 也仍应用 WGC 的 Rgba8 路径避免黑帧）。
-            // 是否做 HDR 亮度校正由 algorithm 决定（在 process_captured_image 内处理）。
-            if self.monitor_hdr_info.hdr_enabled || self.monitor_hdr_info.sdr_white_level > 0 {
-                capture_hdr_image = match windows_capture_image::capture_monitor_image(
-                    &self,
-                    None,
-                    crop_area,
-                    capture_option.color_format,
-                    capture_option.correct_hdr_color_algorithm,
-                ) {
-                    Ok(image) => Some(image),
-                    Err(e) => {
-                        log::error!(
-                            "[MonitorInfo::capture] Failed to capture HDR monitor image: {:?}",
-                            e
-                        );
-                        None
+            // 实际使用的采集方式：
+            //   Auto -> 仅当系统 HDR 真正开启（hdr_enabled）时走 WGC
+            //   Wgc  -> 始终 windows-capture
+            //   Xcap -> 始终 xcap
+            let effective_method = match capture_option.capture_method {
+                CaptureMethod::Auto => {
+                    if self.monitor_hdr_info.hdr_enabled {
+                        CaptureMethod::Wgc
+                    } else {
+                        CaptureMethod::Xcap
                     }
+                }
+                other => other,
+            };
+
+            match effective_method {
+                CaptureMethod::Wgc => {
+                    capture_hdr_image = match windows_capture_image::capture_monitor_image(
+                        &self,
+                        None,
+                        crop_area,
+                        capture_option.color_format,
+                        capture_option.correct_hdr_color_algorithm,
+                    ) {
+                        Ok(image) => Some(image),
+                        Err(e) => {
+                            log::error!(
+                                "[MonitorInfo::capture] Failed to capture WGC monitor image: {:?}",
+                                e
+                            );
+                            None
+                        }
+                    }
+                }
+                CaptureMethod::Xcap | CaptureMethod::Auto => {
+                    // xcap 路径：走下方 xcap 采集分支
                 }
             }
 
@@ -225,6 +241,21 @@ pub struct MonitorList(Vec<MonitorInfo>);
 pub enum CorrectHdrColorAlgorithm {
     None,
     Linear,
+}
+
+/// 截图采集方式（后端选择）
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq)]
+pub enum CaptureMethod {
+    /// 自动：根据显示器 HDR 能力选择。
+    /// HDR/宽色域显示器走 WGC（xcap 会截到黑帧），普通 SDR 显示器走 xcap。
+    #[serde(rename = "Auto")]
+    Auto,
+    /// Windows Graphics Capture（现代捕获 API）
+    #[serde(rename = "WGC")]
+    Wgc,
+    /// xcap（传统采集 API）
+    #[serde(rename = "Xcap")]
+    Xcap,
 }
 
 impl MonitorList {
@@ -848,14 +879,19 @@ impl MonitorList {
         let enable_exclude_window = {
             #[cfg(target_os = "windows")]
             {
-                capture_option.correct_hdr_color_algorithm != CorrectHdrColorAlgorithm::None
-                    && self
+                // 排除窗口（WDA_EXCLUDEFROMCAPTURE）仅在 WGC 下有效（xcap 不支持）。
+                //   Wgc  -> 始终排除截图自身窗口
+                //   Auto -> 仅当存在系统 HDR 已开启的显示器（Auto 下这些屏会走 WGC）时排除
+                //   Xcap -> 不排除
+                // 排除可避免截太快把截图控件也截进去。
+                match capture_option.capture_method {
+                    CaptureMethod::Wgc => true,
+                    CaptureMethod::Auto => self
                         .0
                         .iter()
-                        .any(|monitor| {
-                            monitor.monitor_hdr_info.hdr_enabled
-                                || monitor.monitor_hdr_info.sdr_white_level > 0
-                        })
+                        .any(|monitor| monitor.monitor_hdr_info.hdr_enabled),
+                    CaptureMethod::Xcap => false,
+                }
             }
 
             #[cfg(target_os = "macos")]
@@ -864,21 +900,21 @@ impl MonitorList {
             }
         };
 
-        // 如果启用了 HDR，并且显示器开启了 HDR 信息
-        let mut need_reset_exclude_window = false;
+        // 设置截图窗口不参与捕获（WGC 下才需要）。
+        // 注意：这里设置后【不复位】为 WDA_NONE。截图窗口在存活期间
+        // 应始终保持排除状态，避免快速连续截图时「复位 false」与「下一次
+        // 设置 true」产生竞态，导致某一帧把截图控件也截进去。
+        // 窗口被 close_window_after_delay 销毁时，系统会自动清除该标记。
         if enable_exclude_window {
             if let Some(exclude_window) = exclude_window {
-                match crate::set_exclude_from_capture(exclude_window, true).await {
-                    Ok(_) => {
-                        need_reset_exclude_window = true;
-                    }
-                    Err(e) => {
-                        return Err(format!(
+                crate::set_exclude_from_capture(exclude_window, true)
+                    .await
+                    .map_err(|e| {
+                        format!(
                             "[MonitorInfoList::capture_core] failed to set exclude from capture: {:?}",
                             e
-                        ));
-                    }
-                }
+                        )
+                    })?;
             }
         }
 
@@ -886,20 +922,6 @@ impl MonitorList {
             self.capture_future(crop_region, exclude_window, capture_option,),
             Self::get_mag_color_effect_inverse(capture_option.correct_color_filter)
         );
-
-        if need_reset_exclude_window {
-            if let Some(exclude_window) = exclude_window {
-                match crate::set_exclude_from_capture(exclude_window, false).await {
-                    Ok(_) => (),
-                    Err(e) => {
-                        return Err(format!(
-                            "[MonitorInfoList::capture_core] failed to reset exclude from capture: {:?}",
-                            e
-                        ));
-                    }
-                }
-            }
-        }
 
         match result {
             Ok((mut image, color_effect)) => {
@@ -1027,6 +1049,7 @@ mod tests {
                     color_format: ColorFormat::Rgb8,
                     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm::None,
                     correct_color_filter: false,
+                    capture_method: CaptureMethod::Wgc,
                 },
             )
             .await
@@ -1126,6 +1149,7 @@ mod tests {
                     color_format: ColorFormat::Rgb8,
                     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm::None,
                     correct_color_filter: false,
+                    capture_method: CaptureMethod::Wgc,
                 },
             )
             .await

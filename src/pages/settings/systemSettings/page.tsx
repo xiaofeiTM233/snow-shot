@@ -44,7 +44,8 @@ import { useStateRef } from "@/hooks/useStateRef";
 import {
 	type AppSettingsData,
 	AppSettingsGroup,
-	HdrColorAlgorithm,
+	CaptureMethod,
+	HdrColorCorrection,
 	HistoryValidDuration,
 	LogRetentionDuration,
 	RenderBackend,
@@ -222,23 +223,62 @@ export const SystemSettingsPage = () => {
 		return options;
 	}, [intl]);
 
-	const hdrColorAlgorithmOptions = useMemo((): SelectProps["options"] => {
+	const captureMethodOptions = useMemo((): SelectProps["options"] => {
+		return [
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.screenshotSettings.captureMethod.auto",
+				}),
+				value: CaptureMethod.Auto,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.screenshotSettings.captureMethod.wgc",
+				}),
+				value: CaptureMethod.Wgc,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.screenshotSettings.captureMethod.xcap",
+				}),
+				value: CaptureMethod.Xcap,
+			},
+		];
+	}, [intl]);
+
+	const hdrColorCorrectionOptions = useMemo((): SelectProps["options"] => {
 		return [
 			{
 				label: (
 					<IconLabel
 						title={intl.formatMessage({
-							id: "settings.systemSettings.screenshotSettings.enableCorrectHdrColor.algorithm.linear",
+							id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.linear",
 						})}
 						label={
-							<FormattedMessage id="settings.systemSettings.screenshotSettings.enableCorrectHdrColor.algorithm.linear" />
+							<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection.linear" />
 						}
 						tooltipTitle={
-							<FormattedMessage id="settings.systemSettings.screenshotSettings.enableCorrectHdrColor.algorithm.linear.tip" />
+							<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection.linear.tip" />
 						}
 					/>
 				),
-				value: HdrColorAlgorithm.Linear,
+				value: HdrColorCorrection.Linear,
+			},
+			{
+				label: (
+					<IconLabel
+						title={intl.formatMessage({
+							id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.off",
+						})}
+						label={
+							<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection.off" />
+						}
+						tooltipTitle={
+							<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection.off.tip" />
+						}
+					/>
+				),
+				value: HdrColorCorrection.Off,
 			},
 		];
 	}, [intl]);
@@ -570,37 +610,26 @@ export const SystemSettingsPage = () => {
 								</Col>
 
 								<Col span={12}>
-									<ProFormSwitch
+									<ProFormSelect
 										label={
-											<IconLabel
-												label={
-													<FormattedMessage id="settings.systemSettings.screenshotSettings.enableCorrectHdrColor" />
-												}
-												tooltipTitle={
-													<FormattedMessage id="settings.systemSettings.screenshotSettings.enableCorrectHdrColor.tip" />
-												}
-											/>
+											<FormattedMessage id="settings.systemSettings.screenshotSettings.captureMethod" />
 										}
-										name="correctHdrColor"
-										valuePropName="checked"
+										name="captureMethod"
+										options={captureMethodOptions}
 									/>
 								</Col>
 
 								<Col span={12}>
 									<ProFormSelect
 										label={
-											<IconLabel
-												label={
-													<FormattedMessage id="settings.systemSettings.screenshotSettings.enableCorrectHdrColor.algorithm" />
-												}
-											/>
+											<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection" />
 										}
-										name="correctHdrColorAlgorithm"
-										options={hdrColorAlgorithmOptions}
+										name="hdrColorCorrection"
+										options={hdrColorCorrectionOptions}
 									/>
 								</Col>
-							</>
-						)}
+								</>
+								)}
 
 						<Col span={12}>
 							<ProFormSwitch

@@ -3,6 +3,8 @@ import {
 	type AppSettingsData,
 	AppSettingsGroup,
 	HdrColorAlgorithm,
+	HdrColorCorrection,
+	CaptureMethod,
 } from "@/types/appSettings";
 import { appInfo } from "./log";
 import { getPlatform, getPlatformVersion } from "./platform";
@@ -33,8 +35,14 @@ export const getCorrectHdrColorAlgorithm = (
 		}
 	}
 
-	// 检查用户是否启用了 HDR 颜色校正
-	return appSettings[AppSettingsGroup.SystemScreenshot].correctHdrColor
-		? appSettings[AppSettingsGroup.SystemScreenshot].correctHdrColorAlgorithm
+	// 用户是否启用 HDR 颜色校正
+	return appSettings[AppSettingsGroup.SystemScreenshot].hdrColorCorrection ===
+		HdrColorCorrection.Linear
+		? HdrColorAlgorithm.Linear
 		: HdrColorAlgorithm.None;
+};
+
+/** 获取采集方式（Wgc / Xcap） */
+export const getCaptureMethod = (appSettings: AppSettingsData) => {
+	return appSettings[AppSettingsGroup.SystemScreenshot].captureMethod;
 };

@@ -360,6 +360,7 @@ const CaptureHistoryControllerCore: React.FC<{
 				await getCaptureHistoryImageAbsPath(captureHistoryParams.file_name),
 				getCorrectHdrColorAlgorithm(appSettings),
 				appSettings[AppSettingsGroup.SystemScreenshot].correctColorFilter,
+				appSettings[AppSettingsGroup.SystemScreenshot].captureMethod,
 			);
 			playCameraShutterSound();
 			imageBuffer = await captureFullScreenPromise;

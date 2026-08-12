@@ -628,6 +628,8 @@ const DrawPageCore: React.FC<{
 					getCorrectHdrColorAlgorithm(getAppSettings(), true),
 					getAppSettings()[AppSettingsGroup.SystemScreenshot]
 						.correctColorFilter,
+					getAppSettings()[AppSettingsGroup.SystemScreenshot]
+						.captureMethod,
 				).catch((error) => {
 					appError("[DrawPageCore] captureAllMonitors error", error);
 					return undefined;
@@ -664,6 +666,18 @@ const DrawPageCore: React.FC<{
 				capturing: capturingRef.current,
 				drawPageState: drawPageStateRef.current,
 			});
+
+			// 防重入：截图进行中，或上一次截图窗口尚未完全释放（WaitRelease/Release）
+			// 时，拒绝再次触发截图，避免快速连按导致 WGC 把截图控件也截进画面。
+			if (
+				capturingRef.current ||
+				drawPageStateRef.current === DrawPageState.WaitRelease ||
+				drawPageStateRef.current === DrawPageState.Release
+			) {
+				appInfo("[DIAG] excuteScreenshot: ignored (already capturing or releasing)");
+				return;
+			}
+
 			capturingRef.current = true;
 			setCaptureStateAction(true);
 			drawToolbarActionRef.current?.setEnable(false);

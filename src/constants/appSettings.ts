@@ -14,6 +14,8 @@ import {
 	FixedContentDoubleClickAction,
 	GifFormat,
 	HdrColorAlgorithm,
+	CaptureMethod,
+	HdrColorCorrection,
 	HistoryValidDuration,
 	KeyDisplayDirection,
 	LogRetentionDuration,
@@ -324,12 +326,12 @@ Priority order (highest to lowest):
 		tryWriteBitmapImageToClipboard: true,
 		/** 启用多显示器截图 */
 		enableMultipleMonitor: true,
-		/** 更正颜色滤镜 */
+			/** 更正颜色滤镜 */
 		correctColorFilter: true,
-		/** 更正 HDR 颜色  */
-		correctHdrColor: true,
-		/** HDR 颜色转换算法 */
-		correctHdrColorAlgorithm: HdrColorAlgorithm.Linear,
+		/** 采集方式 */
+		captureMethod: CaptureMethod.Auto,
+		/** HDR 颜色校正 */
+		hdrColorCorrection: HdrColorCorrection.Linear,
 	},
 	[AppSettingsGroup.FunctionTrayIcon]: {
 		iconClickAction: TrayIconClickAction.Screenshot,

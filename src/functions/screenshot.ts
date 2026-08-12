@@ -40,6 +40,7 @@ export const executeScreenshotFocusedWindow = async (
 	try {
 		const captureFocusedWindowPromise = captureFocusedWindow(
 			getCorrectHdrColorAlgorithm(appSettings),
+			getCaptureMethod(appSettings),
 		);
 		playCameraShutterSound();
 		imageBuffer = await captureFocusedWindowPromise;

@@ -3,7 +3,9 @@ use image::imageops::FilterType;
 use serde::Serialize;
 use snow_shot_app_scroll_screenshot_service::scroll_screenshot_capture_service::ScrollScreenshotCaptureService;
 use snow_shot_app_shared::ElementRect;
-use snow_shot_app_utils::monitor_info::{CaptureOption, ColorFormat, CorrectHdrColorAlgorithm};
+use snow_shot_app_utils::monitor_info::{
+	CaptureMethod, CaptureOption, ColorFormat, CorrectHdrColorAlgorithm,
+};
 use snow_shot_global_state::WebViewSharedBufferState;
 use std::path::PathBuf;
 use tauri::ipc::Response;
@@ -53,6 +55,7 @@ pub async fn scroll_screenshot_capture(
     max_y: i32,
     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
     correct_color_filter: bool,
+    capture_method: CaptureMethod,
 ) -> Result<(), String> {
     // 区域截图
     let image = {
@@ -95,6 +98,7 @@ pub async fn scroll_screenshot_capture(
                     color_format: ColorFormat::Rgba8,
                     correct_hdr_color_algorithm,
                     correct_color_filter,
+                    capture_method,
                 },
             )
             .await?

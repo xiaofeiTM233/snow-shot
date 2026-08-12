@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { HdrColorAlgorithm } from "@/types/appSettings";
+import type { HdrColorAlgorithm, CaptureMethod } from "@/types/appSettings";
 import { appError, formatErrorDetails } from "@/utils/log";
 
 export enum ScrollDirection {
@@ -64,6 +64,7 @@ export const scrollScreenshotCapture = async (
 	maxY: number,
 	correctHdrColorAlgorithm: HdrColorAlgorithm,
 	correctColorFilter: boolean,
+	captureMethod: CaptureMethod,
 ) => {
 	const result = await invoke<ArrayBuffer>("scroll_screenshot_capture", {
 		scrollImageList,
@@ -73,6 +74,7 @@ export const scrollScreenshotCapture = async (
 		maxY,
 		correctHdrColorAlgorithm,
 		correctColorFilter,
+		captureMethod,
 	});
 
 	return result;
