@@ -455,14 +455,20 @@ export const copyToClipboard = async (
 	selectRectParams: SelectRectParams | undefined,
 ) => {
 	let imageDataArrayBuffer: ArrayBuffer | undefined;
-	if (
+	// 已编码好的图像（ArrayBuffer/Blob，如截图历史、全屏截图）没有 selectRectParams，
+	// 不应被圆角/阴影样式限制挡在 DIB 复制之外；只要开启 tryWriteBitmapImageToClipboard 就走 DIB。
+	// 带圆角/阴影的 HTMLCanvasElement（区域截图）仍按原 selectRectParams 样式判断。
+	const isEncodedImage =
+		imageData instanceof ArrayBuffer || imageData instanceof Blob;
+	const useDib =
 		getPlatform() === "windows" &&
 		appSettings?.[AppSettingsGroup.SystemScreenshot]
 			.tryWriteBitmapImageToClipboard &&
-		selectRectParams &&
-		selectRectParams.shadowWidth === 0 &&
-		selectRectParams.radius === 0
-	) {
+		(isEncodedImage ||
+			(selectRectParams !== undefined &&
+				selectRectParams.shadowWidth === 0 &&
+				selectRectParams.radius === 0));
+	if (useDib) {
 		try {
 			if (imageData instanceof HTMLCanvasElement) {
 				if (
