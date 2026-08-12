@@ -1044,6 +1044,7 @@ mod tests {
                     color_format: ColorFormat::Rgb8,
                     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm::None,
                     correct_color_filter: false,
+                    capture_method: CaptureMethod::Wgc,
                 },
             )
             .await
@@ -1143,6 +1144,7 @@ mod tests {
                     color_format: ColorFormat::Rgb8,
                     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm::None,
                     correct_color_filter: false,
+                    capture_method: CaptureMethod::Wgc,
                 },
             )
             .await
