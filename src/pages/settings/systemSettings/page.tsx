@@ -247,6 +247,9 @@ export const SystemSettingsPage = () => {
 					id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.linear",
 				}),
 				value: HdrColorCorrection.Linear,
+				tooltipTitle: intl.formatMessage({
+					id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.linear.tip",
+				}),
 			},
 			{
 				label: intl.formatMessage({
@@ -256,7 +259,7 @@ export const SystemSettingsPage = () => {
 				tooltipTitle: intl.formatMessage({
 					id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.off.tip",
 				}),
-				},
+			},
 		];
 	}, [intl]);
 
@@ -599,14 +602,7 @@ export const SystemSettingsPage = () => {
 								<Col span={12}>
 									<ProFormSelect
 										label={
-											<IconLabel
-												label={
-													<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection" />
-												}
-												tooltipTitle={
-													<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection.linear.tip" />
-												}
-											/>
+											<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection" />
 										}
 										name="hdrColorCorrection"
 										options={hdrColorCorrectionOptions}

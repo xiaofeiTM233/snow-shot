@@ -72,6 +72,20 @@ export function renderPutImageDataAction(
 	const ctx = previewCanvasCtxRef.current;
 	const imageData =
 		captureHistoryImageDataRef.current ?? previewImageDataRef.current;
+	const useHistory = !!captureHistoryImageDataRef.current;
+	const tag = useHistory ? "HISTORY" : "PREVIEW";
+	if (useHistory) {
+		console.log("[CP-DIAG] renderPutImageDataAction src=" + tag, {
+			historyW: captureHistoryImageDataRef.current?.width,
+			historyH: captureHistoryImageDataRef.current?.height,
+			previewW: previewImageDataRef.current?.width,
+			previewH: previewImageDataRef.current?.height,
+			x,
+			y,
+			colorX,
+			colorY,
+		});
+	}
 	if (!ctx || !imageData) {
 		return {
 			color: [0, 0, 0],
@@ -158,22 +172,35 @@ export async function renderSwitchCaptureHistoryAction(
 	imageSrc: string | undefined,
 	imageBuffer: ArrayBuffer | undefined,
 ): Promise<void> {
+	console.log("[CP-DIAG] renderSwitchCaptureHistoryAction ENTER", {
+		imageSrc,
+		hasBuffer: !!imageBuffer,
+		bufferByteLength: imageBuffer?.byteLength,
+	});
 	if (!imageSrc && !imageBuffer) {
 		captureHistoryImageDataRef.current = undefined;
+		console.log("[CP-DIAG] renderSwitchCaptureHistoryAction: cleared (no src)");
 		return;
 	}
 
 	try {
 		// 优先使用主线程已 fetch 好的 buffer（worker 中 fetch asset URL 可能挂起），
 		// 仅在无 buffer（非 worker 分支）时才自行 fetch
-		const fileBuffer =
+		const fileBuffer: ArrayBuffer =
 			imageBuffer ??
 			(await fetch(imageSrc!).then((res) => res.arrayBuffer()));
+		console.log("[CP-DIAG] renderSwitchCaptureHistoryAction: have fileBuffer", {
+			byteLength: fileBuffer.byteLength,
+		});
 		const pixels = await getPixels(fileBuffer);
 		captureHistoryImageDataRef.current = pixels.data;
+		console.log("[CP-DIAG] renderSwitchCaptureHistoryAction: DECODED OK", {
+			width: pixels.width,
+			height: pixels.height,
+		});
 	} catch (error) {
 		// 解码失败时保留上一张有效数据
-		console.warn("renderSwitchCaptureHistoryAction decode failed", {
+		console.warn("[CP-DIAG] renderSwitchCaptureHistoryAction decode FAILED", {
 			imageSrc,
 			error,
 		});
