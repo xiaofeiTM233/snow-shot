@@ -274,8 +274,8 @@ fn process_captured_image(
     let image_pixels_ptr = image_pixels.as_mut_ptr() as usize;
     let rgba16f_image_ptr = rgba16f_image.as_ptr() as usize;
 
-    // 非真 HDR 显示器（sdr_white_level == 0，宽色域 SDR / HDR 系统开关关闭）使用 Rgba8 捕获，
-    // 数据为普通 8 位 RGBA，无需 HDR 线性转换，直接构造图像返回。
+    // 走系统合成的 Rgba8 捕获（未开启 HDR 颜色校正，或开启但系统 HDR 当前关闭）：
+    // 数据是普通 8 位 RGBA（已是显示就绪的 sRGB），无需 HDR 线性转换，直接构造图像返回。
     if capture_is_rgba8 {
         let rgba8 = match image::RgbaImage::from_raw(
             image_width as u32,
@@ -344,13 +344,15 @@ pub fn capture_monitor_image(
     color_format: ColorFormat,
     algorithm: CorrectHdrColorAlgorithm,
 ) -> Result<image::DynamicImage, String> {
-    // 是否使用 Rgba8 捕获取决于"系统 HDR 当前是否开启"：
-    // - 系统 HDR 开启（hdr_enabled）：显示器处于 HDR 模式，用 Rgba16F 捕获并做亮度校正；
-    // - 系统 HDR 关闭：显示器处于 SDR 模式，必须用 Rgba8，因为 windows-capture 在 SDR 模式
-    //   下用 Rgba16F 会截到黑帧（这也是关闭系统 HDR 后黑屏的根因）。
+    // 是否使用 Rgba16F 取决于"是否开启 HDR 颜色校正"且"系统 HDR 当前开启"：
+    // - 未开启校正（algorithm == None）：全部走系统合成的 Rgba8 直拷，损失就损失，简单稳定；
+    // - 开启校正且系统 HDR 开启：用 Rgba16F 捕获线性帧并做亮度校正，不损失 HDR 信息；
+    // - 开启校正但系统 HDR 关闭：退化 Rgba8 直拷（避免 windows-capture 在 SDR 模式用
+    //   Rgba16F 截到黑帧，这是关闭系统 HDR 后黑屏的根因）。
     // 注意：不能用 sdr_white_level 判断，它返回的是面板硬件能力（与系统 HDR 开关无关，
     // 关掉 HDR 后仍为硬件固定值 > 0），无法反映"当前是否为 SDR 模式"。
-    let capture_is_rgba8 = !monitor.monitor_hdr_info.hdr_enabled;
+    let capture_is_rgba8 = !(algorithm != CorrectHdrColorAlgorithm::None
+        && monitor.monitor_hdr_info.hdr_enabled);
     let capture_color_format = if capture_is_rgba8 {
         windows_capture::settings::ColorFormat::Rgba8
     } else {
