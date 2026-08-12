@@ -233,11 +233,12 @@ pub enum CorrectHdrColorAlgorithm {
 
 /// 截图采集方式（后端选择）
 #[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq)]
-#[serde(rename_all = "UPPERCASE")]
 pub enum CaptureMethod {
     /// Windows Graphics Capture（现代捕获 API）
+    #[serde(rename = "WGC")]
     Wgc,
     /// xcap（传统采集 API）
+    #[serde(rename = "Xcap")]
     Xcap,
 }
 
