@@ -616,6 +616,7 @@ export const settings = {
 		"When system applies color filter, captured image will also apply it. When enabled, will capture original colors",
 	"settings.systemSettings.screenshotSettings.captureMethod":
 		"Capture Method",
+	"settings.systemSettings.screenshotSettings.captureMethod.auto": "Auto",
 	"settings.systemSettings.screenshotSettings.captureMethod.wgc": "WGC",
 	"settings.systemSettings.screenshotSettings.captureMethod.xcap": "xcap",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection":

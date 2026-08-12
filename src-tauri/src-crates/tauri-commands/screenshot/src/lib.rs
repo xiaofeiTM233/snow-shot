@@ -214,9 +214,10 @@ pub async fn capture_focused_window(
 
         let focused_window = xcap::Window::new(xcap::ImplWindow::new(hwnd));
 
-        // 仅当采集方式选择 WGC 时才尝试 WGC 的 HDR 窗口捕获；
-        // 选择 xcap 时直接走 xcap，不做 WGC 尝试。
-        let hdr_image = if capture_method == CaptureMethod::Wgc {
+        // 选择 xcap 时直接走 xcap，不做 WGC 尝试；
+        // 选择 WGC 或自动（Auto，HDR 屏会走 WGC）时尝试 WGC 的 HDR 窗口捕获，
+        // 失败则回退 xcap（由下方 match 处理）。
+        let hdr_image = if capture_method != CaptureMethod::Xcap {
             capture_window_hdr_image(&focused_window, correct_hdr_color_algorithm)
         } else {
             None

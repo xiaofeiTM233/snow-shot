@@ -227,6 +227,12 @@ export const SystemSettingsPage = () => {
 		return [
 			{
 				label: intl.formatMessage({
+					id: "settings.systemSettings.screenshotSettings.captureMethod.auto",
+				}),
+				value: CaptureMethod.Auto,
+			},
+			{
+				label: intl.formatMessage({
 					id: "settings.systemSettings.screenshotSettings.captureMethod.wgc",
 				}),
 				value: CaptureMethod.Wgc,

@@ -586,6 +586,7 @@ export const settings = {
 		"系统应用颜色滤镜后，截取到的图片也将应用颜色滤镜，开启后将截取原始颜色",
 	"settings.systemSettings.screenshotSettings.captureMethod":
 		"采集方式",
+	"settings.systemSettings.screenshotSettings.captureMethod.auto": "自动",
 	"settings.systemSettings.screenshotSettings.captureMethod.wgc": "WGC",
 	"settings.systemSettings.screenshotSettings.captureMethod.xcap": "xcap",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection":
