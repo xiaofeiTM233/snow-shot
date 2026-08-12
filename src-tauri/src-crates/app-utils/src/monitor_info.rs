@@ -181,10 +181,12 @@ impl MonitorInfo {
             use crate::windows_capture_image;
 
             let mut capture_hdr_image: Option<image::DynamicImage> = None;
-            // HDR 显示器始终使用 windows-capture（Graphics Capture API），
+            // HDR / 宽色域显示器始终使用 windows-capture（Graphics Capture API），
             // 因为 xcap 在 HDR/宽色域显示器上会截到黑帧。
+            // 判定条件：hdr_enabled（系统 HDR 开启）或 sdr_white_level>0（显示器为 HDR-capable，
+            // 即使关闭系统 HDR 也仍应用 WGC 的 Rgba8 路径避免黑帧）。
             // 是否做 HDR 亮度校正由 algorithm 决定（在 process_captured_image 内处理）。
-            if self.monitor_hdr_info.hdr_enabled {
+            if self.monitor_hdr_info.hdr_enabled || self.monitor_hdr_info.sdr_white_level > 0 {
                 capture_hdr_image = match windows_capture_image::capture_monitor_image(
                     &self,
                     None,
@@ -421,7 +423,9 @@ impl MonitorList {
                 };
 
                 // 诊断日志：本次走 WGC 还是 xcap 回退
-                let capture_source = if monitor.monitor_hdr_info.hdr_enabled {
+                let capture_source = if monitor.monitor_hdr_info.hdr_enabled
+                    || monitor.monitor_hdr_info.sdr_white_level > 0
+                {
                     "WGC(HDR)"
                 } else {
                     "xcap(SDR/回退)"
@@ -848,7 +852,10 @@ impl MonitorList {
                     && self
                         .0
                         .iter()
-                        .any(|monitor| monitor.monitor_hdr_info.hdr_enabled)
+                        .any(|monitor| {
+                            monitor.monitor_hdr_info.hdr_enabled
+                                || monitor.monitor_hdr_info.sdr_white_level > 0
+                        })
             }
 
             #[cfg(target_os = "macos")]

@@ -326,7 +326,9 @@ fn process_captured_image(
 
             match image::RgbaImage::from_raw(image_width as u32, image_height as u32, image_pixels)
             {
-                Some(rgba8_image) => Ok(image::DynamicImage::ImageRgba8(rgba8_image)),
+                Some(rgba8_image) => {
+                    Ok(image::DynamicImage::ImageRgba8(rgba8_image))
+                }
                 None => Err(format!(
                     "[windows_capture_image::process_captured_image] Failed to create rgba8 image"
                 )),

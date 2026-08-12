@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use widestring::U16CString;
 use windows::Win32::Devices::Display::{
@@ -11,9 +10,6 @@ use windows::Win32::Devices::Display::{
     GetDisplayConfigBufferSizes, QDC_ONLY_ACTIVE_PATHS, QueryDisplayConfig,
 };
 use windows::Win32::Graphics::Gdi::DISPLAYCONFIG_COLOR_ENCODING;
-
-/// 全局标志：如果 get_all_monitors_sdr_info 失败，则禁用后续调用
-static HDR_INFO_DISABLED: AtomicBool = AtomicBool::new(false);
 
 /// 获取显示器的 SDR 白电平
 fn get_sdr_white_level_for_adapter(
@@ -58,13 +54,6 @@ impl Default for MonitorHdrInfo {
 
 /// 获取显示器信息
 pub fn get_all_monitors_sdr_info() -> Result<HashMap<String, MonitorHdrInfo>, String> {
-    // 检查是否已被禁用
-    if HDR_INFO_DISABLED.load(Ordering::Relaxed) {
-        return Err(
-            "[get_all_monitors_sdr_info] Function is disabled due to previous failures".to_string(),
-        );
-    }
-
     // 获取显示配置缓冲区大小
     let mut number_of_paths = 0;
     let mut number_of_modes = 0;
@@ -78,7 +67,6 @@ pub fn get_all_monitors_sdr_info() -> Result<HashMap<String, MonitorHdrInfo>, St
     } {
         Ok(_) => (),
         Err(e) => {
-            HDR_INFO_DISABLED.store(true, Ordering::Relaxed);
             return Err(format!(
                 "[get_all_monitors_sdr_info] Failed to get display config buffer sizes: {}",
                 e
@@ -87,7 +75,6 @@ pub fn get_all_monitors_sdr_info() -> Result<HashMap<String, MonitorHdrInfo>, St
     }
 
     if number_of_paths == 0 {
-        HDR_INFO_DISABLED.store(true, Ordering::Relaxed);
         return Err(format!(
             "[get_all_monitors_sdr_info] No display paths found"
         ));
@@ -113,7 +100,6 @@ pub fn get_all_monitors_sdr_info() -> Result<HashMap<String, MonitorHdrInfo>, St
     } {
         Ok(_) => (),
         Err(e) => {
-            HDR_INFO_DISABLED.store(true, Ordering::Relaxed);
             return Err(format!(
                 "[get_all_monitors_sdr_info] Failed to get display config: {}",
                 e
@@ -141,7 +127,6 @@ pub fn get_all_monitors_sdr_info() -> Result<HashMap<String, MonitorHdrInfo>, St
             match U16CString::from_vec_truncate(source.viewGdiDeviceName).to_string() {
                 Ok(name) => name,
                 Err(e) => {
-                    HDR_INFO_DISABLED.store(true, Ordering::Relaxed);
                     return Err(format!(
                         "[get_all_monitors_sdr_info] Failed to get device name: {:?}",
                         e
@@ -149,7 +134,6 @@ pub fn get_all_monitors_sdr_info() -> Result<HashMap<String, MonitorHdrInfo>, St
                 }
             }
         } else {
-            HDR_INFO_DISABLED.store(true, Ordering::Relaxed);
             return Err(format!(
                 "[get_all_monitors_sdr_info] Failed to DisplayConfigGetDeviceInfo"
             ));
