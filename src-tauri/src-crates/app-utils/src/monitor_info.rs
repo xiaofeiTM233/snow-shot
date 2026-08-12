@@ -182,10 +182,22 @@ impl MonitorInfo {
             use crate::windows_capture_image;
 
             let mut capture_hdr_image: Option<image::DynamicImage> = None;
-            // 采集方式由用户设置决定（capture_method），不再根据 HDR 能力自动选择。
-            //   Wgc  -> 始终使用 windows-capture（Graphics Capture API）
-            //   Xcap -> 始终使用 xcap（传统采集 API，HDR 屏可能截到黑帧/旧帧，由用户自行承担）
-            match capture_option.capture_method {
+            // 实际使用的采集方式：
+            //   Auto -> 仅当系统 HDR 真正开启（hdr_enabled）时走 WGC
+            //   Wgc  -> 始终 windows-capture
+            //   Xcap -> 始终 xcap
+            let effective_method = match capture_option.capture_method {
+                CaptureMethod::Auto => {
+                    if self.monitor_hdr_info.hdr_enabled {
+                        CaptureMethod::Wgc
+                    } else {
+                        CaptureMethod::Xcap
+                    }
+                }
+                other => other,
+            };
+
+            match effective_method {
                 CaptureMethod::Wgc => {
                     capture_hdr_image = match windows_capture_image::capture_monitor_image(
                         &self,
@@ -204,7 +216,7 @@ impl MonitorInfo {
                         }
                     }
                 }
-                CaptureMethod::Xcap => {
+                CaptureMethod::Xcap | CaptureMethod::Auto => {
                     // xcap 路径：走下方 xcap 采集分支
                 }
             }
@@ -234,6 +246,10 @@ pub enum CorrectHdrColorAlgorithm {
 /// 截图采集方式（后端选择）
 #[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq)]
 pub enum CaptureMethod {
+    /// 自动：根据显示器 HDR 能力选择。
+    /// HDR/宽色域显示器走 WGC（xcap 会截到黑帧），普通 SDR 显示器走 xcap。
+    #[serde(rename = "Auto")]
+    Auto,
     /// Windows Graphics Capture（现代捕获 API）
     #[serde(rename = "WGC")]
     Wgc,
@@ -863,10 +879,19 @@ impl MonitorList {
         let enable_exclude_window = {
             #[cfg(target_os = "windows")]
             {
-                // 仅在 WGC 采集方式下支持排除窗口（xcap 不支持）。
-                // 始终排除截图自身窗口，避免截太快把截图控件也截进去，
-                // 与是否开启 HDR 颜色校正、是否存在 HDR 显示器无关。
-                capture_option.capture_method == CaptureMethod::Wgc
+                // 排除窗口（WDA_EXCLUDEFROMCAPTURE）仅在 WGC 下有效（xcap 不支持）。
+                //   Wgc  -> 始终排除截图自身窗口
+                //   Auto -> 仅当存在系统 HDR 已开启的显示器（Auto 下这些屏会走 WGC）时排除
+                //   Xcap -> 不排除
+                // 排除可避免截太快把截图控件也截进去。
+                match capture_option.capture_method {
+                    CaptureMethod::Wgc => true,
+                    CaptureMethod::Auto => self
+                        .0
+                        .iter()
+                        .any(|monitor| monitor.monitor_hdr_info.hdr_enabled),
+                    CaptureMethod::Xcap => false,
+                }
             }
 
             #[cfg(target_os = "macos")]

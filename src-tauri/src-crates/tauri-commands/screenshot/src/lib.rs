@@ -1,5 +1,5 @@
 use image::DynamicImage;
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Serialize;
 use snow_shot_app_os::ui_automation::UIElements;
 
@@ -214,9 +214,10 @@ pub async fn capture_focused_window(
 
         let focused_window = xcap::Window::new(xcap::ImplWindow::new(hwnd));
 
-        // 仅当采集方式选择 WGC 时才尝试 WGC 的 HDR 窗口捕获；
-        // 选择 xcap 时直接走 xcap，不做 WGC 尝试。
-        let hdr_image = if capture_method == CaptureMethod::Wgc {
+        // 选择 xcap 时直接走 xcap，不做 WGC 尝试；
+        // 选择 WGC 或自动（Auto，HDR 屏会走 WGC）时尝试 WGC 的 HDR 窗口捕获，
+        // 失败则回退 xcap（由下方 match 处理）。
+        let hdr_image = if capture_method != CaptureMethod::Xcap {
             capture_window_hdr_image(&focused_window, correct_hdr_color_algorithm)
         } else {
             None
@@ -704,7 +705,8 @@ pub async fn capture_full_screen(
             },
         )
         .await?;
-    // 所有显示器的最小矩形
+    // 从合并图中裁剪出激活显示器所在区域（使用 image crate 安全裁剪 API）。
+    // 单显示器时激活显示器即合并图本身，裁剪结果与整图一致。
     let all_monitors_bounding_box = monitor_list.get_monitors_bounding_box();
     // 获取激活的显示器相对所有显示器的位置
     let active_monitor_rect = active_monitor.get_monitors_bounding_box();
@@ -729,51 +731,23 @@ pub async fn capture_full_screen(
         ));
     }
 
-    let mut active_monitor_image_bytes = unsafe {
-        let mut bytes = Vec::with_capacity(
-            active_monitor_crop_region_width * active_monitor_crop_region_height * 3,
-        );
-        bytes.set_len(active_monitor_crop_region_width * active_monitor_crop_region_height * 3);
-        bytes
-    };
-
-    let all_monitor_image_width = all_monitors_image.width() as usize;
-    let base_index =
-        (active_monitor_crop_region_y * all_monitor_image_width + active_monitor_crop_region_x) * 3;
-
-    let active_monitor_image_bytes_ptr = active_monitor_image_bytes.as_mut_ptr() as usize;
-    let all_monitor_image_bytes_ptr = all_monitors_image.as_bytes().as_ptr() as usize;
-    (0..active_monitor_crop_region_height)
-        .into_par_iter()
-        .for_each(|y| unsafe {
-            let active_monitor_image_row_ptr = (active_monitor_image_bytes_ptr as *mut u8)
-                .add(y * active_monitor_crop_region_width * 3);
-            let all_monitor_image_row_ptr = (all_monitor_image_bytes_ptr as *mut u8)
-                .add(base_index + y * all_monitor_image_width * 3);
-
-            std::ptr::copy_nonoverlapping(
-                all_monitor_image_row_ptr,
-                active_monitor_image_row_ptr,
-                active_monitor_crop_region_width * 3,
-            );
-        });
-
-    let active_monitor_image = match image::RgbImage::from_raw(
+    // crop_imm 返回的是 4 通道 RgbaImage，直接包成 DynamicImage 编码。
+    // 该 4 通道路径与区域/窗口截图一致（已验证正常），可规避花屏。
+    let active_monitor_image = image::DynamicImage::ImageRgba8(image::imageops::crop_imm(
+        &all_monitors_image,
+        active_monitor_crop_region_x as u32,
+        active_monitor_crop_region_y as u32,
         active_monitor_crop_region_width as u32,
         active_monitor_crop_region_height as u32,
-        active_monitor_image_bytes,
-    ) {
-        Some(image) => image::DynamicImage::ImageRgb8(image),
-        None => {
-            return Err(String::from(
-                "[capture_full_screen] failed to create active monitor image",
-            ));
-        }
-    };
+    )
+    .to_image());
 
     // 编码图像为 PNG 格式
-    let image_buffer = snow_shot_app_utils::encode_image(&active_monitor_image, snow_shot_app_utils::ImageEncoder::Png)
-        .map_err(|e| e.to_string())?;
+    let image_buffer = snow_shot_app_utils::encode_image(
+        &active_monitor_image,
+        snow_shot_app_utils::ImageEncoder::Png,
+    )
+    .map_err(|e| e.to_string())?;
 
     // 写入到截图历史
     let capture_history_file_path = PathBuf::from(capture_history_file_path);

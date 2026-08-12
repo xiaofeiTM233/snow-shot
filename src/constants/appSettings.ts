@@ -329,7 +329,7 @@ Priority order (highest to lowest):
 			/** 更正颜色滤镜 */
 		correctColorFilter: true,
 		/** 采集方式 */
-		captureMethod: CaptureMethod.Wgc,
+		captureMethod: CaptureMethod.Auto,
 		/** HDR 颜色校正 */
 		hdrColorCorrection: HdrColorCorrection.Linear,
 	},

@@ -227,6 +227,12 @@ export const SystemSettingsPage = () => {
 		return [
 			{
 				label: intl.formatMessage({
+					id: "settings.systemSettings.screenshotSettings.captureMethod.auto",
+				}),
+				value: CaptureMethod.Auto,
+			},
+			{
+				label: intl.formatMessage({
 					id: "settings.systemSettings.screenshotSettings.captureMethod.wgc",
 				}),
 				value: CaptureMethod.Wgc,
@@ -243,22 +249,36 @@ export const SystemSettingsPage = () => {
 	const hdrColorCorrectionOptions = useMemo((): SelectProps["options"] => {
 		return [
 			{
-				label: intl.formatMessage({
-					id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.linear",
-				}),
+				label: (
+					<IconLabel
+						title={intl.formatMessage({
+							id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.linear",
+						})}
+						label={
+							<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection.linear" />
+						}
+						tooltipTitle={
+							<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection.linear.tip" />
+						}
+					/>
+				),
 				value: HdrColorCorrection.Linear,
-				tooltipTitle: intl.formatMessage({
-					id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.linear.tip",
-				}),
 			},
 			{
-				label: intl.formatMessage({
-					id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.off",
-				}),
+				label: (
+					<IconLabel
+						title={intl.formatMessage({
+							id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.off",
+						})}
+						label={
+							<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection.off" />
+						}
+						tooltipTitle={
+							<FormattedMessage id="settings.systemSettings.screenshotSettings.hdrColorCorrection.off.tip" />
+						}
+					/>
+				),
 				value: HdrColorCorrection.Off,
-				tooltipTitle: intl.formatMessage({
-					id: "settings.systemSettings.screenshotSettings.hdrColorCorrection.off.tip",
-				}),
 			},
 		];
 	}, [intl]);

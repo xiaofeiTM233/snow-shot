@@ -60,6 +60,8 @@ export enum HdrColorAlgorithm {
 
 /** 采集方式（截图后端） */
 export enum CaptureMethod {
+	/** 自动：根据显示器 HDR 能力选择（HDR 走 WGC，否则 xcap） */
+	Auto = "Auto",
 	/** Windows Graphics Capture（现代捕获 API） */
 	Wgc = "WGC",
 	/** xcap（传统采集 API） */
