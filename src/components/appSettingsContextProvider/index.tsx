@@ -46,7 +46,8 @@ import {
 	type DoubleClickAction,
 	type DragOutsideSelectRectAction,
 	ExtraToolList,
-	type HdrColorAlgorithm,
+	CaptureMethod,
+	HdrColorCorrection,
 	type HistoryValidDuration,
 	OcrDetectAfterAction,
 	RenderBackend,
@@ -1410,17 +1411,19 @@ const AppSettingsContextProviderCore: React.FC<{
 							? newSettings.enableMultipleMonitor
 							: (prevSettings?.enableMultipleMonitor ??
 								defaultAppSettingsData[group].enableMultipleMonitor),
-					correctHdrColor:
-						typeof newSettings?.correctHdrColor === "boolean"
-							? newSettings.correctHdrColor
-							: (prevSettings?.correctHdrColor ??
-								defaultAppSettingsData[group].correctHdrColor),
-					correctHdrColorAlgorithm:
-						typeof newSettings?.correctHdrColorAlgorithm === "string"
-							? (newSettings.correctHdrColorAlgorithm as HdrColorAlgorithm)
-							: (prevSettings?.correctHdrColorAlgorithm ??
-								defaultAppSettingsData[group].correctHdrColorAlgorithm),
-				};
+					captureMethod:
+						newSettings?.captureMethod != null &&
+						Object.values(CaptureMethod).includes(newSettings.captureMethod)
+							? newSettings.captureMethod
+							: (prevSettings?.captureMethod ??
+								defaultAppSettingsData[group].captureMethod),
+					hdrColorCorrection:
+						newSettings?.hdrColorCorrection != null &&
+						Object.values(HdrColorCorrection).includes(newSettings.hdrColorCorrection)
+							? newSettings.hdrColorCorrection
+							: (prevSettings?.hdrColorCorrection ??
+								defaultAppSettingsData[group].hdrColorCorrection),
+					};
 			} else if (group === AppSettingsGroup.SystemCore) {
 				newSettings = newSettings as AppSettingsData[typeof group];
 				const prevSettings = appSettingsRef.current[group] as

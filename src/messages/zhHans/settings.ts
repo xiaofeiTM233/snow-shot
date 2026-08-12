@@ -584,16 +584,20 @@ export const settings = {
 		"更正颜色滤镜",
 	"settings.systemSettings.screenshotSettings.correctColorFilter.tip":
 		"系统应用颜色滤镜后，截取到的图片也将应用颜色滤镜，开启后将截取原始颜色",
-	"settings.systemSettings.screenshotSettings.enableCorrectHdrColor":
-		"更正 HDR 颜色",
-	"settings.systemSettings.screenshotSettings.enableCorrectHdrColor.tip":
-		"显示器开启 HDR 后，获取到的截图将通过指定算法转换为 SDR 颜色。不同的转换算法适合不同的色彩需求。Windows 下需要 Windows 10 2004 或更高版本才能启用",
-	"settings.systemSettings.screenshotSettings.enableCorrectHdrColor.algorithm":
-		"HDR 颜色转换算法",
-	"settings.systemSettings.screenshotSettings.enableCorrectHdrColor.algorithm.linear":
+	"settings.systemSettings.screenshotSettings.captureMethod":
+		"采集方式",
+	"settings.systemSettings.screenshotSettings.captureMethod.wgc": "WGC",
+	"settings.systemSettings.screenshotSettings.captureMethod.xcap": "xcap",
+	"settings.systemSettings.screenshotSettings.hdrColorCorrection":
+		"HDR 颜色校正",
+	"settings.systemSettings.screenshotSettings.hdrColorCorrection.linear":
 		"线性转换",
-	"settings.systemSettings.screenshotSettings.enableCorrectHdrColor.algorithm.linear.tip":
-		"适合将 HDR 中的 SDR 内容还原为 SDR，但当 Windows 的 HDR 设置中的 SDR 内容亮度不等于 50% 时，HDR 内容可能严重失真",
+	"settings.systemSettings.screenshotSettings.hdrColorCorrection.linear.tip":
+		"以 Rgba16F 捕获线性帧并做亮度校正，可将 HDR 中的 SDR 内容还原为 SDR；但当 Windows 的 HDR 设置中的 SDR 内容亮度不等于 50% 时，HDR 内容可能严重失真。仅在系统开启 HDR 时生效。Windows 下需要 Windows 10 2004 或更高版本",
+	"settings.systemSettings.screenshotSettings.hdrColorCorrection.off":
+		"关闭",
+	"settings.systemSettings.screenshotSettings.hdrColorCorrection.off.tip":
+		"直接截取系统合成好的 SDR 画面（可能偏暗）",
 	"settings.systemSettings.screenshotSettings.enableBrowserClipboard.tip":
 		"尝试使用浏览器接口快速写入剪贴板内容，如果出现无法复制到剪贴板的问题请禁用该功能",
 	"settings.systemSettings.screenshotSettings.historyValidDuration.day": "1 天",

@@ -628,6 +628,8 @@ const DrawPageCore: React.FC<{
 					getCorrectHdrColorAlgorithm(getAppSettings(), true),
 					getAppSettings()[AppSettingsGroup.SystemScreenshot]
 						.correctColorFilter,
+					getAppSettings()[AppSettingsGroup.SystemScreenshot]
+						.captureMethod,
 				).catch((error) => {
 					appError("[DrawPageCore] captureAllMonitors error", error);
 					return undefined;

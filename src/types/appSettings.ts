@@ -58,6 +58,22 @@ export enum HdrColorAlgorithm {
 	None = "None",
 }
 
+/** 采集方式（截图后端） */
+export enum CaptureMethod {
+	/** Windows Graphics Capture（现代捕获 API） */
+	Wgc = "WGC",
+	/** xcap（传统采集 API） */
+	Xcap = "Xcap",
+}
+
+/** HDR 颜色校正 */
+export enum HdrColorCorrection {
+	/** 线性转换：Rgba16F 捕获线性帧并做亮度校正（仅在系统 HDR 开启时生效） */
+	Linear = "Linear",
+	/** 关闭：走系统合成好的 Rgba8，不额外校正 */
+	Off = "Off",
+}
+
 /** 渲染引擎（值与 PIXI ApplicationOptions.preference 保持一致） */
 export enum RenderBackend {
 	WebGL = "webgl",
@@ -632,10 +648,10 @@ export type AppSettingsData = {
 		enableMultipleMonitor: boolean;
 		/** 更正颜色滤镜 */
 		correctColorFilter: boolean;
-		/** 更正 HDR 颜色 */
-		correctHdrColor: boolean;
-		/** HDR 颜色转换算法 */
-		correctHdrColorAlgorithm: HdrColorAlgorithm;
+		/** 采集方式：Wgc / Xcap */
+		captureMethod: CaptureMethod;
+		/** HDR 颜色校正：线性转换 / 关闭 */
+		hdrColorCorrection: HdrColorCorrection;
 	};
 	[AppSettingsGroup.SystemScrollScreenshot]: {
 		tryRollback: boolean;

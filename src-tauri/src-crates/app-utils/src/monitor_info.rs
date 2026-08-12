@@ -39,6 +39,7 @@ pub struct CaptureOption {
     pub color_format: ColorFormat,
     pub correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
     pub correct_color_filter: bool,
+    pub capture_method: CaptureMethod,
 }
 
 impl MonitorInfo {
@@ -181,27 +182,30 @@ impl MonitorInfo {
             use crate::windows_capture_image;
 
             let mut capture_hdr_image: Option<image::DynamicImage> = None;
-            // HDR / 宽色域显示器始终使用 windows-capture（Graphics Capture API），
-            // 因为 xcap 在 HDR/宽色域显示器上会截到黑帧。
-            // 判定条件：hdr_enabled（系统 HDR 开启）或 sdr_white_level>0（显示器为 HDR-capable，
-            // 即使关闭系统 HDR 也仍应用 WGC 的 Rgba8 路径避免黑帧）。
-            // 是否做 HDR 亮度校正由 algorithm 决定（在 process_captured_image 内处理）。
-            if self.monitor_hdr_info.hdr_enabled || self.monitor_hdr_info.sdr_white_level > 0 {
-                capture_hdr_image = match windows_capture_image::capture_monitor_image(
-                    &self,
-                    None,
-                    crop_area,
-                    capture_option.color_format,
-                    capture_option.correct_hdr_color_algorithm,
-                ) {
-                    Ok(image) => Some(image),
-                    Err(e) => {
-                        log::error!(
-                            "[MonitorInfo::capture] Failed to capture HDR monitor image: {:?}",
-                            e
-                        );
-                        None
+            // 采集方式由用户设置决定（capture_method），不再根据 HDR 能力自动选择。
+            //   Wgc  -> 始终使用 windows-capture（Graphics Capture API）
+            //   Xcap -> 始终使用 xcap（传统采集 API，HDR 屏可能截到黑帧/旧帧，由用户自行承担）
+            match capture_option.capture_method {
+                CaptureMethod::Wgc => {
+                    capture_hdr_image = match windows_capture_image::capture_monitor_image(
+                        &self,
+                        None,
+                        crop_area,
+                        capture_option.color_format,
+                        capture_option.correct_hdr_color_algorithm,
+                    ) {
+                        Ok(image) => Some(image),
+                        Err(e) => {
+                            log::error!(
+                                "[MonitorInfo::capture] Failed to capture WGC monitor image: {:?}",
+                                e
+                            );
+                            None
+                        }
                     }
+                }
+                CaptureMethod::Xcap => {
+                    // xcap 路径：走下方 xcap 采集分支
                 }
             }
 
@@ -225,6 +229,16 @@ pub struct MonitorList(Vec<MonitorInfo>);
 pub enum CorrectHdrColorAlgorithm {
     None,
     Linear,
+}
+
+/// 截图采集方式（后端选择）
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum CaptureMethod {
+    /// Windows Graphics Capture（现代捕获 API）
+    Wgc,
+    /// xcap（传统采集 API）
+    Xcap,
 }
 
 impl MonitorList {
@@ -848,7 +862,10 @@ impl MonitorList {
         let enable_exclude_window = {
             #[cfg(target_os = "windows")]
             {
-                capture_option.correct_hdr_color_algorithm != CorrectHdrColorAlgorithm::None
+                // 仅在 WGC 采集方式下支持排除窗口（xcap 不支持），
+                // 且需要开启 HDR 颜色校正且存在 HDR-capable 显示器。
+                capture_option.capture_method == CaptureMethod::Wgc
+                    && capture_option.correct_hdr_color_algorithm != CorrectHdrColorAlgorithm::None
                     && self
                         .0
                         .iter()

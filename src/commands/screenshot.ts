@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { HdrColorAlgorithm } from "@/types/appSettings";
+import type { HdrColorAlgorithm, CaptureMethod } from "@/types/appSettings";
 import {
 	type ImageBuffer,
 	ImageBufferType,
@@ -24,9 +24,11 @@ export const setDrawWindowStyle = async () => {
  */
 export const captureFocusedWindow = async (
 	correctHdrColorAlgorithm: HdrColorAlgorithm,
+	captureMethod: CaptureMethod,
 ): Promise<ImageBuffer | undefined> => {
 	const result = await invoke<ArrayBuffer>("capture_focused_window", {
 		correctHdrColorAlgorithm,
+		captureMethod,
 	});
 
 	if (result.byteLength === 0) {
@@ -50,11 +52,13 @@ export const captureAllMonitors = async (
 	enableMultipleMonitor: boolean,
 	correctHdrColorAlgorithm: HdrColorAlgorithm,
 	correctColorFilter: boolean,
+	captureMethod: CaptureMethod,
 ): Promise<ImageBuffer | undefined> => {
 	const result = await invoke<ArrayBuffer>("capture_all_monitors", {
 		enableMultipleMonitor,
 		correctHdrColorAlgorithm,
 		correctColorFilter,
+		captureMethod,
 	});
 
 	if (result.byteLength === 0) {
@@ -81,12 +85,14 @@ export const captureFullScreen = async (
 	captureHistoryFilePath: string,
 	correctHdrColorAlgorithm: HdrColorAlgorithm,
 	correctColorFilter: boolean,
+	captureMethod: CaptureMethod,
 ): Promise<ImageBuffer | undefined> => {
 	const result = await invoke<ArrayBuffer>("capture_full_screen", {
 		enableMultipleMonitor,
 		captureHistoryFilePath,
 		correctHdrColorAlgorithm,
 		correctColorFilter,
+		captureMethod,
 	});
 
 	if (result.byteLength === 0) {
