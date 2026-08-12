@@ -863,17 +863,10 @@ impl MonitorList {
         let enable_exclude_window = {
             #[cfg(target_os = "windows")]
             {
-                // 仅在 WGC 采集方式下支持排除窗口（xcap 不支持），
-                // 且需要开启 HDR 颜色校正且存在 HDR-capable 显示器。
+                // 仅在 WGC 采集方式下支持排除窗口（xcap 不支持）。
+                // 始终排除截图自身窗口，避免截太快把截图控件也截进去，
+                // 与是否开启 HDR 颜色校正、是否存在 HDR 显示器无关。
                 capture_option.capture_method == CaptureMethod::Wgc
-                    && capture_option.correct_hdr_color_algorithm != CorrectHdrColorAlgorithm::None
-                    && self
-                        .0
-                        .iter()
-                        .any(|monitor| {
-                            monitor.monitor_hdr_info.hdr_enabled
-                                || monitor.monitor_hdr_info.sdr_white_level > 0
-                        })
             }
 
             #[cfg(target_os = "macos")]
