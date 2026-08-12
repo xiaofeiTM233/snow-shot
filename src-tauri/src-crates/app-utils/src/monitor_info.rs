@@ -233,11 +233,12 @@ pub enum CorrectHdrColorAlgorithm {
 
 /// 截图采集方式（后端选择）
 #[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq)]
-#[serde(rename_all = "UPPERCASE")]
 pub enum CaptureMethod {
     /// Windows Graphics Capture（现代捕获 API）
+    #[serde(rename = "WGC")]
     Wgc,
     /// xcap（传统采集 API）
+    #[serde(rename = "Xcap")]
     Xcap,
 }
 
@@ -1044,6 +1045,7 @@ mod tests {
                     color_format: ColorFormat::Rgb8,
                     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm::None,
                     correct_color_filter: false,
+                    capture_method: CaptureMethod::Wgc,
                 },
             )
             .await
@@ -1143,6 +1145,7 @@ mod tests {
                     color_format: ColorFormat::Rgb8,
                     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm::None,
                     correct_color_filter: false,
+                    capture_method: CaptureMethod::Wgc,
                 },
             )
             .await

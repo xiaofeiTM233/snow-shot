@@ -5,7 +5,7 @@ use tokio::sync::Mutex;
 
 use snow_shot_app_os::ui_automation::UIElements;
 use snow_shot_app_shared::ElementRect;
-use snow_shot_app_utils::monitor_info::CorrectHdrColorAlgorithm;
+use snow_shot_app_utils::monitor_info::{CaptureMethod, CorrectHdrColorAlgorithm};
 use snow_shot_global_state::WebViewSharedBufferState;
 use snow_shot_tauri_commands_screenshot::WindowElement;
 
@@ -26,6 +26,7 @@ pub async fn capture_all_monitors(
     enable_multiple_monitor: bool,
     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
     correct_color_filter: bool,
+    capture_method: CaptureMethod,
 ) -> Result<Response, String> {
     snow_shot_tauri_commands_screenshot::capture_all_monitors(
         app,
@@ -35,6 +36,7 @@ pub async fn capture_all_monitors(
         enable_multiple_monitor,
         correct_hdr_color_algorithm,
         correct_color_filter,
+        capture_method,
     )
     .await
 }
@@ -45,9 +47,11 @@ pub async fn capture_all_monitors(
 #[command]
 pub async fn capture_focused_window(
     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
+    capture_method: CaptureMethod,
 ) -> Result<Response, String> {
     snow_shot_tauri_commands_screenshot::capture_focused_window(
         correct_hdr_color_algorithm,
+        capture_method,
     )
     .await
 }
@@ -116,6 +120,7 @@ pub async fn capture_full_screen(
     capture_history_file_path: String,
     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
     correct_color_filter: bool,
+    capture_method: CaptureMethod,
 ) -> Result<Response, String> {
     snow_shot_tauri_commands_screenshot::capture_full_screen(
         app,
@@ -123,6 +128,7 @@ pub async fn capture_full_screen(
         capture_history_file_path,
         correct_hdr_color_algorithm,
         correct_color_filter,
+        capture_method,
     )
     .await
 }

@@ -1,4 +1,4 @@
-use snow_shot_app_utils::monitor_info::CorrectHdrColorAlgorithm;
+use snow_shot_app_utils::monitor_info::{CaptureMethod, CorrectHdrColorAlgorithm};
 use tauri::command;
 use tauri::ipc::Response;
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -49,6 +49,7 @@ pub async fn scroll_screenshot_capture(
     max_y: i32,
     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
     correct_color_filter: bool,
+    capture_method: CaptureMethod,
 ) -> Result<(), String> {
     snow_shot_tauri_commands_scroll_screenshot::scroll_screenshot_capture(
         window,
@@ -61,6 +62,7 @@ pub async fn scroll_screenshot_capture(
         max_y,
         correct_hdr_color_algorithm,
         correct_color_filter,
+        capture_method,
     )
     .await
 }

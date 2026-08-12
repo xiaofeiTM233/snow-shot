@@ -670,6 +670,7 @@ pub async fn capture_full_screen(
     capture_history_file_path: String,
     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
     correct_color_filter: bool,
+    capture_method: CaptureMethod,
 ) -> Result<Response, String>
 {
     // 激活的显示器
@@ -699,6 +700,7 @@ pub async fn capture_full_screen(
                 color_format: ColorFormat::Rgb8,
                 correct_hdr_color_algorithm,
                 correct_color_filter,
+                capture_method,
             },
         )
         .await?;
