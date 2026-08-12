@@ -344,10 +344,13 @@ pub fn capture_monitor_image(
     color_format: ColorFormat,
     algorithm: CorrectHdrColorAlgorithm,
 ) -> Result<image::DynamicImage, String> {
-    // 非真 HDR 显示器（sdr_white_level == 0，宽色域 SDR / HDR 系统开关关闭）使用 Rgba8 捕获，
-    // 因为 windows-capture 在 SDR 显示器上使用 Rgba16F 会截到黑帧；
-    // 真正 HDR 显示器（白电平有效）才使用 Rgba16F 并做亮度校正。
-    let capture_is_rgba8 = monitor.monitor_hdr_info.sdr_white_level == 0;
+    // 是否使用 Rgba8 捕获取决于"系统 HDR 当前是否开启"：
+    // - 系统 HDR 开启（hdr_enabled）：显示器处于 HDR 模式，用 Rgba16F 捕获并做亮度校正；
+    // - 系统 HDR 关闭：显示器处于 SDR 模式，必须用 Rgba8，因为 windows-capture 在 SDR 模式
+    //   下用 Rgba16F 会截到黑帧（这也是关闭系统 HDR 后黑屏的根因）。
+    // 注意：不能用 sdr_white_level 判断，它返回的是面板硬件能力（与系统 HDR 开关无关，
+    // 关掉 HDR 后仍为硬件固定值 > 0），无法反映"当前是否为 SDR 模式"。
+    let capture_is_rgba8 = !monitor.monitor_hdr_info.hdr_enabled;
     let capture_color_format = if capture_is_rgba8 {
         windows_capture::settings::ColorFormat::Rgba8
     } else {
