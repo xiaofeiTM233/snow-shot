@@ -9,7 +9,7 @@ use windows::Win32::Foundation::HWND;
 use std::ffi::c_void;
 use snow_shot_app_shared::ElementRect;
 use snow_shot_app_utils::monitor_info::{
-    CaptureOption, ColorFormat, CorrectHdrColorAlgorithm, MonitorList,
+    CaptureMethod, CaptureOption, ColorFormat, CorrectHdrColorAlgorithm, MonitorList,
 };
 use snow_shot_global_state::WebViewSharedBufferState;
 use std::path::PathBuf;
@@ -61,6 +61,7 @@ pub async fn capture_all_monitors(
     enable_multiple_monitor: bool,
     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
     correct_color_filter: bool,
+    capture_method: CaptureMethod,
 ) -> Result<Response, String> {
     #[cfg(target_os = "macos")]
     {
@@ -76,6 +77,7 @@ pub async fn capture_all_monitors(
                 color_format: ColorFormat::Rgb8,
                 correct_hdr_color_algorithm,
                 correct_color_filter,
+                capture_method,
             },
         )
         .await?;
@@ -100,6 +102,7 @@ pub async fn capture_all_monitors(
                 color_format: ColorFormat::Rgba8,
                 correct_hdr_color_algorithm,
                 correct_color_filter,
+                capture_method,
             },
         )
         .await?;
@@ -200,6 +203,7 @@ pub fn capture_window_hdr_image(
 
 pub async fn capture_focused_window(
     #[allow(unused_variables)] correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
+    #[allow(unused_variables)] capture_method: CaptureMethod,
 ) -> Result<Response, String>
 {
     let image;
@@ -210,7 +214,13 @@ pub async fn capture_focused_window(
 
         let focused_window = xcap::Window::new(xcap::ImplWindow::new(hwnd));
 
-        let hdr_image = capture_window_hdr_image(&focused_window, correct_hdr_color_algorithm);
+        // 仅当采集方式选择 WGC 时才尝试 WGC 的 HDR 窗口捕获；
+        // 选择 xcap 时直接走 xcap，不做 WGC 尝试。
+        let hdr_image = if capture_method == CaptureMethod::Wgc {
+            capture_window_hdr_image(&focused_window, correct_hdr_color_algorithm)
+        } else {
+            None
+        };
 
         image = match hdr_image {
             Some(image) => image,

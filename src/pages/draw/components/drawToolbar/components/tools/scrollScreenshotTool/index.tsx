@@ -405,6 +405,7 @@ export const ScrollScreenshot: React.FC<{
 				rect.max_y,
 				getCorrectHdrColorAlgorithm(getAppSettings()),
 				getAppSettings()[AppSettingsGroup.SystemScreenshot].correctColorFilter,
+				getAppSettings()[AppSettingsGroup.SystemScreenshot].captureMethod,
 			);
 
 			handleCaptureImageListDebounce();
