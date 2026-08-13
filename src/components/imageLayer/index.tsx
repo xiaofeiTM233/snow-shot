@@ -246,6 +246,8 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 		new Map(),
 	);
 	const lastWatermarkPropsRef = useRef<WatermarkProps>(defaultWatermarkProps);
+	const paddedTextureRef = useRef<PIXI.Texture | undefined>(undefined);
+	const paddedTextureSourceRef = useRef<PIXI.Texture | undefined>(undefined);
 	const [rendererWorker, setRendererWorker] = useState<Worker | undefined>(
 		undefined,
 	);
@@ -500,6 +502,7 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 				sharedBufferImageTextureRef,
 				imageSharedBufferRef,
 				baseImageTextureRef,
+				blurSpriteMapRef,
 				containerKey,
 				imageSrc,
 				hideImageSprite,
@@ -532,6 +535,8 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 				blurContainerKey,
 				blurElementId,
 				DRAW_LAYER_HIGHLIGHT_CONTAINER_KEY,
+				paddedTextureSourceRef,
+				paddedTextureRef,
 			);
 		},
 		[rendererWorker],
@@ -621,6 +626,8 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 				currentImageTextureRef,
 				highlightContainerKey,
 				highlightProps,
+				paddedTextureSourceRef,
+				paddedTextureRef,
 			);
 		},
 		[rendererWorker],
@@ -635,6 +642,8 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 			blurSpriteFilterMapRef,
 			highlightElementMapRef,
 			lastWatermarkPropsRef,
+			paddedTextureSourceRef,
+			paddedTextureRef,
 		);
 	}, [rendererWorker]);
 
@@ -657,6 +666,8 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 				processImageConfig,
 				canvasWidth,
 				canvasHeight,
+				paddedTextureSourceRef,
+				paddedTextureRef,
 			);
 		},
 		[rendererWorker],
