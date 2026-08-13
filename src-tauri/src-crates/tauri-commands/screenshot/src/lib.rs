@@ -705,85 +705,52 @@ pub async fn capture_full_screen(
             },
         )
         .await?;
-    // 未启用多显示器截图时，合并图本身即为当前显示器全屏图，无需裁剪，
-    // 直接使用合并图既能保证自动保存/复制与历史一致，也能规避裁剪阶段的像素错位花屏。
-    let active_monitor_image = if monitor_list.0.len() == 1 {
-        all_monitors_image.clone()
-    } else {
-        // 所有显示器的最小矩形
-        let all_monitors_bounding_box = monitor_list.get_monitors_bounding_box();
-        // 获取激活的显示器相对所有显示器的位置
-        let active_monitor_rect = active_monitor.get_monitors_bounding_box();
-        let active_monitor_crop_region = ElementRect {
-            min_x: active_monitor_rect.min_x - all_monitors_bounding_box.min_x,
-            min_y: active_monitor_rect.min_y - all_monitors_bounding_box.min_y,
-            max_x: active_monitor_rect.max_x - all_monitors_bounding_box.min_x,
-            max_y: active_monitor_rect.max_y - all_monitors_bounding_box.min_y,
-        };
-
-        let active_monitor_crop_region_x = active_monitor_crop_region.min_x as usize;
-        let active_monitor_crop_region_y = active_monitor_crop_region.min_y as usize;
-        let active_monitor_crop_region_width =
-            (active_monitor_crop_region.max_x - active_monitor_crop_region.min_x) as usize;
-        let active_monitor_crop_region_height =
-            (active_monitor_crop_region.max_y - active_monitor_crop_region.min_y) as usize;
-
-        // 裁剪区域宽高为零时无法编码（Zero width not allowed），直接返回错误，避免 panic
-        if active_monitor_crop_region_width == 0 || active_monitor_crop_region_height == 0 {
-            return Err(String::from(
-                "[capture_full_screen] active monitor crop region has zero width or height",
-            ));
-        }
-
-        let mut active_monitor_image_bytes = unsafe {
-            let mut bytes = Vec::with_capacity(
-                active_monitor_crop_region_width * active_monitor_crop_region_height * 3,
-            );
-            bytes.set_len(
-                active_monitor_crop_region_width * active_monitor_crop_region_height * 3,
-            );
-            bytes
-        };
-
-        let all_monitor_image_width = all_monitors_image.width() as usize;
-        let base_index =
-            (active_monitor_crop_region_y * all_monitor_image_width + active_monitor_crop_region_x)
-                * 3;
-
-        let active_monitor_image_bytes_ptr = active_monitor_image_bytes.as_mut_ptr() as usize;
-        let all_monitor_image_bytes_ptr = all_monitors_image.as_bytes().as_ptr() as usize;
-        (0..active_monitor_crop_region_height)
-            .into_par_iter()
-            .for_each(|y| unsafe {
-                let active_monitor_image_row_ptr = (active_monitor_image_bytes_ptr as *mut u8)
-                    .add(y * active_monitor_crop_region_width * 3);
-                let all_monitor_image_row_ptr = (all_monitor_image_bytes_ptr as *mut u8)
-                    .add(base_index + y * all_monitor_image_width * 3);
-
-                std::ptr::copy_nonoverlapping(
-                    all_monitor_image_row_ptr,
-                    active_monitor_image_row_ptr,
-                    active_monitor_crop_region_width * 3,
-                );
-            });
-
-        match image::RgbImage::from_raw(
-            active_monitor_crop_region_width as u32,
-            active_monitor_crop_region_height as u32,
-            active_monitor_image_bytes,
-        ) {
-            Some(image) => image::DynamicImage::ImageRgb8(image),
-            None => {
-                return Err(String::from(
-                    "[capture_full_screen] failed to create active monitor image",
-                ));
-            }
-        }
+    // 从合并图中裁剪出激活显示器所在区域（使用 image crate 安全裁剪 API）。
+    // 单显示器时激活显示器即合并图本身，裁剪结果与整图一致。
+    let all_monitors_bounding_box = monitor_list.get_monitors_bounding_box();
+    // 获取激活的显示器相对所有显示器的位置
+    let active_monitor_rect = active_monitor.get_monitors_bounding_box();
+    let active_monitor_crop_region = ElementRect {
+        min_x: active_monitor_rect.min_x - all_monitors_bounding_box.min_x,
+        min_y: active_monitor_rect.min_y - all_monitors_bounding_box.min_y,
+        max_x: active_monitor_rect.max_x - all_monitors_bounding_box.min_x,
+        max_y: active_monitor_rect.max_y - all_monitors_bounding_box.min_y,
     };
 
+    let active_monitor_crop_region_x = active_monitor_crop_region.min_x as usize;
+    let active_monitor_crop_region_y = active_monitor_crop_region.min_y as usize;
+    let active_monitor_crop_region_width =
+        (active_monitor_crop_region.max_x - active_monitor_crop_region.min_x) as usize;
+    let active_monitor_crop_region_height =
+        (active_monitor_crop_region.max_y - active_monitor_crop_region.min_y) as usize;
+
+    // 裁剪区域宽高为零时无法编码（Zero width not allowed），直接返回错误，避免 panic
+    if active_monitor_crop_region_width == 0 || active_monitor_crop_region_height == 0 {
+        return Err(String::from(
+            "[capture_full_screen] active monitor crop region has zero width or height",
+        ));
+    }
+
+    let active_monitor_image = image::imageops::crop_imm(
+        &all_monitors_image,
+        active_monitor_crop_region_x as u32,
+        active_monitor_crop_region_y as u32,
+        active_monitor_crop_region_width as u32,
+        active_monitor_crop_region_height as u32,
+    )
+    .to_image();
+
     // 编码图像为 PNG 格式
-    let image_buffer = snow_shot_app_utils::encode_image(&active_monitor_image, snow_shot_app_utils::ImageEncoder::Png)
-        .map_err(|e| e.to_string())?;
+    //
+    // 合并图/裁剪结果均为 3 通道 Rgb8，直接交给 `encode_image` 的 PngEncoder 编码时
+    // 会出现逐行错位花屏（区域/窗口截图为 4 通道 Rgba8，走同一条路径却正常）。
+    // 这里统一先转成 Rgba8（alpha 置 255）再编码，复用已验证正常的 4 通道编码路径，
+    // 彻底规避全屏截图（单屏/多屏）保存与复制花屏。像素内容与 Rgb8 完全一致，视觉无差异。
+    let image_buffer = snow_shot_app_utils::encode_image(
+        &image::DynamicImage::ImageRgba8(active_monitor_image.to_rgba8()),
+        snow_shot_app_utils::ImageEncoder::Png,
+    )
+    .map_err(|e| e.to_string())?;
 
     // 写入到截图历史
     let capture_history_file_path = PathBuf::from(capture_history_file_path);
