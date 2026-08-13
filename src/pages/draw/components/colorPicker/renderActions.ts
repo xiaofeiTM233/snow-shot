@@ -199,13 +199,9 @@ export async function renderSwitchCaptureHistoryAction(
 		// 不再通过 getPixels 子 worker（子 worker 在某些环境加载即崩溃）
 		const imageData = await decodeBufferToImageData(fileBuffer);
 		captureHistoryImageDataRef.current = imageData;
-		console.log("[colorPicker] switchCaptureHistory decoded", {
-			width: imageData.width,
-			height: imageData.height,
-		});
 	} catch (error) {
 		// 解码失败时保留上一张有效数据
-		console.warn("[colorPicker] switchCaptureHistory decode failed", {
+		console.warn("renderSwitchCaptureHistoryAction decode failed", {
 			imageSrc,
 			error,
 		});

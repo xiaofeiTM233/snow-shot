@@ -231,7 +231,7 @@ export const switchCaptureHistoryAction = async (
 		try {
 			imageBuffer = await fetch(imageSrc).then((res) => res.arrayBuffer());
 		} catch (error) {
-			console.warn("[colorPicker] mainthread fetch failed", {
+			console.warn("switchCaptureHistoryAction: fetch imageSrc failed", {
 				imageSrc,
 				error,
 			});
@@ -242,7 +242,6 @@ export const switchCaptureHistoryAction = async (
 		// 兜底：worker 彻底无响应时避免 Promise 永久 pending
 		const timer = setTimeout(() => {
 			renderWorker?.removeEventListener("message", handleMessage);
-			console.warn("[colorPicker] switchCaptureHistoryAction timeout (1000ms)");
 			resolve(undefined);
 		}, 1000);
 
