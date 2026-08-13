@@ -230,12 +230,8 @@ export const switchCaptureHistoryAction = async (
 	if (imageSrc) {
 		try {
 			imageBuffer = await fetch(imageSrc).then((res) => res.arrayBuffer());
-			console.log("[CP-DIAG] mainthread fetch ok", {
-				imageSrc,
-				byteLength: imageBuffer.byteLength,
-			});
 		} catch (error) {
-			console.warn("[CP-DIAG] mainthread fetch FAILED", {
+			console.warn("[colorPicker] mainthread fetch failed", {
 				imageSrc,
 				error,
 			});
@@ -246,7 +242,7 @@ export const switchCaptureHistoryAction = async (
 		// 兜底：worker 彻底无响应时避免 Promise 永久 pending
 		const timer = setTimeout(() => {
 			renderWorker?.removeEventListener("message", handleMessage);
-			console.warn("[CP-DIAG] switchCaptureHistoryAction: TIMER TIMEOUT (1000ms)");
+			console.warn("[colorPicker] switchCaptureHistoryAction timeout (1000ms)");
 			resolve(undefined);
 		}, 1000);
 
@@ -255,7 +251,6 @@ export const switchCaptureHistoryAction = async (
 		) => {
 			const { type, payload } = event.data;
 			if (type === ColorPickerRenderMessageType.SwitchCaptureHistory) {
-				console.log("[CP-DIAG] switchCaptureHistoryAction: worker replied");
 				clearTimeout(timer);
 				resolve(payload);
 				renderWorker?.removeEventListener("message", handleMessage);
@@ -273,11 +268,6 @@ export const switchCaptureHistoryAction = async (
 				};
 
 			renderWorker.addEventListener("message", handleMessage);
-
-			console.log("[CP-DIAG] posting SwitchCaptureHistory to worker", {
-				hasBuffer: !!imageBuffer,
-				bufferByteLength: imageBuffer?.byteLength,
-			});
 
 			// transfer ArrayBuffer 所有权，避免拷贝大图
 			if (imageBuffer) {

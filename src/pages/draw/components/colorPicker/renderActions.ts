@@ -1,11 +1,36 @@
 import type { RefType } from "@/components/imageLayer/baseLayerRenderActions";
 import type { ImageSharedBufferData } from "../../tools";
-import { getPixels, terminateWebWorker } from "./workers/getPixels";
+import { terminateWebWorker } from "./workers/getPixels";
 
 export const COLOR_PICKER_PREVIEW_SCALE = 12;
 export const COLOR_PICKER_PREVIEW_PICKER_SIZE = 10 + 1;
 export const COLOR_PICKER_PREVIEW_CANVAS_SIZE =
 	COLOR_PICKER_PREVIEW_PICKER_SIZE * COLOR_PICKER_PREVIEW_SCALE;
+
+/**
+ * 用浏览器原生 createImageBitmap + OffscreenCanvas 解码图像 buffer 为 ImageData。
+ * 直接在当前上下文（worker 或主线程）执行，不通过子 worker。
+ */
+async function decodeBufferToImageData(
+	imageBuffer: ArrayBuffer,
+): Promise<ImageData> {
+	const blob = new Blob([imageBuffer], { type: "image/png" });
+	const bitmap = await createImageBitmap(blob);
+	const width = bitmap.width;
+	const height = bitmap.height;
+
+	const offscreen = new OffscreenCanvas(width, height);
+	const ctx = offscreen.getContext("2d", { willReadFrequently: true });
+	if (!ctx) {
+		bitmap.close();
+		throw new Error("decodeBufferToImageData: failed to get 2d context");
+	}
+
+	ctx.drawImage(bitmap, 0, 0);
+	bitmap.close();
+
+	return ctx.getImageData(0, 0, width, height);
+}
 
 export const renderInitPreviewCanvasAction = (
 	previewCanvasRef: RefType<HTMLCanvasElement | OffscreenCanvas | null>,
@@ -43,9 +68,9 @@ export function renderInitImageDataAction(
 			return;
 		}
 
-		getPixels(imageSrc as ArrayBuffer)
-			.then((pixels) => {
-				previewImageDataRef.current = pixels.data;
+		decodeBufferToImageData(imageSrc as ArrayBuffer)
+			.then((imageData) => {
+				previewImageDataRef.current = imageData;
 
 				resolve(undefined);
 			})
@@ -72,20 +97,6 @@ export function renderPutImageDataAction(
 	const ctx = previewCanvasCtxRef.current;
 	const imageData =
 		captureHistoryImageDataRef.current ?? previewImageDataRef.current;
-	const useHistory = !!captureHistoryImageDataRef.current;
-	const tag = useHistory ? "HISTORY" : "PREVIEW";
-	if (useHistory) {
-		console.log("[CP-DIAG] renderPutImageDataAction src=" + tag, {
-			historyW: captureHistoryImageDataRef.current?.width,
-			historyH: captureHistoryImageDataRef.current?.height,
-			previewW: previewImageDataRef.current?.width,
-			previewH: previewImageDataRef.current?.height,
-			x,
-			y,
-			colorX,
-			colorY,
-		});
-	}
 	if (!ctx || !imageData) {
 		return {
 			color: [0, 0, 0],
@@ -172,35 +183,29 @@ export async function renderSwitchCaptureHistoryAction(
 	imageSrc: string | undefined,
 	imageBuffer: ArrayBuffer | undefined,
 ): Promise<void> {
-	console.log("[CP-DIAG] renderSwitchCaptureHistoryAction ENTER", {
-		imageSrc,
-		hasBuffer: !!imageBuffer,
-		bufferByteLength: imageBuffer?.byteLength,
-	});
 	if (!imageSrc && !imageBuffer) {
 		captureHistoryImageDataRef.current = undefined;
-		console.log("[CP-DIAG] renderSwitchCaptureHistoryAction: cleared (no src)");
 		return;
 	}
 
 	try {
-		// 优先使用主线程已 fetch 好的 buffer（worker 中 fetch asset URL 可能挂起），
+		// 优先使用主线程已 fetch 好的 buffer（worker 中 fetch asset URL 会挂起），
 		// 仅在无 buffer（非 worker 分支）时才自行 fetch
 		const fileBuffer: ArrayBuffer =
 			imageBuffer ??
 			(await fetch(imageSrc!).then((res) => res.arrayBuffer()));
-		console.log("[CP-DIAG] renderSwitchCaptureHistoryAction: have fileBuffer", {
-			byteLength: fileBuffer.byteLength,
-		});
-		const pixels = await getPixels(fileBuffer);
-		captureHistoryImageDataRef.current = pixels.data;
-		console.log("[CP-DIAG] renderSwitchCaptureHistoryAction: DECODED OK", {
-			width: pixels.width,
-			height: pixels.height,
+
+		// 直接在当前 worker（或主线程）内用 createImageBitmap 解码，
+		// 不再通过 getPixels 子 worker（子 worker 在某些环境加载即崩溃）
+		const imageData = await decodeBufferToImageData(fileBuffer);
+		captureHistoryImageDataRef.current = imageData;
+		console.log("[colorPicker] switchCaptureHistory decoded", {
+			width: imageData.width,
+			height: imageData.height,
 		});
 	} catch (error) {
 		// 解码失败时保留上一张有效数据
-		console.warn("[CP-DIAG] renderSwitchCaptureHistoryAction decode FAILED", {
+		console.warn("[colorPicker] switchCaptureHistory decode failed", {
 			imageSrc,
 			error,
 		});
