@@ -560,6 +560,11 @@ const getOrCreateBlurFilter = (
 		newFilter.resolution = 0.3;
 	}
 
+	// 启用边缘重复，避免靠近画布边缘时模糊效果减弱
+	// 当 filterArea 靠近边缘时，模糊内核会采样到画布外的透明区域，导致模糊变淡
+	// 设置 repeatEdgePixels = true 后，FilterSystem 会使用边缘钳位采样
+	newFilter.repeatEdgePixels = true;
+
 	blurSpriteFilterMapRef.current.set(filterKey, newFilter);
 	return newFilter;
 };
