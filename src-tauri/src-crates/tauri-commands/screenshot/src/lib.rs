@@ -1,5 +1,5 @@
 use image::DynamicImage;
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Serialize;
 use snow_shot_app_os::ui_automation::UIElements;
 
@@ -731,7 +731,7 @@ pub async fn capture_full_screen(
         ));
     }
 
-    let active_monitor_image = image::imageops::crop_imm(
+    let active_monitor_image: image::DynamicImage = image::imageops::crop_imm(
         &all_monitors_image,
         active_monitor_crop_region_x as u32,
         active_monitor_crop_region_y as u32,
@@ -742,9 +742,9 @@ pub async fn capture_full_screen(
 
     // 编码图像为 PNG 格式
     //
-    // 合并图/裁剪结果均为 3 通道 Rgb8，直接交给 `encode_image` 的 PngEncoder 编码时
+    // 合并图/裁剪结果为 3 通道 Rgb8，直接交给 `encode_image` 的 PngEncoder(Paeth) 编码时
     // 会出现逐行错位花屏（区域/窗口截图为 4 通道 Rgba8，走同一条路径却正常）。
-    // 这里统一先转成 Rgba8（alpha 置 255）再编码，复用已验证正常的 4 通道编码路径，
+    // 这里先统一转成 Rgba8（alpha 置 255）再编码，复用已验证正常的 4 通道编码路径，
     // 彻底规避全屏截图（单屏/多屏）保存与复制花屏。像素内容与 Rgb8 完全一致，视觉无差异。
     let image_buffer = snow_shot_app_utils::encode_image(
         &image::DynamicImage::ImageRgba8(active_monitor_image.to_rgba8()),
