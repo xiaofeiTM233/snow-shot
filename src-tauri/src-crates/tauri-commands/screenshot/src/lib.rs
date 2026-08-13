@@ -705,70 +705,79 @@ pub async fn capture_full_screen(
             },
         )
         .await?;
-    // 所有显示器的最小矩形
-    let all_monitors_bounding_box = monitor_list.get_monitors_bounding_box();
-    // 获取激活的显示器相对所有显示器的位置
-    let active_monitor_rect = active_monitor.get_monitors_bounding_box();
-    let active_monitor_crop_region = ElementRect {
-        min_x: active_monitor_rect.min_x - all_monitors_bounding_box.min_x,
-        min_y: active_monitor_rect.min_y - all_monitors_bounding_box.min_y,
-        max_x: active_monitor_rect.max_x - all_monitors_bounding_box.min_x,
-        max_y: active_monitor_rect.max_y - all_monitors_bounding_box.min_y,
-    };
+    // 未启用多显示器截图时，合并图本身即为当前显示器全屏图，无需裁剪，
+    // 直接使用合并图既能保证自动保存/复制与历史一致，也能规避裁剪阶段的像素错位花屏。
+    let active_monitor_image = if monitor_list.0.len() == 1 {
+        all_monitors_image.clone()
+    } else {
+        // 所有显示器的最小矩形
+        let all_monitors_bounding_box = monitor_list.get_monitors_bounding_box();
+        // 获取激活的显示器相对所有显示器的位置
+        let active_monitor_rect = active_monitor.get_monitors_bounding_box();
+        let active_monitor_crop_region = ElementRect {
+            min_x: active_monitor_rect.min_x - all_monitors_bounding_box.min_x,
+            min_y: active_monitor_rect.min_y - all_monitors_bounding_box.min_y,
+            max_x: active_monitor_rect.max_x - all_monitors_bounding_box.min_x,
+            max_y: active_monitor_rect.max_y - all_monitors_bounding_box.min_y,
+        };
 
-    let active_monitor_crop_region_x = active_monitor_crop_region.min_x as usize;
-    let active_monitor_crop_region_y = active_monitor_crop_region.min_y as usize;
-    let active_monitor_crop_region_width =
-        (active_monitor_crop_region.max_x - active_monitor_crop_region.min_x) as usize;
-    let active_monitor_crop_region_height =
-        (active_monitor_crop_region.max_y - active_monitor_crop_region.min_y) as usize;
+        let active_monitor_crop_region_x = active_monitor_crop_region.min_x as usize;
+        let active_monitor_crop_region_y = active_monitor_crop_region.min_y as usize;
+        let active_monitor_crop_region_width =
+            (active_monitor_crop_region.max_x - active_monitor_crop_region.min_x) as usize;
+        let active_monitor_crop_region_height =
+            (active_monitor_crop_region.max_y - active_monitor_crop_region.min_y) as usize;
 
-    // 裁剪区域宽高为零时无法编码（Zero width not allowed），直接返回错误，避免 panic
-    if active_monitor_crop_region_width == 0 || active_monitor_crop_region_height == 0 {
-        return Err(String::from(
-            "[capture_full_screen] active monitor crop region has zero width or height",
-        ));
-    }
-
-    let mut active_monitor_image_bytes = unsafe {
-        let mut bytes = Vec::with_capacity(
-            active_monitor_crop_region_width * active_monitor_crop_region_height * 3,
-        );
-        bytes.set_len(active_monitor_crop_region_width * active_monitor_crop_region_height * 3);
-        bytes
-    };
-
-    let all_monitor_image_width = all_monitors_image.width() as usize;
-    let base_index =
-        (active_monitor_crop_region_y * all_monitor_image_width + active_monitor_crop_region_x) * 3;
-
-    let active_monitor_image_bytes_ptr = active_monitor_image_bytes.as_mut_ptr() as usize;
-    let all_monitor_image_bytes_ptr = all_monitors_image.as_bytes().as_ptr() as usize;
-    (0..active_monitor_crop_region_height)
-        .into_par_iter()
-        .for_each(|y| unsafe {
-            let active_monitor_image_row_ptr = (active_monitor_image_bytes_ptr as *mut u8)
-                .add(y * active_monitor_crop_region_width * 3);
-            let all_monitor_image_row_ptr = (all_monitor_image_bytes_ptr as *mut u8)
-                .add(base_index + y * all_monitor_image_width * 3);
-
-            std::ptr::copy_nonoverlapping(
-                all_monitor_image_row_ptr,
-                active_monitor_image_row_ptr,
-                active_monitor_crop_region_width * 3,
-            );
-        });
-
-    let active_monitor_image = match image::RgbImage::from_raw(
-        active_monitor_crop_region_width as u32,
-        active_monitor_crop_region_height as u32,
-        active_monitor_image_bytes,
-    ) {
-        Some(image) => image::DynamicImage::ImageRgb8(image),
-        None => {
+        // 裁剪区域宽高为零时无法编码（Zero width not allowed），直接返回错误，避免 panic
+        if active_monitor_crop_region_width == 0 || active_monitor_crop_region_height == 0 {
             return Err(String::from(
-                "[capture_full_screen] failed to create active monitor image",
+                "[capture_full_screen] active monitor crop region has zero width or height",
             ));
+        }
+
+        let mut active_monitor_image_bytes = unsafe {
+            let mut bytes = Vec::with_capacity(
+                active_monitor_crop_region_width * active_monitor_crop_region_height * 3,
+            );
+            bytes.set_len(
+                active_monitor_crop_region_width * active_monitor_crop_region_height * 3,
+            );
+            bytes
+        };
+
+        let all_monitor_image_width = all_monitors_image.width() as usize;
+        let base_index =
+            (active_monitor_crop_region_y * all_monitor_image_width + active_monitor_crop_region_x)
+                * 3;
+
+        let active_monitor_image_bytes_ptr = active_monitor_image_bytes.as_mut_ptr() as usize;
+        let all_monitor_image_bytes_ptr = all_monitors_image.as_bytes().as_ptr() as usize;
+        (0..active_monitor_crop_region_height)
+            .into_par_iter()
+            .for_each(|y| unsafe {
+                let active_monitor_image_row_ptr = (active_monitor_image_bytes_ptr as *mut u8)
+                    .add(y * active_monitor_crop_region_width * 3);
+                let all_monitor_image_row_ptr = (all_monitor_image_bytes_ptr as *mut u8)
+                    .add(base_index + y * all_monitor_image_width * 3);
+
+                std::ptr::copy_nonoverlapping(
+                    all_monitor_image_row_ptr,
+                    active_monitor_image_row_ptr,
+                    active_monitor_crop_region_width * 3,
+                );
+            });
+
+        match image::RgbImage::from_raw(
+            active_monitor_crop_region_width as u32,
+            active_monitor_crop_region_height as u32,
+            active_monitor_image_bytes,
+        ) {
+            Some(image) => image::DynamicImage::ImageRgb8(image),
+            None => {
+                return Err(String::from(
+                    "[capture_full_screen] failed to create active monitor image",
+                ));
+            }
         }
     };
 
