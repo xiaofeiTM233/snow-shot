@@ -103,6 +103,13 @@ const blurSpriteMapRef: RefWrap<Map<string, BlurSprite>> = {
 const blurSpriteFilterMapRef: RefWrap<Map<string, Filter>> = {
 	current: new Map(),
 };
+// 模糊精灵共享的扩展纹理缓存（用于避免边缘模糊采样到透明像素）
+const paddedTextureRef: RefWrap<Texture | undefined> = {
+	current: undefined,
+};
+const paddedTextureSourceRef: RefWrap<Texture | undefined> = {
+	current: undefined,
+};
 const highlightElementMapRef: RefWrap<Map<string, HighlightElement>> = {
 	current: new Map(),
 };
@@ -169,6 +176,7 @@ const handleAddImageToContainer = async (
 		data.payload.containerKey,
 		data.payload.imageSrc,
 		data.payload.hideImageSprite,
+		blurSpriteMapRef,
 	);
 };
 
@@ -185,6 +193,8 @@ const handleCreateBlurSprite = (data: BaseLayerRenderCreateBlurSpriteData) => {
 		data.payload.blurContainerKey,
 		data.payload.blurElementId,
 		data.payload.highlightContainerKey,
+		paddedTextureSourceRef,
+		paddedTextureRef,
 	);
 };
 
@@ -226,6 +236,8 @@ const handleUpdateHighlight = (data: BaseLayerRenderUpdateHighlightData) => {
 		currentImageTextureRef,
 		data.payload.highlightContainerKey,
 		data.payload.highlightProps,
+		paddedTextureSourceRef,
+		paddedTextureRef,
 	);
 };
 
@@ -248,6 +260,8 @@ const handleClearContext = () => {
 		blurSpriteFilterMapRef,
 		highlightElementMapRef,
 		lastWatermarkPropsRef,
+		paddedTextureSourceRef,
+		paddedTextureRef,
 	);
 };
 
@@ -298,6 +312,8 @@ const handleApplyProcessImageConfigToCanvas = (
 		data.payload.processImageConfig,
 		data.payload.canvasWidth,
 		data.payload.canvasHeight,
+		paddedTextureSourceRef,
+		paddedTextureRef,
 	);
 };
 

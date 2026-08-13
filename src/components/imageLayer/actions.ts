@@ -431,6 +431,7 @@ export const addImageToContainerAction = async (
 	sharedBufferImageTextureRef: RefObject<Texture | undefined>,
 	imageSharedBufferRef: RefObject<ImageSharedBufferData | undefined>,
 	baseImageTextureRef: RefObject<Texture | undefined>,
+	blurSpriteMapRef: RefObject<Map<string, BlurSprite>>,
 	containerKey: string,
 	imageSrc:
 		| string
@@ -493,6 +494,7 @@ export const addImageToContainerAction = async (
 				containerKey,
 				imageSrc,
 				hideImageSprite,
+				blurSpriteMapRef,
 			).then(() => resolve(undefined));
 		}
 	});
@@ -537,6 +539,8 @@ export const createBlurSpriteAction = async (
 	blurContainerKey: string,
 	blurElementId: string,
 	highlightContainerKey: string,
+	paddedTextureSourceRef: RefObject<Texture | undefined>,
+	paddedTextureRef: RefObject<Texture | undefined>,
 ): Promise<undefined> => {
 	return new Promise((resolve) => {
 		if (renderWorker) {
@@ -567,6 +571,8 @@ export const createBlurSpriteAction = async (
 				blurContainerKey,
 				blurElementId,
 				highlightContainerKey,
+				paddedTextureSourceRef,
+				paddedTextureRef,
 			);
 			resolve(undefined);
 		}
@@ -751,6 +757,8 @@ export const updateHighlightAction = async (
 	currentImageTextureRef: RefObject<Texture | undefined>,
 	highlightContainerKey: string,
 	highlightProps: HighlightProps,
+	paddedTextureSourceRef: RefObject<Texture | undefined>,
+	paddedTextureRef: RefObject<Texture | undefined>,
 ): Promise<undefined> => {
 	return new Promise((resolve) => {
 		if (renderWorker) {
@@ -781,6 +789,8 @@ export const updateHighlightAction = async (
 				currentImageTextureRef,
 				highlightContainerKey,
 				highlightProps,
+				paddedTextureSourceRef,
+				paddedTextureRef,
 			);
 			resolve(undefined);
 		}
@@ -793,6 +803,8 @@ export const clearContextAction = async (
 	blurSpriteFilterMapRef: RefObject<Map<string, Filter>>,
 	highlightElementMapRef: RefObject<Map<string, HighlightElement>>,
 	lastWatermarkPropsRef: RefObject<WatermarkProps>,
+	paddedTextureSourceRef: RefObject<Texture | undefined>,
+	paddedTextureRef: RefObject<Texture | undefined>,
 ): Promise<undefined> => {
 	return new Promise((resolve) => {
 		if (renderWorker) {
@@ -817,6 +829,8 @@ export const clearContextAction = async (
 				blurSpriteFilterMapRef,
 				highlightElementMapRef,
 				lastWatermarkPropsRef,
+				paddedTextureSourceRef,
+				paddedTextureRef,
 			);
 			resolve(undefined);
 		}
@@ -863,6 +877,8 @@ export const applyProcessImageConfigToCanvasAction = async (
 	processImageConfig: FixedContentProcessImageConfig,
 	canvasWidth: number,
 	canvasHeight: number,
+	paddedTextureSourceRef: RefObject<Texture | undefined>,
+	paddedTextureRef: RefObject<Texture | undefined>,
 ): Promise<undefined> => {
 	return new Promise((resolve) => {
 		if (renderWorker) {
@@ -898,6 +914,8 @@ export const applyProcessImageConfigToCanvasAction = async (
 				processImageConfig,
 				canvasWidth,
 				canvasHeight,
+				paddedTextureSourceRef,
+				paddedTextureRef,
 			);
 			resolve(undefined);
 		}

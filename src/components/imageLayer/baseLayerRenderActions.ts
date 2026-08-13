@@ -263,6 +263,86 @@ export const renderCanvasRenderAction = (
 	canvasApp.render();
 };
 
+/**
+ * 填充截图纹理中的透明像素（多显示器截图中的显示器间缺口区域）。
+ * 采用水平 + 垂直四趟扫描，将透明像素填充为相邻不透明像素的延伸，
+ * 避免模糊工具在缺口附近采样到透明像素导致效果变淡。
+ */
+const fillTransparentPixels = (
+	pixels: Uint8ClampedArray,
+	width: number,
+	height: number,
+) => {
+	// 先快速检测是否存在透明像素，单显示器截图可跳过
+	let hasTransparent = false;
+	for (let i = 3; i < pixels.length; i += 4) {
+		if (pixels[i] === 0) {
+			hasTransparent = true;
+			break;
+		}
+	}
+	if (!hasTransparent) {
+		return;
+	}
+
+	// 水平方向：从左到右 + 从右到左
+	for (let y = 0; y < height; y++) {
+		const rowStart = y * width * 4;
+		let lastOpaqueIndex = -1;
+		for (let x = 0; x < width; x++) {
+			const i = rowStart + x * 4;
+			if (pixels[i + 3] !== 0) {
+				lastOpaqueIndex = i;
+			} else if (lastOpaqueIndex >= 0) {
+				pixels[i] = pixels[lastOpaqueIndex];
+				pixels[i + 1] = pixels[lastOpaqueIndex + 1];
+				pixels[i + 2] = pixels[lastOpaqueIndex + 2];
+				pixels[i + 3] = 255;
+			}
+		}
+		lastOpaqueIndex = -1;
+		for (let x = width - 1; x >= 0; x--) {
+			const i = rowStart + x * 4;
+			if (pixels[i + 3] !== 0) {
+				lastOpaqueIndex = i;
+			} else if (lastOpaqueIndex >= 0) {
+				pixels[i] = pixels[lastOpaqueIndex];
+				pixels[i + 1] = pixels[lastOpaqueIndex + 1];
+				pixels[i + 2] = pixels[lastOpaqueIndex + 2];
+				pixels[i + 3] = 255;
+			}
+		}
+	}
+
+	// 垂直方向：从上到下 + 从下到上
+	for (let x = 0; x < width; x++) {
+		let lastOpaqueIndex = -1;
+		for (let y = 0; y < height; y++) {
+			const i = (y * width + x) * 4;
+			if (pixels[i + 3] !== 0) {
+				lastOpaqueIndex = i;
+			} else if (lastOpaqueIndex >= 0) {
+				pixels[i] = pixels[lastOpaqueIndex];
+				pixels[i + 1] = pixels[lastOpaqueIndex + 1];
+				pixels[i + 2] = pixels[lastOpaqueIndex + 2];
+				pixels[i + 3] = 255;
+			}
+		}
+		lastOpaqueIndex = -1;
+		for (let y = height - 1; y >= 0; y--) {
+			const i = (y * width + x) * 4;
+			if (pixels[i + 3] !== 0) {
+				lastOpaqueIndex = i;
+			} else if (lastOpaqueIndex >= 0) {
+				pixels[i] = pixels[lastOpaqueIndex];
+				pixels[i + 1] = pixels[lastOpaqueIndex + 1];
+				pixels[i + 2] = pixels[lastOpaqueIndex + 2];
+				pixels[i + 3] = 255;
+			}
+		}
+	}
+};
+
 export const renderAddImageToContainerAction = async (
 	canvasContainerMapRef: RefType<Map<string, PIXI.Container>>,
 	currentImageTextureRef: RefType<PIXI.Texture | undefined>,
@@ -277,11 +357,15 @@ export const renderAddImageToContainerAction = async (
 		| { type: "base_image_texture" }
 		| { type: "shared_buffer_image_texture" },
 	hideImageSprite?: boolean,
+	blurSpriteMapRef?: RefType<Map<string, BlurSprite>>,
 ): Promise<void> => {
 	const container = canvasContainerMapRef.current.get(containerKey);
 	if (!container) {
 		return;
 	}
+
+	// 记录替换前的图片纹理，用于在替换后同步仍引用旧纹理的模糊/滤镜精灵
+	const oldTexture = currentImageTextureRef.current;
 
 	let texture: PIXI.Texture | undefined;
 	if (typeof imageSrc === "object") {
@@ -295,6 +379,12 @@ export const renderAddImageToContainerAction = async (
 		} else if (imageSrc instanceof ImageBitmap) {
 			texture = PIXI.Texture.from(imageSrc);
 		} else {
+			// 填充多显示器截图中的透明缺口，避免模糊采样到透明像素
+			fillTransparentPixels(
+				imageSrc.sharedBuffer,
+				imageSrc.width,
+				imageSrc.height,
+			);
 			texture = new PIXI.Texture({
 				source: new PIXI.BufferImageSource({
 					resource: imageSrc.sharedBuffer,
@@ -325,6 +415,19 @@ export const renderAddImageToContainerAction = async (
 	container.addChild(image);
 
 	currentImageTextureRef.current = texture;
+
+	// 同步已存在的模糊/滤镜精灵：它们以当前图片纹理作为源，
+	// 若不随主纹理一起更新，会持有已被替换掉的旧纹理引用（WebGPU 下其 GPU
+	// 资源会被回收），导致滤镜渲染时读取到 null 资源而报错
+	// （Cannot read properties of null (reading '0')）。
+	if (oldTexture && blurSpriteMapRef?.current) {
+		for (const blurSprite of blurSpriteMapRef.current.values()) {
+			// 仅同步直接引用主纹理（非自定义高亮纹理）的精灵
+			if (!blurSprite.customTexture && blurSprite.sprite.texture === oldTexture) {
+				blurSprite.sprite.texture = texture;
+			}
+		}
+	}
 };
 
 export const renderTransferImageSharedBufferAction = (
@@ -348,6 +451,14 @@ export const renderClearContainerAction = (
 
 	container.removeChildren();
 };
+
+/**
+ * 模糊精灵扩展纹理的 padding。
+ * PixiJS v8 的 BlurFilter 的 repeatEdgePixels 存在 bug（issue #11281），
+ * 并未真正实现边缘钳位，导致模糊区域靠近画布边缘时采样到透明像素。
+ * 通过在纹理四周填充边缘像素，让模糊内核在边缘也能采样到有效内容。
+ */
+const BLUR_SPRITE_PADDING = 128;
 
 export type BlurSprite = {
 	spriteContainer: PIXI.Container;
@@ -393,6 +504,145 @@ const renderGenerateHighlightTextureAction = (
 	return renderTexture;
 };
 
+
+/**
+ * 生成扩展纹理：在源纹理四周填充边缘像素。
+ * 用于避免模糊内核靠近画布边缘时采样到透明像素（PixiJS v8 issue #11281）。
+ */
+const renderGeneratePaddedTextureAction = (
+	canvasAppRef: RefType<Application | undefined>,
+	texture: PIXI.Texture,
+): PIXI.Texture | undefined => {
+	const canvasApp = canvasAppRef.current;
+	if (!canvasApp) {
+		return;
+	}
+
+	const renderer = canvasApp.renderer;
+	const pad = BLUR_SPRITE_PADDING;
+	const frame = texture.frame;
+	const frameWidth = frame.width;
+	const frameHeight = frame.height;
+
+	const container = new PIXI.Container();
+
+	// 中心：源纹理内容
+	const center = new PIXI.Sprite(texture);
+	center.position.set(pad, pad);
+	container.addChild(center);
+
+	// 生成边缘像素填充切片
+	const addEdgeSlice = (
+		x: number,
+		y: number,
+		sliceWidth: number,
+		sliceHeight: number,
+		destX: number,
+		destY: number,
+		destWidth: number,
+		destHeight: number,
+	) => {
+		const sliceTexture = new PIXI.Texture({
+			source: texture.source,
+			frame: new PIXI.Rectangle(
+				frame.x + x,
+				frame.y + y,
+				sliceWidth,
+				sliceHeight,
+			),
+		});
+		const slice = new PIXI.Sprite(sliceTexture);
+		slice.position.set(destX, destY);
+		slice.scale.set(destWidth / sliceWidth, destHeight / sliceHeight);
+		container.addChild(slice);
+	};
+
+	// 四条边
+	addEdgeSlice(0, 0, frameWidth, 1, pad, 0, frameWidth, pad);
+	addEdgeSlice(
+		0,
+		frameHeight - 1,
+		frameWidth,
+		1,
+		pad,
+		frameHeight + pad,
+		frameWidth,
+		pad,
+	);
+	addEdgeSlice(0, 0, 1, frameHeight, 0, pad, pad, frameHeight);
+	addEdgeSlice(
+		frameWidth - 1,
+		0,
+		1,
+		frameHeight,
+		frameWidth + pad,
+		pad,
+		pad,
+		frameHeight,
+	);
+
+	// 四个角
+	addEdgeSlice(0, 0, 1, 1, 0, 0, pad, pad);
+	addEdgeSlice(frameWidth - 1, 0, 1, 1, frameWidth + pad, 0, pad, pad);
+	addEdgeSlice(0, frameHeight - 1, 1, 1, 0, frameHeight + pad, pad, pad);
+	addEdgeSlice(
+		frameWidth - 1,
+		frameHeight - 1,
+		1,
+		1,
+		frameWidth + pad,
+		frameHeight + pad,
+		pad,
+		pad,
+	);
+
+	const paddedTexture = renderer.generateTexture({
+		target: container,
+		frame: new PIXI.Rectangle(
+			0,
+			0,
+			frameWidth + pad * 2,
+			frameHeight + pad * 2,
+		),
+	});
+
+	container.destroy({ children: true });
+
+	return paddedTexture;
+};
+
+/**
+ * 获取或创建扩展纹理（带单例缓存）。
+ * 所有模糊精灵共享同一个扩展纹理，源纹理变化时自动重建。
+ */
+const getOrCreatePaddedTexture = (
+	canvasAppRef: RefType<Application | undefined>,
+	sourceTexture: PIXI.Texture,
+	paddedTextureSourceRef: RefType<PIXI.Texture | undefined>,
+	paddedTextureRef: RefType<PIXI.Texture | undefined>,
+): PIXI.Texture | undefined => {
+	if (
+		paddedTextureSourceRef.current === sourceTexture &&
+		paddedTextureRef.current
+	) {
+		return paddedTextureRef.current;
+	}
+
+	if (paddedTextureRef.current) {
+		paddedTextureRef.current.destroy(true);
+		paddedTextureRef.current = undefined;
+	}
+	paddedTextureSourceRef.current = undefined;
+
+	const paddedTexture = renderGeneratePaddedTextureAction(
+		canvasAppRef,
+		sourceTexture,
+	);
+	paddedTextureSourceRef.current = sourceTexture;
+	paddedTextureRef.current = paddedTexture;
+	return paddedTexture;
+};
+
 export const renderCreateBlurSpriteAction = (
 	canvasAppRef: RefType<Application | undefined>,
 	canvasContainerMapRef: RefType<Map<string, PIXI.Container>>,
@@ -401,6 +651,8 @@ export const renderCreateBlurSpriteAction = (
 	blurContainerKey: string,
 	blurElementId: string,
 	highlightContainerKey: string,
+	paddedTextureSourceRef: RefType<PIXI.Texture | undefined>,
+	paddedTextureRef: RefType<PIXI.Texture | undefined>,
 ) => {
 	const container = canvasContainerMapRef.current.get(blurContainerKey);
 	if (!container) {
@@ -424,14 +676,28 @@ export const renderCreateBlurSpriteAction = (
 		customTexture = spriteTexture as PIXI.RenderTexture;
 	}
 
+	// 使用扩展纹理，避免模糊采样靠近画布边缘时采样到透明像素
+	const sourceTexture = spriteTexture ?? currentImageTexture;
+	const paddedTexture = getOrCreatePaddedTexture(
+		canvasAppRef,
+		sourceTexture,
+		paddedTextureSourceRef,
+		paddedTextureRef,
+	);
+	if (!paddedTexture) {
+		return;
+	}
+
 	const blurSprite: BlurSprite = {
 		spriteContainer: new PIXI.Container(),
-		sprite: new PIXI.Sprite(spriteTexture ?? currentImageTexture),
+		sprite: new PIXI.Sprite(paddedTexture),
 		spriteBlurFliter: undefined,
 		spriteMask: new PIXI.Graphics(),
 		customTexture,
 	};
 
+	// 偏移 (-padding, -padding)，使扩展纹理中的源内容与画布坐标对齐
+	blurSprite.sprite.position.set(-BLUR_SPRITE_PADDING, -BLUR_SPRITE_PADDING);
 	blurSprite.sprite.filters = undefined;
 	blurSprite.spriteContainer.setMask({
 		mask: blurSprite.spriteMask,
@@ -559,6 +825,10 @@ const getOrCreateBlurFilter = (
 		});
 		newFilter.resolution = 0.3;
 	}
+
+	// 允许 filter bounds 超出画布，避免靠近边缘时采样被裁剪到透明区域
+	// 配合扩展纹理使用，保证边缘模糊采样能命中填充的边缘像素
+	newFilter.clipToViewport = false;
 
 	blurSpriteFilterMapRef.current.set(filterKey, newFilter);
 	return newFilter;
@@ -702,7 +972,7 @@ export const renderUpdateBlurSpriteAction = (
 		const expandedX = rectMinX - strokeWidth * 0.5;
 		const expandedY = rectMinY - strokeWidth * 0.5;
 
-		blurSprite.sprite.filterArea = calculateRotatedFilterArea(
+		const filterArea = calculateRotatedFilterArea(
 			expandedX,
 			expandedY,
 			expandedWidth,
@@ -710,6 +980,11 @@ export const renderUpdateBlurSpriteAction = (
 			blurProps.angle,
 			blurProps.zoom,
 		);
+		// sprite 位置偏移了 (-BLUR_SPRITE_PADDING, -BLUR_SPRITE_PADDING)，
+		// filterArea 使用 sprite 本地坐标，需要加上偏移
+		filterArea.x += BLUR_SPRITE_PADDING;
+		filterArea.y += BLUR_SPRITE_PADDING;
+		blurSprite.sprite.filterArea = filterArea;
 	} else {
 		blurSprite.spriteMask
 			.clear()
@@ -728,7 +1003,7 @@ export const renderUpdateBlurSpriteAction = (
 			.fill();
 
 		// 计算矩形情况下的 filterArea
-		blurSprite.sprite.filterArea = calculateRotatedFilterArea(
+		const filterArea = calculateRotatedFilterArea(
 			blurProps.x,
 			blurProps.y,
 			blurProps.width,
@@ -736,6 +1011,11 @@ export const renderUpdateBlurSpriteAction = (
 			blurProps.angle,
 			blurProps.zoom,
 		);
+		// sprite 位置偏移了 (-BLUR_SPRITE_PADDING, -BLUR_SPRITE_PADDING)，
+		// filterArea 使用 sprite 本地坐标，需要加上偏移
+		filterArea.x += BLUR_SPRITE_PADDING;
+		filterArea.y += BLUR_SPRITE_PADDING;
+		blurSprite.sprite.filterArea = filterArea;
 	}
 
 	blurSprite.spriteContainer.alpha =
@@ -972,6 +1252,8 @@ export const renderUpdateHighlightAction = (
 	currentImageTextureRef: RefType<PIXI.Texture | undefined>,
 	highlightContainerKey: string,
 	highlightProps: HighlightProps,
+	paddedTextureSourceRef: RefType<PIXI.Texture | undefined>,
+	paddedTextureRef: RefType<PIXI.Texture | undefined>,
 ) => {
 	const container = canvasContainerMapRef.current.get(highlightContainerKey);
 	if (!container) {
@@ -995,7 +1277,16 @@ export const renderUpdateHighlightAction = (
 					blurSprite.customTexture.destroy(true);
 					blurSprite.customTexture = undefined;
 				}
-				blurSprite.sprite.texture = currentImageTexture;
+			}
+			// 重新生成原始截图的扩展纹理
+			const paddedTexture = getOrCreatePaddedTexture(
+				canvasAppRef,
+				currentImageTexture,
+				paddedTextureSourceRef,
+				paddedTextureRef,
+			);
+			for (const blurSprite of blurSpriteMapRef.current.values()) {
+				blurSprite.sprite.texture = paddedTexture ?? currentImageTexture;
 			}
 		}
 		return;
@@ -1026,6 +1317,7 @@ export const renderUpdateHighlightAction = (
 	// 高亮更新后，更新所有模糊精灵的纹理以包含最新高亮效果
 	const canvasApp = canvasAppRef.current;
 	if (canvasApp) {
+		// 销毁旧的高亮纹理，并为每个模糊精灵生成新的高亮纹理
 		for (const blurSprite of blurSpriteMapRef.current.values()) {
 			if (blurSprite.customTexture) {
 				blurSprite.customTexture.destroy(true);
@@ -1042,10 +1334,22 @@ export const renderUpdateHighlightAction = (
 			if (newTexture && newTexture !== currentImageTextureRef.current) {
 				blurSprite.customTexture = newTexture as PIXI.RenderTexture;
 			}
+		}
 
-			const fallbackTexture = currentImageTextureRef.current;
-			if (fallbackTexture) {
-				blurSprite.sprite.texture = newTexture ?? fallbackTexture;
+		// 基于新的纹理源生成扩展纹理，所有模糊精灵共享
+		const firstBlurSprite = blurSpriteMapRef.current.values().next().value;
+		const sourceTexture =
+			(firstBlurSprite?.customTexture as PIXI.Texture | undefined) ??
+			currentImageTextureRef.current;
+		if (sourceTexture) {
+			const paddedTexture = getOrCreatePaddedTexture(
+				canvasAppRef,
+				sourceTexture,
+				paddedTextureSourceRef,
+				paddedTextureRef,
+			);
+			for (const blurSprite of blurSpriteMapRef.current.values()) {
+				blurSprite.sprite.texture = paddedTexture ?? sourceTexture;
 			}
 		}
 	}
@@ -1198,6 +1502,8 @@ export const renderClearContextAction = (
 	blurSpriteFilterMapRef: RefType<Map<string, PIXI.Filter>>,
 	highlightElementMapRef: RefType<Map<string, HighlightElement>>,
 	lastWatermarkPropsRef: RefType<WatermarkProps>,
+	paddedTextureSourceRef: RefType<PIXI.Texture | undefined>,
+	paddedTextureRef: RefType<PIXI.Texture | undefined>,
 ) => {
 	for (const blurSprite of blurSpriteMapRef.current.values()) {
 		if (blurSprite.customTexture) {
@@ -1205,6 +1511,12 @@ export const renderClearContextAction = (
 			blurSprite.customTexture = undefined;
 		}
 	}
+	// 销毁共享的扩展纹理
+	if (paddedTextureRef.current) {
+		paddedTextureRef.current.destroy(true);
+		paddedTextureRef.current = undefined;
+	}
+	paddedTextureSourceRef.current = undefined;
 	blurSpriteMapRef.current.clear();
 	blurSpriteFilterMapRef.current.clear();
 	highlightElementMapRef.current.clear();
@@ -1232,6 +1544,8 @@ export const renderApplyProcessImageConfigToCanvasAction = (
 	processImageConfig: FixedContentProcessImageConfig,
 	canvasWidth: number,
 	canvasHeight: number,
+	paddedTextureSourceRef: RefType<PIXI.Texture | undefined>,
+	paddedTextureRef: RefType<PIXI.Texture | undefined>,
 ) => {
 	const canvasApp = canvasAppRef.current;
 	if (!canvasApp) {
@@ -1320,8 +1634,15 @@ export const renderApplyProcessImageConfigToCanvasAction = (
 		frame: new PIXI.Rectangle(0, 0, canvasWidth, canvasHeight),
 	});
 	currentImageTextureRef.current = imageTexture;
+	// 重新生成扩展纹理，避免边缘模糊采样到透明像素
+	const paddedTexture = getOrCreatePaddedTexture(
+		canvasAppRef,
+		imageTexture,
+		paddedTextureSourceRef,
+		paddedTextureRef,
+	);
 	for (const blurSprite of blurSpriteMapRef.current.values()) {
-		blurSprite.sprite.texture = imageTexture;
+		blurSprite.sprite.texture = paddedTexture ?? imageTexture;
 	}
 
 	for (const child of canvasApp.stage.children) {
