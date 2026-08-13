@@ -67,12 +67,15 @@ export const CaptureHistoryItemActions: React.FC<{
 			</Button>
 			<Button
 				onClick={async () => {
-					if (!item.capture_result_file_path) {
+					// 优先复制截图结果图层，全屏等无 result 画面的记录回退复制主图
+					const copyFilePath =
+						item.capture_result_file_path || item.file_path;
+					if (!copyFilePath) {
 						return;
 					}
 
 					setCopyLoading(true);
-					await writeFilePathToClipboard(item.capture_result_file_path);
+					await writeFilePathToClipboard(copyFilePath);
 					setCopyLoading(false);
 				}}
 				key="copy"
