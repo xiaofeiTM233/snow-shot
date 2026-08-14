@@ -27,6 +27,9 @@ struct CaptureFlags {
 
 struct WindowsCaptureImage {
     capture_info: Option<CaptureFlags>,
+    // 已收到的帧数。切换 capture engine / 颜色格式后 WGC 会话会重建，
+    // 首帧常为冷启动空帧（全黑/全零），需丢弃并从后续稳定帧取图。
+    frames_seen: u32,
 }
 
 impl GraphicsCaptureApiHandler for WindowsCaptureImage {
@@ -36,6 +39,7 @@ impl GraphicsCaptureApiHandler for WindowsCaptureImage {
     fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
         Ok(Self {
             capture_info: Some(ctx.flags),
+            frames_seen: 0,
         })
     }
 
@@ -44,6 +48,12 @@ impl GraphicsCaptureApiHandler for WindowsCaptureImage {
         frame: &mut Frame,
         capture_control: InternalCaptureControl,
     ) -> Result<(), Self::Error> {
+        self.frames_seen += 1;
+        // 丢弃冷启动首帧，避免「切换配置后首次截图黑屏」
+        if self.frames_seen == 1 {
+            return Ok(());
+        }
+
         capture_control.stop();
 
         let capture_info = match self.capture_info.take() {
