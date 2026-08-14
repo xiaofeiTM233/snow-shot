@@ -144,6 +144,6 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
-          name: snow-shot-windows-test-build
+          name: snow-shot-windows-test-build-${{ github.run_id }}
           path: |
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
