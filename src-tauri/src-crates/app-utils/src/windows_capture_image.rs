@@ -205,10 +205,6 @@ pub fn write_rgba16f_linear_to_rgba8(
         ))
         .to_f32()
             * hdr_scale;
-        let alpha_f = f16::from_bits(u16::from_le(
-            *(rgba16f_image.add(pixel_index * 8 + 6) as *const u16),
-        ))
-        .to_f32();
 
         // 使用快速饱和转换
         rgba8_image
@@ -220,10 +216,9 @@ pub fn write_rgba16f_linear_to_rgba8(
         rgba8_image
             .add(pixel_index * 4 + 2)
             .write(linear_to_srgb_byte(blue_f));
-        // Alpha 通道不需要 linear_to_srgb 转换，直接钳位到 [0, 1] 范围
-        rgba8_image
-            .add(pixel_index * 4 + 3)
-            .write((alpha_f.clamp(0.0, 1.0) * 255.0) as u8);
+        // 截图不需要透明通道。HDR(WGC Rgba16F) 捕获帧的 Alpha 通常为 0，
+        // 若直接写入会导致整幅图像透明、预览/保存显示为黑屏，因此强制不透明。
+        rgba8_image.add(pixel_index * 4 + 3).write(255);
     }
 }
 
@@ -289,6 +284,11 @@ fn process_captured_image(
                 ));
             }
         };
+        // 同理强制不透明：系统合成 Rgba8 帧的 Alpha 偶尔为 0，会导致黑屏。
+        let mut rgba8 = rgba8;
+        for p in rgba8.pixels_mut() {
+            p.0[3] = 255;
+        }
         return Ok(image::DynamicImage::ImageRgba8(rgba8));
     }
 
