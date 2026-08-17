@@ -16,7 +16,6 @@ snow-shot-app-shared = { workspace = true }
 snow-shot-global-state = { workspace = true }
 
 [target.'cfg(any(target_os = "macos"))'.dependencies]
-scap = { workspace = true }
 
 [target.'cfg(any(target_os = "windows"))'.dependencies]
 snow-shot-webview = { workspace = true }

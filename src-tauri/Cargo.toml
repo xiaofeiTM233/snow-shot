@@ -50,7 +50,6 @@ rayon = "^1.10"
 regex = "^1.11"
 zune-jpegxl = "^0.4"
 zune-core = "0.4"
-scap = { git = "https://github.com/mg-chao/scap", branch = "20250712_custom" }
 objc2 = "0.6.1"
 objc2-app-kit = { version = "0.3.1" }
 objc2-foundation = { version = "0.3.1" }
