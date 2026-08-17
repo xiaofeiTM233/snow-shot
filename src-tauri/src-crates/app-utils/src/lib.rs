@@ -26,6 +26,9 @@ pub mod monitor_hdr_info;
 #[cfg(target_os = "windows")]
 pub mod windows_capture_image;
 
+/// 平台相关的底层工具（本地化定制能力，与 xcap 解耦）。
+pub mod sys;
+
 pub mod monitor_info;
 
 pub fn get_device_state() -> Result<DeviceState, String> {

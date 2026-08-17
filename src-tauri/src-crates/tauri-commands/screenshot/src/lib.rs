@@ -5,8 +5,6 @@ use snow_shot_app_os::ui_automation::UIElements;
 
 #[cfg(target_os = "windows")]
 use windows::Win32::Foundation::HWND;
-#[cfg(target_os = "windows")]
-use std::ffi::c_void;
 use snow_shot_app_shared::ElementRect;
 use snow_shot_app_utils::monitor_info::{
     CaptureMethod, CaptureOption, ColorFormat, CorrectHdrColorAlgorithm, MonitorList,
@@ -145,17 +143,37 @@ pub async fn capture_all_monitors(
 
 #[cfg(target_os = "windows")]
 pub fn capture_window_hdr_image(
-    window: &xcap::Window,
+    hwnd: HWND,
     algorithm: CorrectHdrColorAlgorithm,
 ) -> Option<image::DynamicImage> {
     use snow_shot_app_utils::monitor_hdr_info::get_all_monitors_sdr_info;
     use snow_shot_app_utils::monitor_info::MonitorInfo;
     use snow_shot_app_utils::windows_capture_image;
-    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MONITORINFOEXW, MONITOR_DEFAULTTONEAREST};
+    use windows::Win32::UI::WindowsAndMessaging::MonitorFromWindow;
+    use widestring::U16CString;
 
-    // 获取 Windows 所属的显示
-    let monitor = match window.current_monitor() {
-        Ok(monitor) => monitor,
+    // 获取窗口所属的显示器
+    let hmonitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
+    if hmonitor.is_invalid() {
+        return None;
+    }
+
+    // 取得显示器设备名（与 monitor_hdr_info 的 key 一致，形如 \\.\DISPLAYx）
+    let mut monitor_info = MONITORINFOEXW {
+        monitorInfo: windows::Win32::Graphics::Gdi::MONITORINFO {
+            cbSize: u32::try_from(std::mem::size_of::<MONITORINFOEXW>()).unwrap(),
+            rcMonitor: windows::Win32::Foundation::RECT::default(),
+            rcWork: windows::Win32::Foundation::RECT::default(),
+            dwFlags: 0,
+        },
+        szDevice: [0; 32],
+    };
+    if !unsafe { GetMonitorInfoW(hmonitor, std::ptr::addr_of_mut!(monitor_info).cast()) }.as_bool() {
+        return None;
+    }
+    let device_name = match U16CString::from_vec_truncate(monitor_info.szDevice).to_string() {
+        Ok(name) => name,
         Err(_) => return None,
     };
 
@@ -170,11 +188,7 @@ pub fn capture_window_hdr_image(
         }
     };
 
-    let hdr_info = match hdr_infos.get(
-        MonitorInfo::get_device_name(&monitor)
-            .unwrap_or_default()
-            .as_str(),
-    ) {
+    let hdr_info = match hdr_infos.get(device_name.as_str()) {
         Some(hdr_info) => hdr_info,
         None => return None,
     };
@@ -183,9 +197,19 @@ pub fn capture_window_hdr_image(
         return None;
     }
 
+    // 用设备名构造 xcap Monitor（经由 name 匹配的原生 HMONITOR），再交给 WGC 捕获。
+    let monitor = match xcap::Monitor::all()
+        .unwrap_or_default()
+        .into_iter()
+        .find(|m| m.name().unwrap_or_default() == device_name)
+    {
+        Some(monitor) => monitor,
+        None => return None,
+    };
+
     return match windows_capture_image::capture_monitor_image(
         &MonitorInfo::new(&monitor, Some(hdr_info.clone())),
-        Some(HWND(window.hwnd().unwrap())),
+        Some(hwnd),
         None,
         ColorFormat::Rgba8,
         algorithm,
@@ -212,13 +236,11 @@ pub async fn capture_focused_window(
     {
         let hwnd = snow_shot_app_os::utils::get_focused_window();
 
-        let focused_window = xcap::Window::new(xcap::ImplWindow::new(hwnd));
-
         // 选择 xcap 时直接走 xcap，不做 WGC 尝试；
         // 选择 WGC 或自动（Auto，HDR 屏会走 WGC）时尝试 WGC 的 HDR 窗口捕获，
         // 失败则回退 xcap（由下方 match 处理）。
         let hdr_image = if capture_method != CaptureMethod::Xcap {
-            capture_window_hdr_image(&focused_window, correct_hdr_color_algorithm)
+            capture_window_hdr_image(hwnd, correct_hdr_color_algorithm)
         } else {
             None
         };
@@ -226,22 +248,25 @@ pub async fn capture_focused_window(
         image = match hdr_image {
             Some(image) => image,
             None => {
-                match focused_window.capture_image() {
-                    Ok(image) => DynamicImage::ImageRgba8(image),
-                    Err(_) => {
-                        log::warn!("[capture_focused_window] Failed to capture focused window");
-                        // 改成捕获当前显示器
+                // 用原生 HWND 反查 xcap Window，以便调用其 capture_image() 回退。
+                let focused_window = xcap::Window::all()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .find(|w| {
+                        snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd(w) == Some(hwnd)
+                    });
 
-                        let (_, _, monitor) = snow_shot_app_utils::get_target_monitor()?;
-
-                        match monitor.capture_image() {
-                            Ok(image) => DynamicImage::ImageRgba8(image),
-                            Err(_) => {
-                                return Err(String::from(
-                                    "[capture_focused_window] Failed to capture image",
-                                ));
-                            }
+                match focused_window {
+                    Some(window) => match window.capture_image() {
+                        Ok(image) => DynamicImage::ImageRgba8(image),
+                        Err(_) => {
+                            log::warn!("[capture_focused_window] Failed to capture focused window");
+                            fallback_to_monitor()?
                         }
+                    },
+                    None => {
+                        log::warn!("[capture_focused_window] Failed to find focused window in xcap list");
+                        fallback_to_monitor()?
                     }
                 }
             }
@@ -307,13 +332,33 @@ pub async fn capture_focused_window(
     Ok(Response::new(image_buffer))
 }
 
+/// Windows 下捕获聚焦窗口失败时的回退：截取当前鼠标所在显示器。
+#[cfg(target_os = "windows")]
+fn fallback_to_monitor() -> Result<image::DynamicImage, String> {
+    let (_, _, monitor) = snow_shot_app_utils::get_target_monitor()?;
+
+    match monitor.capture_image() {
+        Ok(image) => Ok(DynamicImage::ImageRgba8(image)),
+        Err(_) => Err(String::from(
+            "[capture_focused_window] Failed to capture image",
+        )),
+    }
+}
+
 /// 获取当前焦点窗口的应用名称
 pub fn get_focused_window_app_name() -> String {
     #[cfg(target_os = "windows")]
     {
         let hwnd = snow_shot_app_os::utils::get_focused_window();
-        let focused_window = xcap::Window::new(xcap::ImplWindow::new(hwnd));
-        focused_window.app_name().unwrap_or_default()
+        let focused_window = xcap::Window::all()
+            .unwrap_or_default()
+            .into_iter()
+            .find(|w| {
+                snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd(w) == Some(hwnd)
+            });
+        focused_window
+            .and_then(|w| w.app_name().ok())
+            .unwrap_or_default()
     }
 
     #[cfg(target_os = "linux")]
@@ -371,25 +416,12 @@ pub async fn get_window_elements(
     #[allow(unused_variables)] window: tauri::Window,
     #[allow(unused_variables)] blacklist: Option<Vec<String>>,
 ) -> Result<Vec<WindowElement>, ()> {
-    // 获取所有窗口，简单筛选下需要的窗口，然后获取窗口所有元素
-    let windows = {
-        #[cfg(target_os = "windows")]
-        {
-            xcap::Window::all()
-                .unwrap_or_default()
-                .iter()
-                .map(|window| window.hwnd().unwrap() as usize)
-                .collect::<Vec<usize>>()
-        }
-        #[cfg(target_os = "macos")]
-        {
-            xcap::Window::all()
-                .unwrap_or_default()
-                .iter()
-                .map(|window| window.id().unwrap())
-                .collect::<Vec<u32>>()
-        }
-    };
+    // 获取所有窗口，简单筛选下需要的窗口，然后获取窗口所有元素。
+    // 注意：原 fork 版用 `window.hwnd()` / `ImplWindow` 等私有 API 反查窗口，
+    // 官方原版 xcap 已移除这些 API。这里统一改用 xcap::Window 的公开方法
+    // （app_name/is_minimized/title/x/y/width/height/id），必要时通过
+    // snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd 取原生 HWND。
+    let windows: Vec<xcap::Window> = xcap::Window::all().unwrap_or_default();
 
     #[cfg(target_os = "macos")]
     let window_size_scale: f32;
@@ -404,37 +436,21 @@ pub async fn get_window_elements(
 
     let rect_list = windows
         .par_iter()
-        .filter_map(|window_hwnd| {
-            let window = {
-                #[cfg(target_os = "windows")]
-                {
-                    let w = xcap::ImplWindow::new(HWND(*window_hwnd as *mut c_void));
-
-                    // 黑名单过滤：检查应用名是否在黑名单中
-                    if let Some(ref bl) = blacklist {
-                        if let Ok(app_name) = w.app_name() {
-                            let app_name_lower = app_name.to_lowercase();
-                            for item in bl {
-                                if app_name_lower.contains(&item.to_lowercase()) {
-                                    return None;
-                                }
+        .filter_map(|window| {
+            // 黑名单过滤：检查应用名是否在黑名单中
+            #[cfg(target_os = "windows")]
+            {
+                if let Some(ref bl) = blacklist {
+                    if let Ok(app_name) = window.app_name() {
+                        let app_name_lower = app_name.to_lowercase();
+                        for item in bl {
+                            if app_name_lower.contains(&item.to_lowercase()) {
+                                return None;
                             }
                         }
                     }
-
-                    w
                 }
-                #[cfg(target_os = "macos")]
-                {
-                    xcap::ImplWindow::new(*window_hwnd)
-                }
-            };
-
-            #[cfg(target_os = "macos")]
-            let cf_dict = match window.window_cf_dictionary() {
-                Ok(cf_dict) => cf_dict,
-                Err(_) => return None,
-            };
+            }
 
             #[cfg(target_os = "windows")]
             {
@@ -445,24 +461,15 @@ pub async fn get_window_elements(
 
             #[cfg(target_os = "macos")]
             {
-                if xcap::ImplWindow::is_minimized_by_cf_dictionary(cf_dict.as_ref()).unwrap_or(true)
-                {
+                if window.is_minimized().unwrap_or(true) {
                     return None;
                 }
             }
 
-            let window_title;
-            #[cfg(target_os = "windows")]
-            {
-                window_title = window.title().unwrap_or_default();
-            }
+            let window_title = window.title().unwrap_or_default();
+
             #[cfg(target_os = "macos")]
             {
-                window_title = match xcap::ImplWindow::title_by_cf_dictionary(cf_dict.as_ref()) {
-                    Ok(title) => title,
-                    Err(_) => return None,
-                };
-
                 if window_title.eq("Notification Center") || window_title.eq("Dock") {
                     return None;
                 }
@@ -474,6 +481,13 @@ pub async fn get_window_elements(
                 }
             }
 
+            #[cfg(target_os = "windows")]
+            {
+                if window_title.eq("Shell Handwriting Canvas") {
+                    return None;
+                }
+            }
+
             let window_rect: ElementRect;
             let window_id: u32;
             let x: i32;
@@ -481,35 +495,12 @@ pub async fn get_window_elements(
             let width: i32;
             let height: i32;
 
-            #[cfg(target_os = "windows")]
-            {
-                if window_title.eq("Shell Handwriting Canvas") {
-                    return None;
-                }
-
-                let window_info = match window.get_window_info() {
-                    Ok(window_info) => window_info,
-                    Err(_) => return None,
-                };
-
-                x = window_info.rcClient.left;
-                y = window_info.rcClient.top;
-                width = window_info.rcClient.right - window_info.rcClient.left;
-                height = window_info.rcClient.bottom - window_info.rcClient.top;
-            }
-
-            #[cfg(target_os = "macos")]
-            {
-                let cg_rect = match xcap::ImplWindow::cg_rect_by_cf_dictionary(cf_dict.as_ref()) {
-                    Ok(window_rect) => window_rect,
-                    Err(_) => return None,
-                };
-
-                x = cg_rect.origin.x as i32;
-                y = cg_rect.origin.y as i32;
-                width = cg_rect.size.width as i32;
-                height = cg_rect.size.height as i32;
-            }
+            // 使用 xcap 公开的几何属性（x/y/width/height）替代原 fork 的
+            // get_window_info()（client rect）与 cg_rect_by_cf_dictionary。
+            x = window.x().unwrap_or(0);
+            y = window.y().unwrap_or(0);
+            width = window.width().unwrap_or(0) as i32;
+            height = window.height().unwrap_or(0) as i32;
 
             window_id = match window.id() {
                 Ok(id) => id,
@@ -550,14 +541,13 @@ pub async fn switch_always_on_top(#[allow(unused_variables)] window_id: u32) -> 
             None => return false,
         };
 
-        let window_hwnd = window.hwnd();
-
-        let window_hwnd = match window_hwnd {
-            Ok(hwnd) => hwnd,
-            Err(_) => return false,
+        // 官方原版 xcap 不再提供 Window::hwnd()，改用本地化映射。
+        let window_hwnd = match snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd(window) {
+            Some(hwnd) => hwnd,
+            None => return false,
         };
 
-        snow_shot_app_os::utils::switch_always_on_top(window_hwnd);
+        snow_shot_app_os::utils::switch_always_on_top(window_hwnd.0);
     }
 
     #[cfg(target_os = "linux")]

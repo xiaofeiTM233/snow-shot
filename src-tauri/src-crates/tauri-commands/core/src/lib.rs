@@ -1113,17 +1113,14 @@ pub async fn has_focused_full_screen_window() -> Result<bool, String> {
             return Ok(true);
         }
 
+        // 官方原版 xcap 不再提供 Window::hwnd()，改用本地化映射判断前台窗口
+        // 是否出现在 xcap 可枚举窗口列表中。
         Ok(xcap::Window::all()
             .unwrap_or_default()
             .iter()
             .any(|window| {
-                use windows::Win32::Foundation::HWND;
-
-                if HWND(window.hwnd().unwrap()) == focused_window_hwnd {
-                    return is_window_fullscreen(focused_window_hwnd);
-                }
-
-                return false;
+                snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd(window)
+                    == Some(focused_window_hwnd)
             }))
     }
 
@@ -1131,7 +1128,6 @@ pub async fn has_focused_full_screen_window() -> Result<bool, String> {
     {
         use objc2_app_kit::NSWorkspace;
         use objc2_foundation::{NSNumber, NSString};
-        use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
         // 并行获取 monitor_list 和 windows
         let (monitor_list, windows) = tokio::join!(
@@ -1139,11 +1135,7 @@ pub async fn has_focused_full_screen_window() -> Result<bool, String> {
                 snow_shot_app_utils::monitor_info::MonitorList::all(true)
             }),
             tokio::task::spawn_blocking(|| {
-                xcap::Window::all()
-                    .unwrap_or_default()
-                    .iter()
-                    .map(|window| window.id().unwrap())
-                    .collect::<Vec<u32>>()
+                xcap::Window::all().unwrap_or_default()
             })
         );
 
@@ -1191,27 +1183,17 @@ pub async fn has_focused_full_screen_window() -> Result<bool, String> {
             }
         };
 
-        Ok(windows.par_iter().any(|window_id| {
-            let window = { xcap::ImplWindow::new(*window_id) };
-
+        Ok(windows.iter().any(|window| {
             if window.pid().unwrap_or_default() != focused_app_id {
                 return false;
             }
 
-            let cf_dict = match window.window_cf_dictionary() {
-                Ok(cf_dict) => cf_dict,
-                Err(_) => return false,
-            };
-
-            let cg_rect = match xcap::ImplWindow::cg_rect_by_cf_dictionary(cf_dict.as_ref()) {
-                Ok(window_rect) => window_rect,
-                Err(_) => return false,
-            };
-
-            let min_x = cg_rect.origin.x as i32;
-            let min_y = cg_rect.origin.y as i32;
-            let max_x = min_x + cg_rect.size.width as i32;
-            let max_y = min_y + cg_rect.size.height as i32;
+            // 官方原版 xcap 不再提供 cf_dictionary / cg_rect_by_cf_dictionary，
+            // 改用公开的几何属性 x/y/width/height。
+            let min_x = window.x().unwrap_or(0);
+            let min_y = window.y().unwrap_or(0);
+            let max_x = min_x + window.width().unwrap_or(0) as i32;
+            let max_y = min_y + window.height().unwrap_or(0) as i32;
 
             monitor_list.iter().any(|monitor| {
                 (monitor.rect.min_x as f32 / monitor.monitor_scale_factor as f32) as i32 == min_x

@@ -24,13 +24,13 @@ core-graphics-helmer-fork = "0.24.0"
 macos-accessibility-client = { workspace = true }
 
 [target.'cfg(any(target_os = "windows"))'.dependencies]
-windows = { workspace = true, features = ["Win32_UI_Magnification"] }
+windows = { workspace = true, features = ["Win32_UI_Magnification", "Win32_UI_WindowsAndMessaging"] }
 rayon = { workspace = true }
 image = { workspace = true }
 widestring = "1.2.0"
 windows-capture = "2.0.0-alpha.7"
 half = "2.6.0"
-webview2-com = "0.38.0"
-windows-core = { version = "0.61" }
+webview2-com = "0.39.0"
+windows-core = { version = "0.62" }
 snow-shot-webview = { workspace = true }
 clipboard-win = { workspace = true }

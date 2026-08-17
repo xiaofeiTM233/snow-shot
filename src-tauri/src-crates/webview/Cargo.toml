@@ -12,5 +12,5 @@ windows = { workspace = true }
 tokio = { workspace = true }
 dashmap = { workspace = true }
 
-webview2-com = "0.38.0"
+webview2-com = "0.39.0"
 windows-core = { version = "0.61" }

@@ -9,7 +9,16 @@ use xcap::Monitor;
 #[cfg(target_os = "windows")]
 use crate::monitor_hdr_info::{self, MonitorHdrInfo};
 #[cfg(target_os = "windows")]
-use windows::Win32::Graphics::Gdi::HMONITOR;
+use windows::Win32::Foundation::LPARAM;
+#[cfg(target_os = "windows")]
+use windows::Win32::Graphics::Gdi::{
+    DEVMODEW, ENUM_CURRENT_SETTINGS, EnumDisplayMonitors, EnumDisplaySettingsW, HMONITOR,
+    MONITORINFOEXW,
+};
+#[cfg(target_os = "windows")]
+use windows::Win32::Graphics::Gdi::{
+    GetMonitorInfoW, MONITORINFO,
+};
 
 #[derive(Debug)]
 pub struct MonitorInfo {
@@ -52,14 +61,20 @@ impl MonitorInfo {
 
         #[cfg(target_os = "windows")]
         {
-            let rect = monitor.get_dev_mode_w().unwrap();
+            // 原版 xcap 的 Monitor::id() 返回 u32（内部编号），不再是 HMONITOR 句柄，
+            // 因此无法直接把 id() 当 HMONITOR 使用。这里改用 monitor.name() 经
+            // EnumDisplayMonitors 反查真实 HMONITOR，再经 GetMonitorInfoW 取得
+            // 设备名，最后用 EnumDisplaySettingsW 读取 DEVMODE 的 dmPosition 与
+            // 分辨率来构建显示器矩形。
+            let name = monitor.name().unwrap_or_default();
+            let hmonitor = get_monitor_handle_by_name(&name).unwrap_or(HMONITOR(std::ptr::null_mut()));
+            let device_name = get_device_name_by_handle(hmonitor).unwrap_or(name);
+            let rect = get_dev_mode(&device_name).unwrap_or_default();
             monitor_rect = ElementRect {
-                min_x: unsafe { rect.Anonymous1.Anonymous2.dmPosition.x },
-                min_y: unsafe { rect.Anonymous1.Anonymous2.dmPosition.y },
-                max_x: unsafe { rect.Anonymous1.Anonymous2.dmPosition.x + rect.dmPelsWidth as i32 },
-                max_y: unsafe {
-                    rect.Anonymous1.Anonymous2.dmPosition.y + rect.dmPelsHeight as i32
-                },
+                min_x: rect.Anonymous1.Anonymous2.dmPosition.x,
+                min_y: rect.Anonymous1.Anonymous2.dmPosition.y,
+                max_x: rect.Anonymous1.Anonymous2.dmPosition.x + rect.dmPelsWidth as i32,
+                max_y: rect.Anonymous1.Anonymous2.dmPosition.y + rect.dmPelsHeight as i32,
             };
             scale_factor = monitor.scale_factor().unwrap_or(0.0);
 
@@ -108,11 +123,123 @@ impl MonitorInfo {
         }
     }
 
+    /// 通过显示器设备名（xcap 的 `Monitor::name()`）反查真实 `HMONITOR`。
+    ///
+    /// 原版 xcap 的 `Monitor::id()` 返回 u32 内部编号，不再是 `HMONITOR` 句柄，
+    /// 因此这里用 `EnumDisplayMonitors` 枚举系统显示器，按 `GetMonitorInfoW`
+    /// 返回的 `szDevice`（设备名）与给定名称匹配。找不到时返回空句柄。
     #[cfg(target_os = "windows")]
     pub fn get_monitor_handle(monitor: &Monitor) -> HMONITOR {
+        get_monitor_handle_by_name(&monitor.name().unwrap_or_default())
+    }
+
+    /// 枚举系统显示器，按设备名匹配返回 `HMONITOR`。
+    #[cfg(target_os = "windows")]
+    fn get_monitor_handle_by_name(name: &str) -> HMONITOR {
         use std::ffi::c_void;
 
-        HMONITOR(monitor.id().unwrap() as *mut c_void)
+        struct Ctx<'a> {
+            name: &'a str,
+            found: HMONITOR,
+        }
+
+        unsafe extern "system" fn callback(
+            hmonitor: HMONITOR,
+            _hdc: windows::Win32::Graphics::Gdi::HDC,
+            _rect: *mut windows::Win32::Foundation::RECT,
+            lparam: LPARAM,
+        ) -> windows::Win32::Foundation::BOOL {
+            let ctx = &mut *(lparam.0 as *mut Ctx);
+            let device = get_device_name_by_handle(hmonitor).unwrap_or_default();
+            if device == ctx.name {
+                ctx.found = hmonitor;
+                // 停止枚举
+                windows::Win32::Foundation::BOOL::from(false)
+            } else {
+                windows::Win32::Foundation::BOOL::from(true)
+            }
+        }
+
+        let mut ctx = Ctx {
+            name,
+            found: HMONITOR(std::ptr::null_mut::<c_void>()),
+        };
+        unsafe {
+            let _ = EnumDisplayMonitors(
+                None,
+                None,
+                Some(callback),
+                LPARAM(&mut ctx as *mut _ as isize),
+            );
+        }
+        ctx.found
+    }
+
+    /// 通过 `HMONITOR` 取得显示器设备名（`\\.\DISPLAYx`）。
+    #[cfg(target_os = "windows")]
+    fn get_device_name_by_handle(hmonitor: HMONITOR) -> Option<String> {
+        use widestring::U16CString;
+        use windows::Win32::{
+            Foundation::RECT,
+            Graphics::Gdi::{GetMonitorInfoW, MONITORINFO},
+        };
+
+        if hmonitor.0.is_null() {
+            return None;
+        }
+
+        let mut monitor_info = MONITORINFOEXW {
+            monitorInfo: MONITORINFO {
+                cbSize: u32::try_from(std::mem::size_of::<MONITORINFOEXW>()).unwrap(),
+                rcMonitor: RECT::default(),
+                rcWork: RECT::default(),
+                dwFlags: 0,
+            },
+            szDevice: [0; 32],
+        };
+
+        let result = unsafe {
+            GetMonitorInfoW(
+                hmonitor,
+                std::ptr::addr_of_mut!(monitor_info).cast(),
+            )
+        };
+
+        if !result.as_bool() {
+            return None;
+        }
+
+        U16CString::from_vec_truncate(monitor_info.szDevice)
+            .to_string()
+            .ok()
+    }
+
+    /// 通过显示器设备名读取当前设置的 `DEVMODEW`（含位置与分辨率）。
+    #[cfg(target_os = "windows")]
+    fn get_dev_mode(device_name: &str) -> Option<DEVMODEW> {
+        use std::ffi::c_void;
+
+        let name_u16: Vec<u16> = device_name
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+
+        let mut dev_mode: DEVMODEW = unsafe { std::mem::zeroed() };
+        dev_mode.dmSize = u16::try_from(std::mem::size_of::<DEVMODEW>()).unwrap();
+
+        let result = unsafe {
+            EnumDisplaySettingsW(
+                windows::core::PCWSTR(name_u16.as_ptr()),
+                ENUM_CURRENT_SETTINGS,
+                &mut dev_mode,
+            )
+        };
+
+        if result.as_bool() {
+            Some(dev_mode)
+        } else {
+            None
+        }
     }
 
     /// 获取显示器设备名称
