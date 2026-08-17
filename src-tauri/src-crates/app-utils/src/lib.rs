@@ -26,6 +26,9 @@ pub mod monitor_hdr_info;
 #[cfg(target_os = "windows")]
 pub mod windows_capture_image;
 
+/// 平台相关的底层工具（本地化定制能力，与 xcap 解耦）。
+pub mod sys;
+
 pub mod monitor_info;
 
 pub fn get_device_state() -> Result<DeviceState, String> {
@@ -243,17 +246,6 @@ pub fn get_capture_monitor_list(
     }
 }
 
-#[cfg(target_os = "macos")]
-pub fn get_window_id_from_ns_handle(ns_handle: *mut std::ffi::c_void) -> u32 {
-    use objc2::runtime::AnyObject;
-
-    unsafe {
-        let ns_window = ns_handle as *mut AnyObject;
-        let window_id: u32 = objc2::msg_send![ns_window, windowNumber];
-        window_id
-    }
-}
-
 /// 检查所有显示器的 scale_factor 是否一致
 ///
 /// 返回一个元组：(是否一致, 所有 scale_factor 的列表)
@@ -286,59 +278,40 @@ pub fn capture_target_monitor(
 ) -> Option<image::DynamicImage> {
     #[cfg(target_os = "windows")]
     {
+        // 0.9.8 仅提供 RGBA 的 capture_image()/capture_region()，Rgb8 时取 RGBA 再转。
         let image = if let Some(crop_area) = crop_area {
-            match color_format {
-                ColorFormat::Rgb8 => DynamicImage::ImageRgb8(
-                    match monitor.capture_region_rgb(
-                        crop_area.min_x as u32,
-                        crop_area.min_y as u32,
-                        (crop_area.max_x - crop_area.min_x) as u32,
-                        (crop_area.max_y - crop_area.min_y) as u32,
-                    ) {
-                        Ok(image) => image,
-                        Err(e) => {
-                            log::error!(
-                                "[capture_target_monitor] failed to capture image: {:?}",
-                                e
-                            );
-                            return None;
-                        }
-                    },
-                ),
-                ColorFormat::Rgba8 => DynamicImage::ImageRgba8(
-                    match monitor.capture_region(
-                        crop_area.min_x as u32,
-                        crop_area.min_y as u32,
-                        (crop_area.max_x - crop_area.min_x) as u32,
-                        (crop_area.max_y - crop_area.min_y) as u32,
-                    ) {
-                        Ok(image) => image,
-                        Err(e) => {
-                            log::error!(
-                                "[capture_target_monitor] failed to capture image: {:?}",
-                                e
-                            );
-                            return None;
-                        }
-                    },
-                ),
+            match monitor.capture_region(
+                crop_area.min_x as u32,
+                crop_area.min_y as u32,
+                (crop_area.max_x - crop_area.min_x) as u32,
+                (crop_area.max_y - crop_area.min_y) as u32,
+            ) {
+                Ok(rgba) => match color_format {
+                    ColorFormat::Rgb8 => {
+                        DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(rgba).to_rgb8())
+                    }
+                    ColorFormat::Rgba8 => DynamicImage::ImageRgba8(rgba),
+                },
+                Err(e) => {
+                    log::error!(
+                        "[capture_target_monitor] failed to capture image: {:?}",
+                        e
+                    );
+                    return None;
+                }
             }
         } else {
-            match color_format {
-                ColorFormat::Rgb8 => DynamicImage::ImageRgb8(match monitor.capture_image_rgb() {
-                    Ok(image) => image,
-                    Err(e) => {
-                        log::error!("[capture_target_monitor] failed to capture image: {:?}", e);
-                        return None;
+            match monitor.capture_image() {
+                Ok(rgba) => match color_format {
+                    ColorFormat::Rgb8 => {
+                        DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(rgba).to_rgb8())
                     }
-                }),
-                ColorFormat::Rgba8 => DynamicImage::ImageRgba8(match monitor.capture_image() {
-                    Ok(image) => image,
-                    Err(e) => {
-                        log::error!("[capture_target_monitor] failed to capture image: {:?}", e);
-                        return None;
-                    }
-                }),
+                    ColorFormat::Rgba8 => DynamicImage::ImageRgba8(rgba),
+                },
+                Err(e) => {
+                    log::error!("[capture_target_monitor] failed to capture image: {:?}", e);
+                    return None;
+                }
             }
         };
 
@@ -347,199 +320,35 @@ pub fn capture_target_monitor(
 
     #[cfg(target_os = "macos")]
     {
-        if !scap::has_permission() {
-            log::warn!("[capture_current_monitor_with_scap] failed tohas_permission");
-            if !scap::request_permission() {
-                log::warn!("[capture_current_monitor_with_scap] failed to request_permission");
-            }
-
-            // macOS 必须重启应用后生效，所以这里返回 None
-            return None;
-        }
-
+        // macOS 改用官方 xcap：权限由 xcap 隐式获取（失败转 None），且 xcap 不支持排除窗口故忽略。
         if monitor
             .name()
-            .unwrap_or("".to_string())
+            .unwrap_or_default()
             .eq("DeskPad Display")
         {
-            log::warn!("[capture_current_monitor_with_scap] skip DeskPad Display");
-            return Some(image::DynamicImage::ImageRgb8(image::RgbImage::new(1, 1)));
+            log::warn!("[capture_target_monitor] skip DeskPad Display");
+            return Some(image::DynamicImage::ImageRgba8(image::RgbaImage::new(1, 1)));
         }
 
-        let monitor_id = match monitor.id() {
-            Ok(id) => id,
-            Err(e) => {
-                log::error!(
-                    "[capture_current_monitor_with_scap] failed to get monitor id: {:?}",
-                    e
-                );
-                return None;
-            }
+        let capture_result = if let Some(crop_area) = crop_area {
+            monitor.capture_region(
+                crop_area.min_x as u32,
+                crop_area.min_y as u32,
+                (crop_area.max_x - crop_area.min_x) as u32,
+                (crop_area.max_y - crop_area.min_y) as u32,
+            )
+        } else {
+            monitor.capture_image()
         };
 
-        let mut window_id: Option<u32> = None;
-        if let Some(exclude_window) = exclude_window {
-            let ns_handle = match exclude_window.ns_window() {
-                Ok(ns_handle) => ns_handle,
-                Err(_) => {
-                    log::error!("[capture_current_monitor_with_scap] failed to get ns_window");
-                    return None;
-                }
-            };
-            window_id = Some(get_window_id_from_ns_handle(ns_handle));
-        }
-
-        let options = scap::capturer::Options {
-            fps: 1,
-            target: Some(scap::Target::Display(scap::Display {
-                id: monitor_id as u32,
-                title: "".to_string(), // 这里 title 不重要
-                raw_handle: core_graphics_helmer_fork::display::CGDisplay::new(monitor_id),
-            })),
-            show_cursor: false,
-            show_highlight: true,
-            excluded_targets: if let Some(window_id) = window_id {
-                Some(vec![scap::Target::Window(scap::Window {
-                    id: window_id,
-                    title: "Snow Shot - Draw".to_string(),
-                    raw_handle: window_id,
-                })])
-            } else {
+        match capture_result {
+            Ok(rgba) => Some(image::DynamicImage::ImageRgba8(rgba)),
+            Err(e) => {
+                log::error!("[capture_target_monitor] macOS xcap capture failed: {:?}", e);
                 None
-            },
-            output_type: scap::frame::FrameType::BGRAFrame,
-            output_resolution: scap::capturer::Resolution::Captured,
-            crop_area: if let Some(crop_area) = crop_area {
-                Some(scap::capturer::Area {
-                    origin: scap::capturer::Point {
-                        x: crop_area.min_x as f64,
-                        y: crop_area.min_y as f64,
-                    },
-                    size: scap::capturer::Size {
-                        width: (crop_area.max_x - crop_area.min_x) as f64,
-                        height: (crop_area.max_y - crop_area.min_y) as f64,
-                    },
-                })
-            } else {
-                Some(scap::capturer::Area {
-                    origin: scap::capturer::Point { x: 0.0, y: 0.0 },
-                    size: scap::capturer::Size {
-                        width: monitor.width().unwrap_or(0) as f64,
-                        height: monitor.height().unwrap_or(0) as f64,
-                    },
-                })
-            },
-            ..Default::default()
-        };
-
-        // Create Capturer
-        let capturer = scap::capturer::Capturer::build(options);
-        let mut capturer = match capturer {
-            Ok(capturer) => capturer,
-            Err(e) => {
-                log::error!(
-                    "[capture_current_monitor_with_scap] failed to build capturer: {:?}",
-                    e
-                );
-                return None;
-            }
-        };
-
-        capturer.start_capture();
-        let frame = match capturer.get_next_frame() {
-            Ok(frame) => match frame {
-                scap::frame::Frame::BGRA(frame) => frame,
-                _ => {
-                    log::error!("[capture_current_monitor_with_scap] valid frame type");
-                    return None;
-                }
-            },
-            Err(e) => {
-                log::error!(
-                    "[capture_current_monitor_with_scap] failed to get_next_frame: {:?}",
-                    e
-                );
-                return None;
-            }
-        };
-        capturer.stop_capture();
-
-        match color_format {
-            ColorFormat::Rgb8 => match image::RgbImage::from_raw(
-                frame.width as u32,
-                frame.height as u32,
-                bgra_to_rgb(&frame.data),
-            ) {
-                Some(rgb_image) => Some(image::DynamicImage::ImageRgb8(rgb_image)),
-                None => {
-                    log::error!("[capture_current_monitor_with_scap] failed to create image");
-                    return None;
-                }
-            },
-            ColorFormat::Rgba8 => {
-                match image::RgbaImage::from_raw(
-                    frame.width as u32,
-                    frame.height as u32,
-                    bgra_to_rgba(&frame.data),
-                ) {
-                    Some(rgba_image) => Some(image::DynamicImage::ImageRgba8(rgba_image)),
-                    None => {
-                        log::error!("[capture_current_monitor_with_scap] failed to create image");
-                        return None;
-                    }
-                }
             }
         }
     }
-}
-
-#[cfg(target_os = "macos")]
-pub fn bgra_to_rgb(bgra_data: &[u8]) -> Vec<u8> {
-    let pixel_count = bgra_data.len() / 4;
-    let mut rgb_data = Vec::with_capacity(pixel_count * 3);
-
-    unsafe {
-        rgb_data.set_len(pixel_count * 3);
-
-        let bgra_ptr_address = bgra_data.as_ptr() as usize;
-        let rgb_ptr_address = rgb_data.as_mut_ptr() as usize;
-
-        (0..pixel_count).into_par_iter().for_each(|i| {
-            let rgb_ptr = (rgb_ptr_address as *mut u8).add(i * 3);
-            let bgra_ptr = (bgra_ptr_address as *const u8).add(i * 4);
-
-            rgb_ptr.write(*bgra_ptr.add(2)); // R
-            rgb_ptr.add(1).write(*bgra_ptr.add(1)); // G
-            rgb_ptr.add(2).write(*bgra_ptr.add(0)); // B
-        });
-    }
-
-    rgb_data
-}
-
-#[cfg(target_os = "macos")]
-pub fn bgra_to_rgba(bgra_data: &[u8]) -> Vec<u8> {
-    let pixel_count = bgra_data.len() / 4;
-    let mut rgba_data = Vec::with_capacity(pixel_count * 4);
-
-    unsafe {
-        rgba_data.set_len(pixel_count * 4);
-
-        let bgra_ptr_address = bgra_data.as_ptr() as usize;
-        let rgba_ptr_address = rgba_data.as_mut_ptr() as usize;
-
-        (0..pixel_count).into_par_iter().for_each(|i| {
-            let rgba_ptr = (rgba_ptr_address as *mut u8).add(i * 4);
-            let bgra_ptr = (bgra_ptr_address as *const u8).add(i * 4);
-
-            rgba_ptr.write(*bgra_ptr.add(2)); // R
-            rgba_ptr.add(1).write(*bgra_ptr.add(1)); // G
-            rgba_ptr.add(2).write(*bgra_ptr.add(0)); // B
-            rgba_ptr.add(3).write(*bgra_ptr.add(3)); // A
-        });
-    }
-
-    rgba_data
 }
 
 pub enum ImageEncoder {
@@ -916,6 +725,10 @@ pub async fn set_exclude_from_capture(
                 ));
             }
         };
+
+        // tauri 的 window.hwnd() 返回 wry 体系（windows 0.61）的 HWND，
+        // 而本 crate 的 windows API 是 0.62；用原始指针重建为 0.62 的 HWND。
+        let window_hwnd = windows::Win32::Foundation::HWND(window_hwnd.0);
 
         let result = unsafe {
             windows::Win32::UI::WindowsAndMessaging::SetWindowDisplayAffinity(

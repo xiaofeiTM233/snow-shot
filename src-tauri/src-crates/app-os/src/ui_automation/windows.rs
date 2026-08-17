@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use std::ffi::c_void;
 use std::mem;
 
 use atree::Arena;
@@ -18,8 +17,6 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use snow_shot_app_shared::ElementRect;
 use snow_shot_app_utils::monitor_info::MonitorList;
 use std::sync::Arc;
-use windows::Win32::Foundation::HWND;
-use xcap::ImplWindow;
 use xcap::Window;
 
 use super::ElementLevel;
@@ -217,18 +214,12 @@ impl UIElements {
         );
 
         // 遍历所有窗口
-        let windows = Window::all()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|window| window.hwnd().unwrap() as usize)
-            .collect::<Vec<usize>>();
+        let windows = Window::all().unwrap_or_default();
 
         let automation = self.automation.clone();
         let children_list = windows
             .par_iter()
-            .filter_map(|window_hwnd| {
-                let window = ImplWindow::new(HWND(*window_hwnd as *mut c_void));
-
+            .filter_map(|window| {
                 if window.is_minimized().unwrap_or(true) {
                     return None;
                 }
@@ -244,27 +235,29 @@ impl UIElements {
                     Err(_) => return None,
                 };
 
-                let window_hwnd = match window.hwnd() {
-                    Ok(hwnd) => hwnd,
-                    Err(_) => return None,
-                };
+                // 官方原版 xcap 不再提供 Window::hwnd()，改用本地化映射得到原生 HWND，
+                // 再交给 UIAutomation 定位元素。
+                let window_hwnd =
+                    match snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd(window) {
+                        Some(hwnd) => hwnd,
+                        None => return None,
+                    };
 
-                let window_info = match window.get_window_info() {
-                    Ok(window_info) => window_info,
-                    Err(_) => return None,
-                };
-
+                // 使用 xcap 公开的窗口几何（替代原 fork 的 get_window_info().rcClient）。
                 let element_rect = uiautomation::types::Rect::new(
-                    window_info.rcClient.left,
-                    window_info.rcClient.top,
-                    window_info.rcClient.right,
-                    window_info.rcClient.bottom,
+                    window.x().unwrap_or(0),
+                    window.y().unwrap_or(0),
+                    window.x().unwrap_or(0) + window.width().unwrap_or(0) as i32,
+                    window.y().unwrap_or(0) + window.height().unwrap_or(0) as i32,
                 );
 
-                if let Ok(element) =
-                    automation.as_ref().unwrap().automation.element_from_handle(
-                        uiautomation::types::Handle::from(window_hwnd as isize),
-                    )
+                if let Ok(element) = automation
+                    .as_ref()
+                    .unwrap()
+                    .automation
+                    .element_from_handle(uiautomation::types::Handle::from(
+                        window_hwnd.0 as isize,
+                    ))
                 {
                     let app_name = window.app_name().unwrap_or_default();
                     Some((UIElementWrapper { element }, element_rect, app_name))
