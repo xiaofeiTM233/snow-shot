@@ -8,9 +8,10 @@ tauri = { workspace = true }
 
 [target.'cfg(any(target_os = "windows"))'.dependencies]
 log = { workspace = true }
-windows = { workspace = true }
+windows = "0.62"
 tokio = { workspace = true }
 dashmap = { workspace = true }
 
 webview2-com = "0.39.0"
-windows-core = { version = "0.61" }
+windows-core = { version = "0.62" }
+windows-core-061 = { package = "windows-core", version = "0.61" }

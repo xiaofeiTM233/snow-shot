@@ -162,24 +162,22 @@ pub async fn create_fixed_content_window(
     scroll_screenshot: bool,
     file_path: Option<String>,
 ) -> Result<(), String> {
-    let (_, _, monitor) = get_target_monitor()?;
+    let (window_x, window_y) = {
+        let (_, _, monitor) = get_target_monitor()?;
 
-    let monitor_x = monitor.x().unwrap() as f64;
-    let monitor_y = monitor.y().unwrap() as f64;
+        let monitor_x = monitor.x().unwrap() as f64;
+        let monitor_y = monitor.y().unwrap() as f64;
 
-    let window_x;
-    let window_y;
-    #[cfg(target_os = "macos")]
-    {
-        window_x = monitor_x;
-        window_y = monitor_y;
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let monitor_scale_factor = monitor.scale_factor().unwrap() as f64;
-        window_x = monitor_x / monitor_scale_factor;
-        window_y = monitor_y / monitor_scale_factor;
-    }
+        #[cfg(target_os = "macos")]
+        {
+            (monitor_x, monitor_y)
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let monitor_scale_factor = monitor.scale_factor().unwrap() as f64;
+            (monitor_x / monitor_scale_factor, monitor_y / monitor_scale_factor)
+        }
+    };
 
     let url = match &file_path {
         Some(file_path) => format!(
@@ -286,12 +284,16 @@ pub async fn create_full_screen_draw_window(
         return Ok(());
     }
 
-    let (_, _, monitor) = get_target_monitor()?;
+    let (monitor_x, monitor_y, monitor_width, monitor_height) = {
+        let (_, _, monitor) = get_target_monitor()?;
 
-    let monitor_x = monitor.x().unwrap() as f64;
-    let monitor_y = monitor.y().unwrap() as f64;
-    let monitor_width = monitor.width().unwrap() as f64;
-    let monitor_height = monitor.height().unwrap() as f64;
+        (
+            monitor.x().unwrap() as f64,
+            monitor.y().unwrap() as f64,
+            monitor.width().unwrap() as f64,
+            monitor.height().unwrap() as f64,
+        )
+    };
 
     // 先从服务中获取两个窗口（必须串行以避免竞态条件）
     let main_window_opt = hot_load_page_service.pop_page().await;

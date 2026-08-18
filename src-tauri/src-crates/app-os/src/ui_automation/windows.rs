@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use std::ffi::c_void;
 use std::mem;
 
 use atree::Arena;
@@ -221,7 +220,7 @@ impl UIElements {
         let children_list = windows
             .par_iter()
             .filter_map(|window| {
-                if window.is_minimized().unwrap_or(true)) {
+                if window.is_minimized().unwrap_or(true) {
                     return None;
                 }
 

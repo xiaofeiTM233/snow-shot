@@ -1,7 +1,5 @@
 use image::{DynamicImage, GenericImageView};
-use rayon::iter::{
-    IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
-};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use snow_shot_app_shared::ElementRect;
 use xcap::Monitor;
@@ -15,10 +13,6 @@ use windows::Win32::Graphics::Gdi::{
     DEVMODEW, ENUM_CURRENT_SETTINGS, EnumDisplayMonitors, EnumDisplaySettingsW, HMONITOR,
     MONITORINFOEXW,
 };
-#[cfg(target_os = "windows")]
-use windows::Win32::Graphics::Gdi::{
-    GetMonitorInfoW, MONITORINFO,
-};
 
 #[derive(Debug)]
 pub struct MonitorInfo {
@@ -30,6 +24,12 @@ pub struct MonitorInfo {
     #[cfg(target_os = "windows")]
     pub monitor_hdr_info: MonitorHdrInfo,
 }
+
+// xcap 0.9.8 的 `Monitor` 内部持有 `HMONITOR(*mut c_void)` 裸指针，
+// 导致 `MonitorInfo` 默认不实现 `Send`/`Sync`。但 `HMONITOR` 是只读的
+// 显示器句柄，逻辑上可安全跨线程共享，因此在此处显式声明。
+unsafe impl Send for MonitorInfo {}
+unsafe impl Sync for MonitorInfo {}
 
 #[derive(Debug, Clone, Copy)]
 pub enum ColorFormat {
@@ -67,14 +67,23 @@ impl MonitorInfo {
             // 设备名，最后用 EnumDisplaySettingsW 读取 DEVMODE 的 dmPosition 与
             // 分辨率来构建显示器矩形。
             let name = monitor.name().unwrap_or_default();
-            let hmonitor = get_monitor_handle_by_name(&name).unwrap_or(HMONITOR(std::ptr::null_mut()));
-            let device_name = get_device_name_by_handle(hmonitor).unwrap_or(name);
-            let rect = get_dev_mode(&device_name).unwrap_or_default();
+            let hmonitor = Self::get_monitor_handle_by_name(&name);
+            let device_name = Self::get_device_name_by_handle(hmonitor).unwrap_or(name);
+            let rect = Self::get_dev_mode(&device_name).unwrap_or_default();
+            // DEVMODEW 含匿名 union 字段，读取需 unsafe（Rust 2024）。
+            let (pos_x, pos_y, pels_w, pels_h) = unsafe {
+                (
+                    rect.Anonymous1.Anonymous2.dmPosition.x,
+                    rect.Anonymous1.Anonymous2.dmPosition.y,
+                    rect.dmPelsWidth as i32,
+                    rect.dmPelsHeight as i32,
+                )
+            };
             monitor_rect = ElementRect {
-                min_x: rect.Anonymous1.Anonymous2.dmPosition.x,
-                min_y: rect.Anonymous1.Anonymous2.dmPosition.y,
-                max_x: rect.Anonymous1.Anonymous2.dmPosition.x + rect.dmPelsWidth as i32,
-                max_y: rect.Anonymous1.Anonymous2.dmPosition.y + rect.dmPelsHeight as i32,
+                min_x: pos_x,
+                min_y: pos_y,
+                max_x: pos_x + pels_w,
+                max_y: pos_y + pels_h,
             };
             scale_factor = monitor.scale_factor().unwrap_or(0.0);
 
@@ -130,7 +139,7 @@ impl MonitorInfo {
     /// 返回的 `szDevice`（设备名）与给定名称匹配。找不到时返回空句柄。
     #[cfg(target_os = "windows")]
     pub fn get_monitor_handle(monitor: &Monitor) -> HMONITOR {
-        get_monitor_handle_by_name(&monitor.name().unwrap_or_default())
+        Self::get_monitor_handle_by_name(&monitor.name().unwrap_or_default())
     }
 
     /// 枚举系统显示器，按设备名匹配返回 `HMONITOR`。
@@ -148,15 +157,16 @@ impl MonitorInfo {
             _hdc: windows::Win32::Graphics::Gdi::HDC,
             _rect: *mut windows::Win32::Foundation::RECT,
             lparam: LPARAM,
-        ) -> windows::Win32::Foundation::BOOL {
-            let ctx = &mut *(lparam.0 as *mut Ctx);
-            let device = get_device_name_by_handle(hmonitor).unwrap_or_default();
+        ) -> windows_core::BOOL {
+            // Rust 2024：unsafe fn 体内解引用裸指针需显式 unsafe 块。
+            let ctx = unsafe { &mut *(lparam.0 as *mut Ctx) };
+            let device = MonitorInfo::get_device_name_by_handle(hmonitor).unwrap_or_default();
             if device == ctx.name {
                 ctx.found = hmonitor;
                 // 停止枚举
-                windows::Win32::Foundation::BOOL::from(false)
+                windows_core::BOOL::from(false)
             } else {
-                windows::Win32::Foundation::BOOL::from(true)
+                windows_core::BOOL::from(true)
             }
         }
 
@@ -217,8 +227,6 @@ impl MonitorInfo {
     /// 通过显示器设备名读取当前设置的 `DEVMODEW`（含位置与分辨率）。
     #[cfg(target_os = "windows")]
     fn get_dev_mode(device_name: &str) -> Option<DEVMODEW> {
-        use std::ffi::c_void;
-
         let name_u16: Vec<u16> = device_name
             .encode_utf16()
             .chain(std::iter::once(0))
@@ -654,7 +662,9 @@ impl MonitorList {
 
         let capture_image_pixels_ptr = capture_image_pixels.as_mut_ptr() as usize;
 
-        monitor_image_list.par_iter().for_each(
+        // 多显示器必须串行处理（见上方注释：WGC session 并行会冲突黑屏），
+        // 且 &MonitorInfo 含 xcap::Monitor（非 Sync），不能用 par_iter。
+        monitor_image_list.iter().for_each(
             |(monitor, monitor_image, monitor_crop_region)| {
                 // 计算显示器在合并图像中的位置
                 let offset_x: i32;

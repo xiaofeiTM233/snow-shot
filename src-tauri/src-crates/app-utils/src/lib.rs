@@ -278,59 +278,41 @@ pub fn capture_target_monitor(
 ) -> Option<image::DynamicImage> {
     #[cfg(target_os = "windows")]
     {
+        // 官方 xcap 0.9.8 只提供返回 RGBA 的 capture_image()/capture_region()，
+        // 不再有 *_rgb 变体。ColorFormat::Rgb8 时先取 RGBA 再转 RGB。
         let image = if let Some(crop_area) = crop_area {
-            match color_format {
-                ColorFormat::Rgb8 => DynamicImage::ImageRgb8(
-                    match monitor.capture_region_rgb(
-                        crop_area.min_x as u32,
-                        crop_area.min_y as u32,
-                        (crop_area.max_x - crop_area.min_x) as u32,
-                        (crop_area.max_y - crop_area.min_y) as u32,
-                    ) {
-                        Ok(image) => image,
-                        Err(e) => {
-                            log::error!(
-                                "[capture_target_monitor] failed to capture image: {:?}",
-                                e
-                            );
-                            return None;
-                        }
-                    },
-                ),
-                ColorFormat::Rgba8 => DynamicImage::ImageRgba8(
-                    match monitor.capture_region(
-                        crop_area.min_x as u32,
-                        crop_area.min_y as u32,
-                        (crop_area.max_x - crop_area.min_x) as u32,
-                        (crop_area.max_y - crop_area.min_y) as u32,
-                    ) {
-                        Ok(image) => image,
-                        Err(e) => {
-                            log::error!(
-                                "[capture_target_monitor] failed to capture image: {:?}",
-                                e
-                            );
-                            return None;
-                        }
-                    },
-                ),
+            match monitor.capture_region(
+                crop_area.min_x as u32,
+                crop_area.min_y as u32,
+                (crop_area.max_x - crop_area.min_x) as u32,
+                (crop_area.max_y - crop_area.min_y) as u32,
+            ) {
+                Ok(rgba) => match color_format {
+                    ColorFormat::Rgb8 => {
+                        DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(rgba).to_rgb8())
+                    }
+                    ColorFormat::Rgba8 => DynamicImage::ImageRgba8(rgba),
+                },
+                Err(e) => {
+                    log::error!(
+                        "[capture_target_monitor] failed to capture image: {:?}",
+                        e
+                    );
+                    return None;
+                }
             }
         } else {
-            match color_format {
-                ColorFormat::Rgb8 => DynamicImage::ImageRgb8(match monitor.capture_image_rgb() {
-                    Ok(image) => image,
-                    Err(e) => {
-                        log::error!("[capture_target_monitor] failed to capture image: {:?}", e);
-                        return None;
+            match monitor.capture_image() {
+                Ok(rgba) => match color_format {
+                    ColorFormat::Rgb8 => {
+                        DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(rgba).to_rgb8())
                     }
-                }),
-                ColorFormat::Rgba8 => DynamicImage::ImageRgba8(match monitor.capture_image() {
-                    Ok(image) => image,
-                    Err(e) => {
-                        log::error!("[capture_target_monitor] failed to capture image: {:?}", e);
-                        return None;
-                    }
-                }),
+                    ColorFormat::Rgba8 => DynamicImage::ImageRgba8(rgba),
+                },
+                Err(e) => {
+                    log::error!("[capture_target_monitor] failed to capture image: {:?}", e);
+                    return None;
+                }
             }
         };
 
@@ -748,6 +730,10 @@ pub async fn set_exclude_from_capture(
                 ));
             }
         };
+
+        // tauri 的 window.hwnd() 返回 wry 体系（windows 0.61）的 HWND，
+        // 而本 crate 的 windows API 是 0.62；用原始指针重建为 0.62 的 HWND。
+        let window_hwnd = windows::Win32::Foundation::HWND(window_hwnd.0);
 
         let result = unsafe {
             windows::Win32::UI::WindowsAndMessaging::SetWindowDisplayAffinity(

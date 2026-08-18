@@ -12,12 +12,12 @@
 //! 注意：`xcap::Window::id()` 返回的是 xcap 内部窗口编号（u32），在 Windows 上
 //! 并不一定等于 `HWND`，因此不直接用它做句柄映射，而是用标题 + pid 等属性。
 
-use windows::core::PWSTR;
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
+use windows::Win32::Foundation::{HWND, LPARAM, RECT};
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
     IsWindowVisible,
 };
+use windows_core::BOOL;
 use xcap::Window;
 
 /// 枚举回调的上下文：持有目标窗口的匹配属性与匹配结果。
@@ -36,8 +36,8 @@ struct HwndMatchContext {
 /// 读取窗口标题（UTF-16 -> String）。失败时返回空字符串。
 fn get_window_text(hwnd: HWND) -> String {
     let mut buffer = [0u16; 512];
-    // GetWindowTextW 需要 PWSTR 与字符容量（含结尾 \0）
-    let len = unsafe { GetWindowTextW(hwnd, PWSTR(buffer.as_mut_ptr()), buffer.len() as i32) };
+    // GetWindowTextW 在 windows 0.62 接收 &mut [u16]（内部处理容量与结尾 \0）
+    let len = unsafe { GetWindowTextW(hwnd, &mut buffer) };
     if len <= 0 {
         return String::new();
     }
@@ -46,16 +46,19 @@ fn get_window_text(hwnd: HWND) -> String {
 
 /// `EnumWindows` 回调函数：找到第一个属性匹配的窗口即停止枚举。
 unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
-    let ctx = &mut *(lparam.0 as *mut HwndMatchContext);
+    // Rust 2024 要求 unsafe fn 体内调用 unsafe 操作需显式 unsafe 块。
+    let ctx = unsafe { &mut *(lparam.0 as *mut HwndMatchContext) };
 
     // 跳过不可见窗口（与 xcap 枚举「可捕获窗口」的语义保持一致）
-    if !IsWindowVisible(hwnd).as_bool() {
+    if unsafe { !IsWindowVisible(hwnd).as_bool() } {
         return BOOL::from(true);
     }
 
     // 进程 ID 必须一致
     let mut pid = 0u32;
-    GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    unsafe {
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    }
     if pid != ctx.target_pid {
         return BOOL::from(true);
     }
@@ -67,13 +70,13 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
     }
 
     // 最小化状态必须一致
-    if IsIconic(hwnd).as_bool() != ctx.target_minimized {
+    if unsafe { IsIconic(hwnd).as_bool() } != ctx.target_minimized {
         return BOOL::from(true);
     }
 
     // 位置 / 尺寸尽量一致（部分窗口尺寸可能为 0，此时放宽该维度匹配）
     let mut rect = RECT::default();
-    if GetWindowRect(hwnd, &mut rect).is_err() {
+    if unsafe { GetWindowRect(hwnd, &mut rect).is_err() } {
         return BOOL::from(true);
     }
     let x = rect.left;

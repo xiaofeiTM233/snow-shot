@@ -1,10 +1,39 @@
 use dashmap::DashMap;
+use std::ptr::NonNull;
 use std::sync::mpsc::channel;
 use webview2_com::Microsoft::Web::WebView2::Win32::{
-    COREWEBVIEW2_SHARED_BUFFER_ACCESS_READ_WRITE, ICoreWebView2_17, ICoreWebView2Environment12,
-    ICoreWebView2SharedBuffer,
+    COREWEBVIEW2_SHARED_BUFFER_ACCESS_READ_WRITE, ICoreWebView2, ICoreWebView2Environment,
+    ICoreWebView2Environment12, ICoreWebView2_17, ICoreWebView2SharedBuffer,
 };
 use windows_core::Interface;
+// wry 的 COM 对象来自 windows-core 0.61 体系，需访问其 Interface::as_raw。
+// 通过 rename 依赖引入，避免与本 crate 的 windows-core 0.62 同名冲突。
+use windows_core_061::Interface as Interface061;
+
+/// wry 给的 COM 对象来自 webview2-com 0.38（windows 0.61 体系），
+/// 而本项目需要 cast 到 webview2-com 0.39（windows 0.62 体系）才导出的
+/// ICoreWebView2Environment12 / ICoreWebView2_17 等扩展接口。
+///
+/// 安全桥接：先用 0.61 的 `Interface::as_raw` 取出底层 COM 指针，
+/// 再用 0.62 的 `InterfaceRef`（借用、无 Drop，不调用 AddRef/Release）
+/// 直接 `cast` 到目标扩展接口。`cast` 内部通过 QueryInterface 增加引用计数，
+/// 返回的扩展接口拥有对象析构时 `Release` 一次，二者正好抵消；
+/// 而 `InterfaceRef` 借用的原始指针**不会被 release**，因此 wry 持有的
+/// 0.61 原始 COM 对象引用计数始终保持完整，避免了过早释放
+/// （use-after-free / double-free）导致的崩溃。
+fn to_062_environment<T: Interface061 + ?Sized>(
+    env: &T,
+) -> Option<windows_core::InterfaceRef<'static, ICoreWebView2Environment>> {
+    let raw = Interface061::as_raw(env);
+    NonNull::new(raw).map(|ptr| unsafe { windows_core::InterfaceRef::from_raw(ptr) })
+}
+
+fn to_062_core_webview<T: Interface061 + ?Sized>(
+    core: &T,
+) -> Option<windows_core::InterfaceRef<'static, ICoreWebView2>> {
+    let raw = Interface061::as_raw(core);
+    NonNull::new(raw).map(|ptr| unsafe { windows_core::InterfaceRef::from_raw(ptr) })
+}
 
 pub async fn create_shared_buffer(
     webview: tauri::Webview,
@@ -35,7 +64,10 @@ pub async fn create_shared_buffer(
             }
         };
 
-        let enviroment_12 = match environment.cast::<ICoreWebView2Environment12>() {
+        let enviroment_12 = match to_062_environment(&environment)
+            .expect("null environment pointer")
+            .cast::<ICoreWebView2Environment12>()
+        {
             Ok(environment) => environment,
             Err(e) => {
                 sender
@@ -76,7 +108,10 @@ pub async fn create_shared_buffer(
             }
         };
 
-        let webview_17 = match core_webview.cast::<ICoreWebView2_17>() {
+        let webview_17 = match to_062_core_webview(&core_webview)
+            .expect("null core webview pointer")
+            .cast::<ICoreWebView2_17>()
+        {
             Ok(environment) => environment,
             Err(e) => {
                 sender
@@ -206,7 +241,10 @@ impl SharedBufferService {
                 }
             };
 
-            let enviroment_12 = match environment.cast::<ICoreWebView2Environment12>() {
+            let enviroment_12 = match to_062_environment(&environment)
+            .expect("null environment pointer")
+            .cast::<ICoreWebView2Environment12>()
+        {
                 Ok(environment) => environment,
                 Err(e) => {
                     sender
@@ -233,7 +271,10 @@ impl SharedBufferService {
             };
 
 
-            let webview_17 = match core_webview.cast::<ICoreWebView2_17>() {
+            let webview_17 = match to_062_core_webview(&core_webview)
+            .expect("null core webview pointer")
+            .cast::<ICoreWebView2_17>()
+        {
                 Ok(environment) => environment,
                 Err(e) => {
                     sender

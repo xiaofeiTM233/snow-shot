@@ -149,9 +149,9 @@ pub fn capture_window_hdr_image(
     use snow_shot_app_utils::monitor_hdr_info::get_all_monitors_sdr_info;
     use snow_shot_app_utils::monitor_info::MonitorInfo;
     use snow_shot_app_utils::windows_capture_image;
-    use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MONITORINFOEXW, MONITOR_DEFAULTTONEAREST};
-    use windows::Win32::UI::WindowsAndMessaging::MonitorFromWindow;
-    use widestring::U16CString;
+    use windows::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MonitorFromWindow, MONITORINFOEXW, MONITOR_DEFAULTTONEAREST,
+    };
 
     // 获取窗口所属的显示器
     let hmonitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
@@ -172,10 +172,9 @@ pub fn capture_window_hdr_image(
     if !unsafe { GetMonitorInfoW(hmonitor, std::ptr::addr_of_mut!(monitor_info).cast()) }.as_bool() {
         return None;
     }
-    let device_name = match U16CString::from_vec_truncate(monitor_info.szDevice).to_string() {
-        Ok(name) => name,
-        Err(_) => return None,
-    };
+    let device_name = String::from_utf16_lossy(
+        &monitor_info.szDevice[..monitor_info.szDevice.iter().position(|&c| c == 0).unwrap_or(monitor_info.szDevice.len())],
+    );
 
     let hdr_infos = match get_all_monitors_sdr_info() {
         Ok(hdr_infos) => hdr_infos,
