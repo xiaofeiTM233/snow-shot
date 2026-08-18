@@ -278,8 +278,7 @@ pub fn capture_target_monitor(
 ) -> Option<image::DynamicImage> {
     #[cfg(target_os = "windows")]
     {
-        // 官方 xcap 0.9.8 只提供返回 RGBA 的 capture_image()/capture_region()，
-        // 不再有 *_rgb 变体。ColorFormat::Rgb8 时先取 RGBA 再转 RGB。
+        // 0.9.8 仅提供 RGBA 的 capture_image()/capture_region()，Rgb8 时取 RGBA 再转。
         let image = if let Some(crop_area) = crop_area {
             match monitor.capture_region(
                 crop_area.min_x as u32,
@@ -321,11 +320,7 @@ pub fn capture_target_monitor(
 
     #[cfg(target_os = "macos")]
     {
-        // macOS 截图统一改用官方 xcap（不再依赖 mg-chao/scap fork）。
-        // 说明：
-        // - 屏幕录制权限由 xcap 在 capture 时隐式要求，失败时返回 Err，这里转为 None。
-        // - xcap 不提供「排除指定窗口」能力，因此忽略 exclude_window（与 Windows WGC
-        //   排除行为存在差异，后续如需 macOS 排除自身窗口可在上层用遮挡/裁剪规避）。
+        // macOS 改用官方 xcap：权限由 xcap 隐式获取（失败转 None），且 xcap 不支持排除窗口故忽略。
         if monitor
             .name()
             .unwrap_or_default()

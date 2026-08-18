@@ -25,9 +25,7 @@ pub struct MonitorInfo {
     pub monitor_hdr_info: MonitorHdrInfo,
 }
 
-// xcap 0.9.8 的 `Monitor` 内部持有 `HMONITOR(*mut c_void)` 裸指针，
-// 导致 `MonitorInfo` 默认不实现 `Send`/`Sync`。但 `HMONITOR` 是只读的
-// 显示器句柄，逻辑上可安全跨线程共享，因此在此处显式声明。
+// `Monitor` 含 `HMONITOR` 裸指针，默认非 Send/Sync；HMONITOR 为只读句柄，可安全共享。
 unsafe impl Send for MonitorInfo {}
 unsafe impl Sync for MonitorInfo {}
 
@@ -61,11 +59,8 @@ impl MonitorInfo {
 
         #[cfg(target_os = "windows")]
         {
-            // 原版 xcap 的 Monitor::id() 返回 u32（内部编号），不再是 HMONITOR 句柄，
-            // 因此无法直接把 id() 当 HMONITOR 使用。这里改用 monitor.name() 经
-            // EnumDisplayMonitors 反查真实 HMONITOR，再经 GetMonitorInfoW 取得
-            // 设备名，最后用 EnumDisplaySettingsW 读取 DEVMODE 的 dmPosition 与
-            // 分辨率来构建显示器矩形。
+            // 0.9.8 的 Monitor::id() 为内部编号而非 HMONITOR，故改用 name 经
+            // EnumDisplayMonitors/GetMonitorInfoW/EnumDisplaySettingsW 反查构建矩形。
             let name = monitor.name().unwrap_or_default();
             let hmonitor = Self::get_monitor_handle_by_name(&name);
             let device_name = Self::get_device_name_by_handle(hmonitor).unwrap_or(name);

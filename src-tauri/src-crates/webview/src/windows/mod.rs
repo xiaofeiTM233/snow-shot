@@ -6,21 +6,11 @@ use webview2_com::Microsoft::Web::WebView2::Win32::{
     ICoreWebView2Environment12, ICoreWebView2_17, ICoreWebView2SharedBuffer,
 };
 use windows_core::Interface;
-// wry 的 COM 对象来自 windows-core 0.61 体系，需访问其 Interface::as_raw。
-// 通过 rename 依赖引入，避免与本 crate 的 windows-core 0.62 同名冲突。
+// wry 的 COM 对象来自 windows-core 0.61，rename 引入以访问其 as_raw。
 use windows_core_061::Interface as Interface061;
 
-/// wry 给的 COM 对象来自 webview2-com 0.38（windows 0.61 体系），
-/// 而本项目需要 cast 到 webview2-com 0.39（windows 0.62 体系）才导出的
-/// ICoreWebView2Environment12 / ICoreWebView2_17 等扩展接口。
-///
-/// 安全桥接：先用 0.61 的 `Interface::as_raw` 取出底层 COM 指针，
-/// 再用 0.62 的 `InterfaceRef`（借用、无 Drop，不调用 AddRef/Release）
-/// 直接 `cast` 到目标扩展接口。`cast` 内部通过 QueryInterface 增加引用计数，
-/// 返回的扩展接口拥有对象析构时 `Release` 一次，二者正好抵消；
-/// 而 `InterfaceRef` 借用的原始指针**不会被 release**，因此 wry 持有的
-/// 0.61 原始 COM 对象引用计数始终保持完整，避免了过早释放
-/// （use-after-free / double-free）导致的崩溃。
+/// 将 wry（0.61）的 COM 指针桥接为 0.62 的 `InterfaceRef` 以便 cast 到扩展接口。
+/// 用借用而非拥有的 `from_raw`，避免析构时误 Release 原始指针导致计数失衡。
 fn to_062_environment<T: Interface061 + ?Sized>(
     env: &T,
 ) -> Option<windows_core::InterfaceRef<'static, ICoreWebView2Environment>> {

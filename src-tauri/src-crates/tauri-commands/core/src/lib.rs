@@ -1115,8 +1115,7 @@ pub async fn has_focused_full_screen_window() -> Result<bool, String> {
             return Ok(true);
         }
 
-        // 官方原版 xcap 不再提供 Window::hwnd()，改用本地化映射判断前台窗口
-        // 是否出现在 xcap 可枚举窗口列表中。
+        // 0.9.8 移除 Window::hwnd()，改用本地化映射判断前台窗口是否在 xcap 列表中。
         Ok(xcap::Window::all()
             .unwrap_or_default()
             .iter()
@@ -1190,8 +1189,7 @@ pub async fn has_focused_full_screen_window() -> Result<bool, String> {
                 return false;
             }
 
-            // 官方原版 xcap 不再提供 cf_dictionary / cg_rect_by_cf_dictionary，
-            // 改用公开的几何属性 x/y/width/height。
+            // 0.9.8 移除 cf_dictionary/cg_rect_by_cf_dictionary，改用公开几何属性。
             let min_x = window.x().unwrap_or(0);
             let min_y = window.y().unwrap_or(0);
             let max_x = min_x + window.width().unwrap_or(0) as i32;

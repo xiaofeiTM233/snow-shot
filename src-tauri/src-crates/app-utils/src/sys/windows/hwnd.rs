@@ -1,16 +1,6 @@
-//! 将官方原版 `xcap::Window` 映射到原生 `HWND`。
-//!
-//! 背景：fork 版 `xcap` 暴露了 `Window::hwnd()` / `ImplWindow` 等私有 API，
-//! 直接用 HWND 构造/反查窗口。官方原版 `xcap`（0.9.8）移除了这些 API。
-//! 本项目需要原生 `HWND` 来对接 `windows-capture`（WGC HDR 捕获）、
-//! UIAutomation 元素定位、置顶/排除捕获等场景。
-//!
-//! 方案：通过 `xcap::Window::all()` 拿到窗口列表后，用「可见性 + 标题 + 进程 ID
-//! + 最小化状态 + 位置尺寸」组合，与 `EnumWindows` 枚举出的真实窗口逐一匹配，
-//! 得到等价原生 `HWND`。逻辑集中在本文件，避免散落各处。
-//!
-//! 注意：`xcap::Window::id()` 返回的是 xcap 内部窗口编号（u32），在 Windows 上
-//! 并不一定等于 `HWND`，因此不直接用它做句柄映射，而是用标题 + pid 等属性。
+//! 将官方 `xcap::Window` 映射到原生 `HWND`（0.9.8 已移除 `Window::hwnd()`）。
+//! 通过 `Window::all()` 与 `EnumWindows` 真实窗口按「可见性+标题+pid+最小化+尺寸」匹配。
+//! 注意：`Window::id()` 是内部编号，不等于 HWND，故用属性组合映射而非 id。
 
 use windows::Win32::Foundation::{HWND, LPARAM, RECT};
 use windows::Win32::UI::WindowsAndMessaging::{

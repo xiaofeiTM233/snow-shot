@@ -235,9 +235,7 @@ pub async fn capture_focused_window(
     {
         let hwnd = snow_shot_app_os::utils::get_focused_window();
 
-        // 选择 xcap 时直接走 xcap，不做 WGC 尝试；
-        // 选择 WGC 或自动（Auto，HDR 屏会走 WGC）时尝试 WGC 的 HDR 窗口捕获，
-        // 失败则回退 xcap（由下方 match 处理）。
+        // 非 Xcap 模式尝试 WGC 的 HDR 窗口捕获，失败则由下方回退到 xcap。
         let hdr_image = if capture_method != CaptureMethod::Xcap {
             capture_window_hdr_image(hwnd, correct_hdr_color_algorithm)
         } else {
@@ -415,11 +413,8 @@ pub async fn get_window_elements(
     #[allow(unused_variables)] window: tauri::Window,
     #[allow(unused_variables)] blacklist: Option<Vec<String>>,
 ) -> Result<Vec<WindowElement>, ()> {
-    // 获取所有窗口，简单筛选下需要的窗口，然后获取窗口所有元素。
-    // 注意：原 fork 版用 `window.hwnd()` / `ImplWindow` 等私有 API 反查窗口，
-    // 官方原版 xcap 已移除这些 API。这里统一改用 xcap::Window 的公开方法
-    // （app_name/is_minimized/title/x/y/width/height/id），必要时通过
-    // snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd 取原生 HWND。
+    // 获取所有窗口及其元素。0.9.8 已移除 `Window::hwnd()` 等私有 API，改用公开方法；
+    // 需要原生 HWND 时通过 sys::windows::hwnd::find_window_hwnd 映射。
     let windows: Vec<xcap::Window> = xcap::Window::all().unwrap_or_default();
 
     #[cfg(target_os = "macos")]
@@ -494,8 +489,7 @@ pub async fn get_window_elements(
             let width: i32;
             let height: i32;
 
-            // 使用 xcap 公开的几何属性（x/y/width/height）替代原 fork 的
-            // get_window_info()（client rect）与 cg_rect_by_cf_dictionary。
+            // 用 xcap 公开几何属性替代原 fork 的 get_window_info()/cg_rect_by_cf_dictionary。
             x = window.x().unwrap_or(0);
             y = window.y().unwrap_or(0);
             width = window.width().unwrap_or(0) as i32;
@@ -540,7 +534,7 @@ pub async fn switch_always_on_top(#[allow(unused_variables)] window_id: u32) -> 
             None => return false,
         };
 
-        // 官方原版 xcap 不再提供 Window::hwnd()，改用本地化映射。
+        // 0.9.8 移除 Window::hwnd()，改用本地化映射取原生 HWND。
         let window_hwnd = match snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd(window) {
             Some(hwnd) => hwnd,
             None => return false,
