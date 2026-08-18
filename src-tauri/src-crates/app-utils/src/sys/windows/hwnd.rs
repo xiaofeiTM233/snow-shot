@@ -142,3 +142,62 @@ pub fn find_window_hwnd(window: &Window) -> Option<HWND> {
         target_height,
     )
 }
+
+/// 宽松匹配的 `EnumWindows` 回调：仅校验可见性 + 进程 ID + 标题，
+/// 忽略最小化状态与坐标/尺寸，用于 `find_window_hwnd` 精确匹配失败时的兜底。
+unsafe extern "system" fn enum_window_callback_loose(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    let ctx = unsafe { &mut *(lparam.0 as *mut HwndMatchContext) };
+
+    if unsafe { !IsWindowVisible(hwnd).as_bool() } {
+        return BOOL::from(true);
+    }
+
+    let mut pid = 0u32;
+    unsafe {
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    }
+    if pid != ctx.target_pid {
+        return BOOL::from(true);
+    }
+
+    if get_window_text(hwnd) != ctx.target_title {
+        return BOOL::from(true);
+    }
+
+    ctx.found = Some(hwnd);
+    BOOL::from(false)
+}
+
+/// 先精确匹配（含坐标/尺寸），失败则按「可见 + pid + 标题」宽松匹配。
+///
+/// 0.9.8 移除了 `Window::hwnd()`，xcap 报告的窗口几何与真实窗口常因
+/// DPI/边框/瞬间状态存在偏差，精确匹配极易失败。宽松兜底可避免最前
+/// 窗口因匹配不上而被丢弃，从而保证自动捕获元素的窗口层级正确。
+pub fn find_window_hwnd_loose(window: &Window) -> Option<HWND> {
+    if let Some(hwnd) = find_window_hwnd(window) {
+        return Some(hwnd);
+    }
+
+    let target_title = window.title().unwrap_or_default();
+    let target_pid = window.pid().unwrap_or_default();
+
+    let mut ctx = HwndMatchContext {
+        target_title,
+        target_pid,
+        target_minimized: false,
+        target_x: 0,
+        target_y: 0,
+        target_width: 0,
+        target_height: 0,
+        found: None,
+    };
+
+    unsafe {
+        let _ = EnumWindows(
+            Some(enum_window_callback_loose),
+            LPARAM(&mut ctx as *mut _ as isize),
+        );
+    }
+
+    ctx.found
+}

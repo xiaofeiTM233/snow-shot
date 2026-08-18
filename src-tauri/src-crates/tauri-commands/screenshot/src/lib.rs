@@ -1,5 +1,4 @@
 use image::DynamicImage;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Serialize;
 use snow_shot_app_os::ui_automation::UIElements;
 
@@ -415,7 +414,9 @@ pub async fn get_window_elements(
 ) -> Result<Vec<WindowElement>, ()> {
     // 获取所有窗口及其元素。0.9.8 已移除 `Window::hwnd()` 等私有 API，改用公开方法；
     // 需要原生 HWND 时通过 sys::windows::hwnd::find_window_hwnd 映射。
-    let windows: Vec<xcap::Window> = xcap::Window::all().unwrap_or_default();
+    let mut windows: Vec<xcap::Window> = xcap::Window::all().unwrap_or_default();
+    // 按原生 z() 值（越大越靠近顶层）降序排列，使最前面窗口排在列表最前。
+    windows.sort_by_key(|w| std::cmp::Reverse(w.z().unwrap_or(0)));
 
     #[cfg(target_os = "macos")]
     let window_size_scale: f32;
@@ -428,8 +429,9 @@ pub async fn get_window_elements(
         window_size_scale = window.scale_factor().unwrap_or(1.0) as f32;
     }
 
+    // 串行遍历以保持 z 序，par_iter 收集后顺序不确定会打乱窗口顺序。
     let rect_list = windows
-        .par_iter()
+        .iter()
         .filter_map(|window| {
             // 黑名单过滤：检查应用名是否在黑名单中
             #[cfg(target_os = "windows")]
