@@ -249,9 +249,10 @@ impl UIElements {
                 };
 
                 // 官方原版 xcap 不再提供 Window::hwnd()，改用本地化映射得到原生 HWND，
-                // 再交给 UIAutomation 定位元素。
+                // 再交给 UIAutomation 定位元素。用宽松匹配兜底，避免最前窗口因
+                // 几何偏差匹配失败而被丢弃，导致自动捕获元素层级错乱。
                 let window_hwnd =
-                    match snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd(window) {
+                    match snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd_loose(window) {
                         Some(hwnd) => hwnd,
                         None => return None,
                     };
