@@ -35,6 +35,36 @@ pub enum ColorFormat {
     Rgb8,
 }
 
+/// 判断图像是否「全黑 / 近全黑」。采样像素统计近黑比例，超过阈值即视为黑屏。
+/// 与 windows_capture_image::is_black_image 逻辑一致，用于多屏合成层对单屏结果二次校验。
+fn is_black_image(image: &image::DynamicImage, black_ratio_threshold: f32) -> bool {
+    let (width, height) = image.dimensions();
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    let step = ((width * height) as usize / 4000).max(1) as u32;
+    let mut sampled = 0u32;
+    let mut black = 0u32;
+
+    for y in (0..height).step_by(step as usize) {
+        for x in (0..width).step_by(step as usize) {
+            let pixel = image.get_pixel(x, y);
+            sampled += 1;
+            let lum = (pixel[0] as u32 + pixel[1] as u32 + pixel[2] as u32) / 3;
+            if lum < 8 {
+                black += 1;
+            }
+        }
+    }
+
+    if sampled == 0 {
+        return true;
+    }
+
+    (black as f32 / sampled as f32) >= black_ratio_threshold
+}
+
 #[derive(Serialize, Clone)]
 pub struct MonitorRect {
     pub rect: ElementRect,
@@ -599,10 +629,43 @@ impl MonitorList {
                     capture_source
                 );
 
-                let capture_image = monitor.capture(monitor_crop_region, exclude_window, capture_option);
+                // 单屏捕获后做黑屏检测，命中则重试最多 3 次（重截该显示器）。
+                // 多屏场景下某块显示器可能单独截到黑帧（WGC 会话冲突/冷启动），
+                // 只重截该块，避免整批重来。
+                const BLACK_RETRY_TIMES: u32 = 3;
+                let mut capture_image =
+                    monitor.capture(monitor_crop_region, exclude_window, capture_option);
+                let mut black_retried = false;
+                if let Some(ref img) = capture_image {
+                    if is_black_image(img, 0.99) {
+                        for attempt in 1..=BLACK_RETRY_TIMES {
+                            log::warn!(
+                                "[MonitorInfoList::capture] detected black frame on monitor {:?}, retrying capture (attempt {})",
+                                monitor.monitor.name(),
+                                attempt
+                            );
+                            capture_image =
+                                monitor.capture(monitor_crop_region, exclude_window, capture_option);
+                            black_retried = true;
+                            if let Some(ref img2) = capture_image {
+                                if !is_black_image(img2, 0.99) {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
 
                 match capture_image {
                     Some(image) => {
+                        if black_retried {
+                            log::info!(
+                                "[MonitorInfoList::capture] monitor recovered after black-frame retry: name={:?}",
+                                monitor.monitor.name()
+                            );
+                        }
                         log::info!(
                             "[MonitorInfoList::capture] captured monitor OK: name={:?}, image_size={}x{}, color={:?}",
                             monitor.monitor.name(),

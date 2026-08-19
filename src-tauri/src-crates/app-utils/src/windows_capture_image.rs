@@ -14,6 +14,7 @@ use windows_capture::settings::{
 };
 
 use crate::monitor_info::{ColorFormat, CorrectHdrColorAlgorithm, MonitorInfo};
+use image::GenericImageView;
 
 /// 全局标志：标记系统是否支持 DrawBorderSettings::WithoutBorder
 /// 默认值为 true，当遇到 BorderConfigUnsupported 错误时会设置为 false
@@ -232,6 +233,44 @@ pub fn write_rgba16f_linear_to_rgba8(
     }
 }
 
+/// 判断一张图像是否「全黑 / 近全黑」。
+/// 采样像素并统计明度接近 0 的比例，超过阈值即视为黑屏帧。
+/// 注意：纯黑桌面（用户背景本来就是黑的）也会被命中，但截图场景里
+/// 显示器全黑基本都意味着捕获失败（冷启动空帧 / DRM 保护 / 设备冲突），
+/// 因此宁可误杀也优先重试，避免把黑屏带进结果。
+fn is_black_image(image: &image::DynamicImage, black_ratio_threshold: f32) -> bool {
+    let (width, height) = image.dimensions();
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    // 步进取样，避免大图逐像素扫描开销
+    let step = ((width * height) as usize / 4000).max(1) as u32;
+    let mut sampled = 0u32;
+    let mut black = 0u32;
+
+    for y in (0..height).step_by(step as usize) {
+        for x in (0..width).step_by(step as usize) {
+            let pixel = image.get_pixel(x, y);
+            sampled += 1;
+            // 取 RGB 均值作为明度近似，< 8 (≈3%) 视为黑像素
+            let r = pixel[0] as u32;
+            let g = pixel[1] as u32;
+            let b = pixel[2] as u32;
+            let lum = (r + g + b) / 3;
+            if lum < 8 {
+                black += 1;
+            }
+        }
+    }
+
+    if sampled == 0 {
+        return true;
+    }
+
+    (black as f32 / sampled as f32) >= black_ratio_threshold
+}
+
 /// 处理捕获的图像数据
 /// capture_is_rgba8 表示底层 windows-capture 捕获到的是 Rgba8（普通 SDR 显示器）而非 Rgba16F（HDR），
 /// 此时无需做 HDR 线性转换，直接按 RGBA8 复制即可。
@@ -431,12 +470,96 @@ pub fn capture_monitor_image(
         }
     };
 
-    // 尝试启动捕获器
+    // 尝试启动捕获器。捕获成功后做黑屏检测，命中则按 BLACK_RETRY_TIMES 重试。
+
+    // 黑屏检测阈值：采样像素中 ≥ 99% 为近黑即判定为黑屏帧
+    const BLACK_RATIO_THRESHOLD: f32 = 0.99;
+    // 单显示器最多重试次数（不含首次）
+    const BLACK_RETRY_TIMES: u32 = 3;
 
     match start_result {
         Ok(_capturer) => {
             // 启动成功，处理捕获的图像
-            process_captured_image(receiver, monitor, color_format, algorithm, capture_is_rgba8)
+            let mut image = process_captured_image(
+                receiver,
+                monitor,
+                color_format,
+                algorithm,
+                capture_is_rgba8,
+            )?;
+
+            // 黑屏检测 + 重试：WGC 冷启动空帧、DRM 保护、设备冲突都可能截到全黑，
+            // 重试一次通常能拿到正常帧。
+            for attempt in 1..=BLACK_RETRY_TIMES {
+                if !is_black_image(&image, BLACK_RATIO_THRESHOLD) {
+                    return Ok(image);
+                }
+                log::warn!(
+                    "[windows_capture_image::capture_monitor_image] detected black frame (attempt {}), retrying WGC capture",
+                    attempt
+                );
+                let (retry_sender, retry_receiver) = channel();
+                let retry_result: Result<(), GraphicsCaptureApiError<String>> = match window {
+                    Some(window) => WindowsCaptureImage::start(Settings::new(
+                        window,
+                        CursorCaptureSettings::WithoutCursor,
+                        draw_border_setting,
+                        SecondaryWindowSettings::Default,
+                        MinimumUpdateIntervalSettings::Default,
+                        DirtyRegionSettings::Default,
+                        capture_color_format,
+                        CaptureFlags {
+                            on_frame_arrived: retry_sender,
+                            crop_area,
+                            capture_is_rgba8,
+                        },
+                    )),
+                    None => WindowsCaptureImage::start(Settings::new(
+                        capture_monitor,
+                        CursorCaptureSettings::WithoutCursor,
+                        draw_border_setting,
+                        SecondaryWindowSettings::Default,
+                        MinimumUpdateIntervalSettings::Default,
+                        DirtyRegionSettings::Default,
+                        capture_color_format,
+                        CaptureFlags {
+                            on_frame_arrived: retry_sender,
+                            crop_area,
+                            capture_is_rgba8,
+                        },
+                    )),
+                };
+                match retry_result {
+                    Ok(_) => {
+                        image = process_captured_image(
+                            retry_receiver,
+                            monitor,
+                            color_format,
+                            algorithm,
+                            capture_is_rgba8,
+                        )?;
+                    }
+                    Err(retry_e) => {
+                        log::error!(
+                            "[windows_capture_image::capture_monitor_image] WGC retry start failed: {:?}",
+                            retry_e
+                        );
+                        return Err(format!(
+                            "[windows_capture_image::capture_monitor_image] failed to start capturer on retry: {:?}",
+                            retry_e
+                        ));
+                    }
+                }
+            }
+
+            // 重试耗尽仍黑屏：记录并仍返回最后一帧（交由上层决定是否回退 xcap）
+            if is_black_image(&image, BLACK_RATIO_THRESHOLD) {
+                log::error!(
+                    "[windows_capture_image::capture_monitor_image] still black after {} retries, returning last frame",
+                    BLACK_RETRY_TIMES
+                );
+            }
+            Ok(image)
         }
         Err(e) => match e {
             GraphicsCaptureApiError::GraphicsCaptureApiError(
@@ -495,7 +618,20 @@ pub fn capture_monitor_image(
                 match start_result {
                     Ok(_capturer) => {
                         // 重试成功，处理捕获的图像
-                        process_captured_image(retry_receiver, monitor, color_format, algorithm, capture_is_rgba8)
+                        let image = process_captured_image(
+                            retry_receiver,
+                            monitor,
+                            color_format,
+                            algorithm,
+                            capture_is_rgba8,
+                        )?;
+                        // BorderConfigUnsupported 回退路径同样做黑屏检测
+                        if is_black_image(&image, 0.99) {
+                            log::warn!(
+                                "[windows_capture_image::capture_monitor_image] detected black frame after BorderConfig fallback, returning (may fall back to xcap)"
+                            );
+                        }
+                        Ok(image)
                     }
                     Err(retry_e) => {
                         // 重试失败，本次回退到 xcap（由上层处理），不永久禁用 WGC
