@@ -10,6 +10,30 @@ import type { RefWrap } from "./workers/renderWorkerTypes";
 
 export type RefType<T> = RefWrap<T> | RefObject<T>;
 
+/**
+ * 渲染层日志：worker 线程的 console 不通过 tauri-log 落盘，黑屏排查时看不到 worker 内部状态。
+ * 由 renderWorker 入口设置 forwardLog 为 postMessage 转发，主线程收到后 appInfo/appWarn 落盘；
+ * 未设置时（主线程直接跑无 worker 分支）fallback 到 console。
+ */
+export type ForwardLogFn = (level: "info" | "warn" | "error", message: string) => void;
+let forwardLogFn: ForwardLogFn | undefined;
+export const setForwardLog = (fn: ForwardLogFn | undefined) => {
+	forwardLogFn = fn;
+};
+export const renderLog = (level: "info" | "warn" | "error", message: string) => {
+	if (forwardLogFn) {
+		forwardLogFn(level, message);
+	} else {
+		if (level === "error") {
+			console.error(message);
+		} else if (level === "warn") {
+			console.warn(message);
+		} else {
+			console.info(message);
+		}
+	}
+};
+
 export const renderInitBaseImageTextureAction = async (
 	baseImageTextureRef: RefType<PIXI.Texture | undefined>,
 	imageUrl: string,
@@ -104,6 +128,8 @@ export const renderClearCanvasAction = (
 	canvasContainerChildCountRef: RefType<number>,
 	currentImageTextureRef: RefType<PIXI.Texture | undefined>,
 	baseImageTextureRef: RefType<PIXI.Texture | undefined>,
+	sharedBufferImageTextureRef?: RefType<PIXI.Texture | undefined>,
+	imageSharedBufferRef?: RefType<ImageSharedBufferData | undefined>,
 ) => {
 	const canvasApp = canvasAppRef.current;
 	if (!canvasApp) {
@@ -114,6 +140,11 @@ export const renderClearCanvasAction = (
 	canvasContainerChildCountRef.current = 0;
 	currentImageTextureRef.current = undefined;
 	baseImageTextureRef.current = undefined;
+	// 必须同步清空 sharedBuffer 缓存：若残留旧截图的纹理/数据，下次截图走
+	// shared_buffer_image_texture 分支时会复用已失效的旧纹理（GPU 资源已释放），
+	// 导致预览/保存/复制全部黑屏。
+	sharedBufferImageTextureRef && (sharedBufferImageTextureRef.current = undefined);
+	imageSharedBufferRef && (imageSharedBufferRef.current = undefined);
 
 	canvasApp.render();
 };
@@ -144,6 +175,16 @@ export const renderGetImageBitmapAction = async (
 		imageContainer.children[0].alpha = 1;
 		hasChangeAlpha = true;
 	}
+
+	// 诊断日志：导出前检查渲染容器内容，定位保存/复制黑屏
+	renderLog(
+		"info",
+		`[renderGetImageBitmapAction] export, imageContainer: ${!!imageContainer}, childrenCount: ${
+			imageContainer?.children.length ?? -1
+		}, hasTexture: ${
+			!!(imageContainer?.children[0] && imageContainer.children[0].texture)
+		}`,
+	);
 
 	const canvas = canvasApp.renderer.extract.canvas({
 		target: renderContainer,
@@ -361,6 +402,10 @@ export const renderAddImageToContainerAction = async (
 ): Promise<void> => {
 	const container = canvasContainerMapRef.current.get(containerKey);
 	if (!container) {
+		renderLog(
+			"warn",
+			`[renderAddImageToContainerAction] container not found, skip rendering: ${containerKey}`,
+		);
 		return;
 	}
 
@@ -375,6 +420,12 @@ export const renderAddImageToContainerAction = async (
 				baseImageTextureRef.current = undefined;
 			} else if (imageSrc.type === "shared_buffer_image_texture") {
 				texture = sharedBufferImageTextureRef.current;
+				renderLog(
+					"info",
+					`[renderAddImageToContainerAction] shared_buffer_image_texture branch, cached texture: ${
+						!!texture
+					}, cached imageSharedBuffer: ${!!imageSharedBufferRef.current}`,
+				);
 			}
 		} else if (imageSrc instanceof ImageBitmap) {
 			texture = PIXI.Texture.from(imageSrc);
@@ -384,6 +435,12 @@ export const renderAddImageToContainerAction = async (
 				imageSrc.sharedBuffer,
 				imageSrc.width,
 				imageSrc.height,
+			);
+			renderLog(
+				"info",
+				`[renderAddImageToContainerAction] raw sharedBuffer branch, size: ${imageSrc.width}x${imageSrc.height}, bufferLength: ${
+					imageSrc.sharedBuffer?.length ?? -1
+				}`,
 			);
 			texture = new PIXI.Texture({
 				source: new PIXI.BufferImageSource({
@@ -413,6 +470,13 @@ export const renderAddImageToContainerAction = async (
 	const image = new PIXI.Sprite(texture);
 	image.alpha = hideImageSprite ? 0 : 1;
 	container.addChild(image);
+
+	if (!texture) {
+		renderLog(
+			"warn",
+			`[renderAddImageToContainerAction] texture is undefined after add, result will be blank/black, container: ${containerKey}`,
+		);
+	}
 
 	currentImageTextureRef.current = texture;
 

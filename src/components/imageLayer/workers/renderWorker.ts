@@ -34,6 +34,7 @@ import {
 	renderUpdateHighlightAction,
 	renderUpdateHighlightElementPropsAction,
 	renderUpdateWatermarkSpriteAction,
+	setForwardLog,
 	type WatermarkProps,
 } from "../baseLayerRenderActions";
 import {
@@ -147,6 +148,8 @@ const handleClearCanvas = () => {
 		canvasContainerChildCountRef,
 		currentImageTextureRef,
 		baseImageTextureRef,
+		sharedBufferImageTextureRef,
+		imageSharedBufferRef,
 	);
 };
 
@@ -317,10 +320,26 @@ const handleApplyProcessImageConfigToCanvas = (
 	);
 };
 
+// 将渲染层日志转发到主线程落盘（worker 的 console 不通过 tauri-log 写文件）
+setForwardLog((level, message) => {
+	self.postMessage({
+		type: BaseLayerRenderMessageType.ForwardLog,
+		payload: { level, message },
+	});
+});
+
 self.onmessage = async ({ data }: MessageEvent<BaseLayerRenderData>) => {
 	let message: RenderResult;
 
 	switch (data.type) {
+		case BaseLayerRenderMessageType.ForwardLog: {
+			// 主线程不需要给 worker 发日志，这里仅保证类型完整性
+			message = {
+				type: BaseLayerRenderMessageType.ForwardLog,
+				payload: undefined,
+			};
+			break;
+		}
 		case BaseLayerRenderMessageType.Init:
 			await handleInit(data);
 			message = {

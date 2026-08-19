@@ -24,7 +24,7 @@ import {
 } from "@/types/appSettings";
 import { getCaptureHistoryImageAbsPath } from "@/utils/captureHistory";
 import { supportOffscreenCanvas } from "@/utils/environment";
-import { appWarn } from "@/utils/log";
+import { appInfo, appWarn } from "@/utils/log";
 import {
 	addImageToContainerAction,
 	applyProcessImageConfigToCanvasAction,
@@ -72,7 +72,9 @@ export type ImageLayerActionType = {
 	getLayerContainerElement: () => HTMLDivElement | null;
 	changeCursor: (cursor: Required<React.CSSProperties>["cursor"]) => string;
 	transferImageSharedBuffer: () => Promise<ImageSharedBufferData | undefined>;
-	renderImageSharedBufferToPng: () => Promise<ArrayBuffer | undefined>;
+	renderImageSharedBufferToPng: (
+		imageSharedBuffer?: ImageSharedBufferData,
+	) => Promise<ArrayBuffer | undefined>;
 	getImageBitmap: (
 		selectRect: ElementRect,
 		renderContainerKey?: string,
@@ -257,6 +259,40 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 		const worker = supportOffscreenCanvas()
 			? new Worker(new URL("./workers/renderWorker.ts", import.meta.url))
 			: undefined;
+		// 将 worker 的未捕获异常/消息错误落盘到本地日志，便于排查渲染黑屏
+		if (worker) {
+			worker.onerror = (event) => {
+				appError(
+					`[ImageLayer] rendererWorker error: ${event.message} (${event.filename}:${event.lineno})`,
+				);
+			};
+			worker.onmessageerror = (event) => {
+				appError(
+					`[ImageLayer] rendererWorker messageerror: ${event.type}`,
+				);
+			};
+			// 处理 worker 自发转发的诊断日志（worker console 不落盘，转发到主线程落盘）
+			worker.addEventListener(
+				"message",
+				(event: MessageEvent<{ type?: string; payload?: { level?: string; message?: string } }>) => {
+					const data = event.data;
+					if (
+						data &&
+						data.type === "forwardLog" &&
+						data.payload?.message
+					) {
+						const msg = `[worker-render] ${data.payload.message}`;
+						if (data.payload.level === "warn") {
+							appWarn(msg);
+						} else if (data.payload.level === "error") {
+							appError(msg);
+						} else {
+							appInfo(msg);
+						}
+					}
+				},
+			);
+		}
 		setRendererWorker(worker);
 		setHasInitRendererWorker(true);
 		return () => {
@@ -382,6 +418,8 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 			canvasContainerChildCountRef,
 			currentImageTextureRef,
 			baseImageTextureRef,
+			sharedBufferImageTextureRef,
+			imageSharedBufferRef,
 		);
 	}, [rendererWorker]);
 
@@ -446,15 +484,21 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 
 	const renderImageSharedBufferToPng = useCallback<
 		ImageLayerActionType["renderImageSharedBufferToPng"]
-	>(async () => {
-		const imageSharedBuffer = await transferImageSharedBufferAction(
-			rendererWorker,
-			imageSharedBufferRef,
-		);
-		if (!imageSharedBuffer) {
+	>(async (imageSharedBuffer?: ImageSharedBufferData) => {
+		// 优先使用外部传入的 sharedBuffer（主线程保存的独立拷贝，不受 worker transfer 影响）；
+		// 否则回退到 worker 内部同步的 imageSharedBufferRef。
+		// 修复：截图的 sharedBuffer 传给 worker 时会被 transfer（所有权转移），主线程无法再访问，
+		// 一旦 worker 侧 ref 丢失（worker 重建 / 多窗口实例），保存历史就会 invalid imageBuffer。
+		const buffer =
+			imageSharedBuffer ??
+			(await transferImageSharedBufferAction(
+				rendererWorker,
+				imageSharedBufferRef,
+			));
+		if (!buffer) {
 			return undefined;
 		}
-		return await encodeImage(encodeImageWorker, imageSharedBuffer);
+		return await encodeImage(encodeImageWorker, buffer);
 	}, [encodeImageWorker, rendererWorker]);
 
 	const renderToPng = useCallback<ImageLayerActionType["renderToPng"]>(
@@ -495,6 +539,12 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 		ImageLayerActionType["addImageToContainer"]
 	>(
 		async (containerKey, imageSrc, hideImageSprite) => {
+			// 兜底：确保目标容器已创建。worker 侧 renderAddImageToContainerAction 在容器不存在时
+			// 会静默 return（不渲染、不报错），若 INIT_CONTAINER_KEY 容器尚未创建（渲染初始化
+			// 与截图并行时的竞态），画面就会保持透明/黑屏。这里先创建再添加，消除竞态。
+			if (containerKey === INIT_CONTAINER_KEY) {
+				await createNewCanvasContainer(INIT_CONTAINER_KEY);
+			}
 			await addImageToContainerAction(
 				rendererWorker,
 				canvasContainerMapRef,
@@ -508,7 +558,7 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 				hideImageSprite,
 			);
 		},
-		[rendererWorker],
+		[rendererWorker, createNewCanvasContainer],
 	);
 
 	const clearContainer = useCallback<ImageLayerActionType["clearContainer"]>(
@@ -706,6 +756,26 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 				currentCaptureImageSrcRef.current = isSharedBuffer
 					? imageBuffer
 					: imageSrc;
+			}
+			// 诊断日志：记录 onCaptureReady 收到的数据形态，定位黑屏是哪种路径
+			if (isSharedBuffer) {
+				appInfo(
+					`[onCaptureReady] sharedBuffer path, size: ${imageBuffer.width}x${imageBuffer.height}, bufferLen: ${
+						imageBuffer.sharedBuffer?.length ?? -1
+					}, bufferByteLength: ${
+						imageBuffer.sharedBuffer?.buffer?.byteLength ?? -1
+					}`,
+				);
+			} else {
+				appInfo(
+					`[onCaptureReady] non-sharedBuffer path, imageSrc: ${typeof imageSrc}, ${
+						imageSrc ? imageSrc.slice(0, 40) : ""
+					}, imageBufferType: ${
+						imageBuffer && "type" in imageBuffer
+							? imageBuffer.type
+							: typeof imageBuffer
+					}`,
+				);
 			}
 			if (imageSrc) {
 				await addImageToContainer(

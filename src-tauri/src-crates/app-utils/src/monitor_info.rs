@@ -14,7 +14,7 @@ use windows::Win32::Graphics::Gdi::{
     MONITORINFOEXW,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MonitorInfo {
     pub monitor: Monitor,
     pub rect: ElementRect,
@@ -33,6 +33,100 @@ unsafe impl Sync for MonitorInfo {}
 pub enum ColorFormat {
     Rgba8,
     Rgb8,
+}
+
+/// 采样统计图像状态，输出诊断日志：尺寸、alpha 分布、亮度分布。
+/// 用于黑屏排查——区分「RGB 全黑」与「alpha=0 透明黑屏」两种根因。
+pub(crate) fn log_image_state(tag: &str, image: &image::DynamicImage) {
+    let (width, height) = image.dimensions();
+    if width == 0 || height == 0 {
+        log::warn!("[image_state] {} empty image {}x{}", tag, width, height);
+        return;
+    }
+
+    let step = ((width * height) as usize / 4000).max(1) as u32;
+    let mut sampled = 0u32;
+    let mut alpha_zero = 0u32;
+    let mut alpha_below_10 = 0u32;
+    let mut black_rgb = 0u32;
+    let mut dark_rgb = 0u32;
+    let has_alpha = image.color().has_alpha();
+
+    for y in (0..height).step_by(step as usize) {
+        for x in (0..width).step_by(step as usize) {
+            let pixel = image.get_pixel(x, y);
+            sampled += 1;
+            if has_alpha && pixel.0.len() > 3 {
+                if pixel[3] == 0 {
+                    alpha_zero += 1;
+                } else if pixel[3] < 10 {
+                    alpha_below_10 += 1;
+                }
+            }
+            let lum = (pixel[0] as u32 + pixel[1] as u32 + pixel[2] as u32) / 3;
+            if lum < 8 {
+                black_rgb += 1;
+            } else if lum < 40 {
+                dark_rgb += 1;
+            }
+        }
+    }
+
+    let alpha_zero_ratio = if has_alpha {
+        alpha_zero as f32 / sampled as f32
+    } else {
+        -1.0
+    };
+    let alpha_below_10_ratio = if has_alpha {
+        alpha_below_10 as f32 / sampled as f32
+    } else {
+        -1.0
+    };
+    log::info!(
+        "[image_state] {} size={}x{} has_alpha={} alpha_zero_ratio={:.3} alpha_below10_ratio={:.3} black_rgb_ratio={:.3} dark_rgb_ratio={:.3}",
+        tag,
+        width,
+        height,
+        has_alpha,
+        alpha_zero_ratio,
+        alpha_below_10_ratio,
+        black_rgb as f32 / sampled as f32,
+        dark_rgb as f32 / sampled as f32,
+    );
+}
+
+/// 判断图像是否「全黑 / 近全黑」。采样像素统计近黑比例，超过阈值即视为黑屏。
+/// 与 windows_capture_image::is_black_image 逻辑一致，用于多屏合成层对单屏结果二次校验。
+/// 注意：不仅统计 RGB 亮度，也统计 Alpha。若整幅图像 Alpha 均为 0（透明黑屏），
+/// 即使 RGB 有内容，前端渲染也会显示为全黑（透明背景），同样应判为黑屏触发回退。
+fn is_black_image(image: &image::DynamicImage, black_ratio_threshold: f32) -> bool {
+    let (width, height) = image.dimensions();
+    if width == 0 || height == 0 {
+        return true;
+    }
+
+    let step = ((width * height) as usize / 4000).max(1) as u32;
+    let mut sampled = 0u32;
+    let mut black = 0u32;
+
+    for y in (0..height).step_by(step as usize) {
+        for x in (0..width).step_by(step as usize) {
+            let pixel = image.get_pixel(x, y);
+            sampled += 1;
+            let lum = (pixel[0] as u32 + pixel[1] as u32 + pixel[2] as u32) / 3;
+            // 有 Alpha 通道且接近透明（< 10），或 RGB 接近全黑，均视为"黑"像素
+            let is_transparent = pixel.0.len() > 3 && pixel[3] < 10;
+            if lum < 8 || is_transparent {
+                black += 1;
+            }
+        }
+    }
+
+    if sampled == 0 {
+        return true;
+    }
+
+    (black as f32 / sampled as f32) >= black_ratio_threshold
 }
 
 #[derive(Serialize, Clone)]
@@ -329,37 +423,91 @@ impl MonitorInfo {
 
             match effective_method {
                 CaptureMethod::Wgc => {
-                    capture_hdr_image = match windows_capture_image::capture_monitor_image(
+                    match windows_capture_image::capture_monitor_image(
                         &self,
                         None,
                         crop_area,
                         capture_option.color_format,
                         capture_option.correct_hdr_color_algorithm,
                     ) {
-                        Ok(image) => Some(image),
+                        Ok(image) => {
+                            // WGC 截到黑帧（如 Rgba16F 线性转换异常、首帧空帧重试耗尽）时，
+                            // 回退 xcap 兜底，避免把黑屏直接交给用户。
+                            if is_black_image(&image, 0.99) {
+                                log::warn!(
+                                    "[MonitorInfo::capture] WGC returned black frame, falling back to xcap, monitor: {:?}",
+                                    self.monitor.name()
+                                );
+                                capture_hdr_image = super::capture_target_monitor(
+                                    &self.monitor,
+                                    crop_area,
+                                    exclude_window,
+                                    capture_option.color_format,
+                                );
+                            } else {
+                                capture_hdr_image = Some(image);
+                            }
+                        }
                         Err(e) => {
                             log::error!(
                                 "[MonitorInfo::capture] Failed to capture WGC monitor image: {:?}",
                                 e
                             );
-                            None
+                            // WGC 启动失败，回退 xcap（保持原有兜底语义）
+                            capture_hdr_image = super::capture_target_monitor(
+                                &self.monitor,
+                                crop_area,
+                                exclude_window,
+                                capture_option.color_format,
+                            );
                         }
                     }
                 }
-                CaptureMethod::Xcap | CaptureMethod::Auto => {
-                    // xcap 路径：走下方 xcap 采集分支
+                CaptureMethod::Xcap => {
+                    // xcap 路径：xcap 在 HDR/宽色域显示器上可能截到黑帧（DXGI 桌面复制的已知限制），
+                    // 检测到黑帧时回退 WGC 重截。
+                    capture_hdr_image = super::capture_target_monitor(
+                        &self.monitor,
+                        crop_area,
+                        exclude_window,
+                        capture_option.color_format,
+                    );
+                    if let Some(ref image) = capture_hdr_image {
+                        if is_black_image(image, 0.99) {
+                            log::warn!(
+                                "[MonitorInfo::capture] xcap returned black frame, falling back to WGC, monitor: {:?}",
+                                self.monitor.name()
+                            );
+                            capture_hdr_image =
+                                windows_capture_image::capture_monitor_image(
+                                    &self,
+                                    None,
+                                    crop_area,
+                                    capture_option.color_format,
+                                    capture_option.correct_hdr_color_algorithm,
+                                )
+                                .ok();
+                        }
+                    }
+                }
+                CaptureMethod::Auto => {
+                    // effective_method 已把 Auto 解析为 Wgc / Xcap，这里不会走到
                 }
             }
 
-            return match capture_hdr_image {
-                Some(image) => Some(image),
-                None => super::capture_target_monitor(
-                    &self.monitor,
-                    crop_area,
-                    exclude_window,
-                    capture_option.color_format,
-                ),
-            };
+            if let Some(ref image) = capture_hdr_image {
+                log_image_state(
+                    &format!("MonitorInfo::capture end (method={:?})", effective_method),
+                    image,
+                );
+            } else {
+                log::warn!(
+                    "[MonitorInfo::capture] capture_hdr_image is None, monitor: {:?}",
+                    self.monitor.name()
+                );
+            }
+
+            capture_hdr_image
         }
     }
 }
@@ -583,26 +731,66 @@ impl MonitorList {
                     None
                 };
 
-                // 诊断日志：本次走 WGC 还是 xcap 回退
-                let capture_source = if monitor.monitor_hdr_info.hdr_enabled
-                    || monitor.monitor_hdr_info.sdr_white_level > 0
-                {
-                    "WGC(HDR)"
-                } else {
-                    "xcap(SDR/回退)"
+                // 诊断日志：按用户设置的采集方式与 HDR 状态推算本次实际使用的引擎
+                // 注意：不能只用 hdr_enabled / sdr_white_level 判断——HDR 面板的
+                // sdr_white_level 恒 > 0，会导致标签永远显示 WGC(HDR)，误导排查。
+                let capture_source = match capture_option.capture_method {
+                    CaptureMethod::Wgc => "WGC",
+                    CaptureMethod::Xcap => "xcap",
+                    CaptureMethod::Auto => {
+                        if monitor.monitor_hdr_info.hdr_enabled {
+                            "Auto->WGC"
+                        } else {
+                            "Auto->xcap"
+                        }
+                    }
                 };
                 log::info!(
-                    "[MonitorInfoList::capture] capturing monitor: name={:?}, rect={:?}, hdr_enabled={}, source={}",
+                    "[MonitorInfoList::capture] capturing monitor: name={:?}, rect={:?}, hdr_enabled={}, capture_method={:?}, source={}",
                     monitor.monitor.name(),
                     monitor.rect,
                     monitor.monitor_hdr_info.hdr_enabled,
+                    capture_option.capture_method,
                     capture_source
                 );
 
-                let capture_image = monitor.capture(monitor_crop_region, exclude_window, capture_option);
+                // 单屏捕获后做黑屏检测，命中则重试最多 3 次（重截该显示器）。
+                // 多屏场景下某块显示器可能单独截到黑帧（WGC 会话冲突/冷启动），
+                // 只重截该块，避免整批重来。
+                const BLACK_RETRY_TIMES: u32 = 3;
+                let mut capture_image =
+                    monitor.capture(monitor_crop_region, exclude_window, capture_option);
+                let mut black_retried = false;
+                if let Some(ref img) = capture_image {
+                    if is_black_image(img, 0.99) {
+                        for attempt in 1..=BLACK_RETRY_TIMES {
+                            log::warn!(
+                                "[MonitorInfoList::capture] detected black frame on monitor {:?}, retrying capture (attempt {})",
+                                monitor.monitor.name(),
+                                attempt
+                            );
+                            capture_image =
+                                monitor.capture(monitor_crop_region, exclude_window, capture_option);
+                            black_retried = true;
+                            if let Some(ref img2) = capture_image {
+                                if !is_black_image(img2, 0.99) {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
 
                 match capture_image {
                     Some(image) => {
+                        if black_retried {
+                            log::info!(
+                                "[MonitorInfoList::capture] monitor recovered after black-frame retry: name={:?}",
+                                monitor.monitor.name()
+                            );
+                        }
                         log::info!(
                             "[MonitorInfoList::capture] captured monitor OK: name={:?}, image_size={}x{}, color={:?}",
                             monitor.monitor.name(),
@@ -716,14 +904,25 @@ impl MonitorList {
                 )
                 .unwrap(),
             ),
-            ColorFormat::Rgba8 => image::DynamicImage::ImageRgba8(
-                image::RgbaImage::from_raw(
-                    capture_image_width as u32,
-                    capture_image_height as u32,
-                    capture_image_pixels,
+            ColorFormat::Rgba8 => {
+                // 合成缓冲初始化为全 0（alpha 为 0）。若单屏图（尤其 xcap 路径）alpha 为 0，
+                // 合成图会整幅透明，前端渲染显示为黑屏。因此合成后统一强制 alpha=255，
+                // 确保最终交付给前端的图一定不透明（截图场景不需要透明通道）。
+                for y in 0..capture_image_height {
+                    for x in 0..capture_image_width {
+                        let index = (y * capture_image_width + x) * 4 + 3;
+                        capture_image_pixels[index] = 255;
+                    }
+                }
+                image::DynamicImage::ImageRgba8(
+                    image::RgbaImage::from_raw(
+                        capture_image_width as u32,
+                        capture_image_height as u32,
+                        capture_image_pixels,
+                    )
+                    .unwrap(),
                 )
-                .unwrap(),
-            ),
+            }
         };
 
         // 诊断日志：合成完成，输出最终尺寸
@@ -733,6 +932,7 @@ impl MonitorList {
             capture_image.height(),
             monitor_image_list.len()
         );
+        log_image_state("MonitorInfoList::capture composite final", &capture_image);
 
         Ok(capture_image)
     }

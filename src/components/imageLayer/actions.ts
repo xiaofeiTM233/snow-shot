@@ -10,6 +10,7 @@ import type { RefObject } from "react";
 import type { ImageSharedBufferData } from "@/pages/draw/tools";
 import type { FixedContentProcessImageConfig } from "@/pages/fixedContent/components/fixedContentCore";
 import type { ElementRect } from "@/types/commands/screenshot";
+import { appInfo, appWarn } from "@/utils/log";
 import {
 	type BlurSprite,
 	type BlurSpriteProps,
@@ -243,6 +244,8 @@ export const clearCanvasAction = async (
 	canvasContainerChildCountRef: RefObject<number>,
 	currentImageTextureRef: RefObject<Texture | undefined>,
 	baseImageTextureRef: RefObject<Texture | undefined>,
+	sharedBufferImageTextureRef?: RefObject<Texture | undefined>,
+	imageSharedBufferRef?: RefObject<ImageSharedBufferData | undefined>,
 ): Promise<undefined> => {
 	return new Promise((resolve) => {
 		if (renderWorker) {
@@ -267,6 +270,8 @@ export const clearCanvasAction = async (
 				canvasContainerChildCountRef,
 				currentImageTextureRef,
 				baseImageTextureRef,
+				sharedBufferImageTextureRef,
+				imageSharedBufferRef,
 			);
 			resolve(undefined);
 		}
@@ -467,11 +472,17 @@ export const addImageToContainerAction = async (
 				imageSrc.sharedBuffer?.buffer
 			) {
 				if (imageSrc.sharedBuffer.buffer.byteLength > 0) {
+					appInfo(
+						`[addImageToContainerAction] transfer real sharedBuffer to worker, byteLength: ${imageSrc.sharedBuffer.buffer.byteLength}`,
+					);
 					renderWorker.postMessage(AddImageToContainerData, {
 						transfer: [imageSrc.sharedBuffer.buffer],
 					});
 				} else {
 					// SharedBuffer 已经传递给了 Worker，传递标记给 Worker 使用，避免报错
+					appWarn(
+						"[addImageToContainerAction] sharedBuffer buffer is EMPTY (byteLength 0), using cached texture in worker",
+					);
 					AddImageToContainerData.payload.imageSrc = {
 						type: "shared_buffer_image_texture",
 					};
@@ -482,6 +493,11 @@ export const addImageToContainerAction = async (
 					transfer: [imageSrc],
 				});
 			} else {
+				appInfo(
+					`[addImageToContainerAction] non-sharedBuffer path, imageSrc type: ${typeof imageSrc}, ${
+						imageSrc && "type" in imageSrc ? imageSrc.type : ""
+					}`,
+				);
 				renderWorker.postMessage(AddImageToContainerData);
 			}
 		} else {
