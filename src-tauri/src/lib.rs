@@ -733,7 +733,10 @@ pub fn cleanup_old_logs(app: &tauri::AppHandle) {
 /// 从 `systemCommon.json` 读取日志保留时长（天）。
 /// 返回 `Some(0)` 表示永久保留，`None` 表示读取失败（不清理）。
 fn read_log_retention_duration(app: &tauri::AppHandle) -> Option<i64> {
-    let config_dir = match app.path().app_config_dir() {
+    // 配置真实路径为 ${get_app_config_dir}/systemCommon.json，
+    // 与 main.rs::resolve_config_dir（读取 boostProcessPriority 等同文件）保持一致。
+    let file_cache_service = file_cache_service::FileCacheService::new();
+    let config_dir = match file_cache_service.get_app_config_dir(app) {
         Ok(dir) => dir,
         Err(e) => {
             log::error!("[read_log_retention_duration] Failed to get app_config_dir: {e}");
