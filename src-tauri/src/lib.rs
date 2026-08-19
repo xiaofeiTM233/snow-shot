@@ -663,7 +663,7 @@ fn month_lengths(year: i64) -> [i64; 12] {
 /// 根据日志保留时长设置清理过期的日志文件。
 ///
 /// 日志文件名格式为 `snow-shot-YYYY-MM-DD_HH-MM-SS.log`，
-/// 解析文件名中的时间戳，删除超过保留期的文件。
+/// 根据文件的修改时间删除超过保留期的文件。
 /// `log_retention_duration` 为 0 表示永久保留。
 pub fn cleanup_old_logs(app: &tauri::AppHandle) {
     let log_dir = match app.path().app_log_dir() {
@@ -711,19 +711,29 @@ pub fn cleanup_old_logs(app: &tauri::AppHandle) {
             continue;
         }
 
-        // 解析文件名中的时间戳: snow-shot-YYYY-MM-DD_HH-MM-SS.log
-        let ts_str = &file_name["snow-shot-".len()..file_name.len() - ".log".len()];
-        if let Some(file_secs) = parse_timestamp_tag_to_secs(ts_str) {
-            if file_secs < cutoff_secs {
-                match std::fs::remove_file(&path) {
-                    Ok(()) => {
-                        log::info!("[cleanup_old_logs] Removed old log: {file_name}");
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "[cleanup_old_logs] Failed to remove old log {file_name}: {e}"
-                        );
-                    }
+        // 根据文件的修改时间（而非文件名中的创建时间戳）判断日志是否过期
+        let modified_secs = match std::fs::metadata(&path).and_then(|m| m.modified()) {
+            Ok(modified) => modified
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+            Err(e) => {
+                log::error!(
+                    "[cleanup_old_logs] Failed to read modified time of {file_name}: {e}"
+                );
+                continue;
+            }
+        };
+
+        if modified_secs < cutoff_secs {
+            match std::fs::remove_file(&path) {
+                Ok(()) => {
+                    log::info!("[cleanup_old_logs] Removed old log: {file_name}");
+                }
+                Err(e) => {
+                    log::error!(
+                        "[cleanup_old_logs] Failed to remove old log {file_name}: {e}"
+                    );
                 }
             }
         }
@@ -733,7 +743,10 @@ pub fn cleanup_old_logs(app: &tauri::AppHandle) {
 /// 从 `systemCommon.json` 读取日志保留时长（天）。
 /// 返回 `Some(0)` 表示永久保留，`None` 表示读取失败（不清理）。
 fn read_log_retention_duration(app: &tauri::AppHandle) -> Option<i64> {
-    let config_dir = match app.path().app_config_dir() {
+    // 配置真实路径为 ${get_app_config_dir}/systemCommon.json，
+    // 与 main.rs::resolve_config_dir（读取 boostProcessPriority 等同文件）保持一致。
+    let file_cache_service = file_cache_service::FileCacheService::new();
+    let config_dir = match file_cache_service.get_app_config_dir(app) {
         Ok(dir) => dir,
         Err(e) => {
             log::error!("[read_log_retention_duration] Failed to get app_config_dir: {e}");
@@ -763,43 +776,3 @@ fn read_log_retention_duration(app: &tauri::AppHandle) -> Option<i64> {
         .and_then(|v| v.as_i64())
 }
 
-/// 将 `YYYY-MM-DD_HH-MM-SS` 格式的时间戳字符串转为 Unix 秒数。
-fn parse_timestamp_tag_to_secs(ts: &str) -> Option<u64> {
-    // 格式: "2025-07-04_12-30-45"
-    if ts.len() != 19 {
-        return None;
-    }
-    let bytes = ts.as_bytes();
-    if bytes[4] != b'-' || bytes[7] != b'-' || bytes[10] != b'_' || bytes[13] != b'-' || bytes[16] != b'-' {
-        return None;
-    }
-
-    let year = parse_u32(&bytes[0..4])? as i64;
-    let month = parse_u32(&bytes[5..7])? as i64;
-    let day = parse_u32(&bytes[8..10])? as i64;
-    let hour = parse_u32(&bytes[11..13])? as u64;
-    let min = parse_u32(&bytes[14..16])? as u64;
-    let sec = parse_u32(&bytes[17..19])? as u64;
-
-    if month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || min > 59 || sec > 59 {
-        return None;
-    }
-
-    // 计算从 1970-01-01 起的天数
-    let mut total_days: i64 = 0;
-    for y in 1970..year {
-        total_days += if is_leap_year(y) { 366 } else { 365 };
-    }
-    let mdays = month_lengths(year);
-    for m in 0..(month - 1) as usize {
-        total_days += mdays[m];
-    }
-    total_days += day - 1;
-
-    Some(total_days as u64 * 86_400 + hour * 3600 + min * 60 + sec)
-}
-
-fn parse_u32(bytes: &[u8]) -> Option<u32> {
-    let s = std::str::from_utf8(bytes).ok()?;
-    s.parse().ok()
-}
