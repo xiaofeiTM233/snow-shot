@@ -359,37 +359,79 @@ impl MonitorInfo {
 
             match effective_method {
                 CaptureMethod::Wgc => {
-                    capture_hdr_image = match windows_capture_image::capture_monitor_image(
+                    match windows_capture_image::capture_monitor_image(
                         &self,
                         None,
                         crop_area,
                         capture_option.color_format,
                         capture_option.correct_hdr_color_algorithm,
                     ) {
-                        Ok(image) => Some(image),
+                        Ok(image) => {
+                            // WGC 截到黑帧（如 Rgba16F 线性转换异常、首帧空帧重试耗尽）时，
+                            // 回退 xcap 兜底，避免把黑屏直接交给用户。
+                            if is_black_image(&image, 0.99) {
+                                log::warn!(
+                                    "[MonitorInfo::capture] WGC returned black frame, falling back to xcap, monitor: {:?}",
+                                    self.monitor.name()
+                                );
+                                capture_hdr_image = super::capture_target_monitor(
+                                    &self.monitor,
+                                    crop_area,
+                                    exclude_window,
+                                    capture_option.color_format,
+                                );
+                            } else {
+                                capture_hdr_image = Some(image);
+                            }
+                        }
                         Err(e) => {
                             log::error!(
                                 "[MonitorInfo::capture] Failed to capture WGC monitor image: {:?}",
                                 e
                             );
-                            None
+                            // WGC 启动失败，回退 xcap（保持原有兜底语义）
+                            capture_hdr_image = super::capture_target_monitor(
+                                &self.monitor,
+                                crop_area,
+                                exclude_window,
+                                capture_option.color_format,
+                            );
                         }
                     }
                 }
-                CaptureMethod::Xcap | CaptureMethod::Auto => {
-                    // xcap 路径：走下方 xcap 采集分支
+                CaptureMethod::Xcap => {
+                    // xcap 路径：xcap 在 HDR/宽色域显示器上可能截到黑帧（DXGI 桌面复制的已知限制），
+                    // 检测到黑帧时回退 WGC 重截。
+                    capture_hdr_image = super::capture_target_monitor(
+                        &self.monitor,
+                        crop_area,
+                        exclude_window,
+                        capture_option.color_format,
+                    );
+                    if let Some(ref image) = capture_hdr_image {
+                        if is_black_image(image, 0.99) {
+                            log::warn!(
+                                "[MonitorInfo::capture] xcap returned black frame, falling back to WGC, monitor: {:?}",
+                                self.monitor.name()
+                            );
+                            capture_hdr_image =
+                                windows_capture_image::capture_monitor_image(
+                                    &self,
+                                    None,
+                                    crop_area,
+                                    capture_option.color_format,
+                                    capture_option.correct_hdr_color_algorithm,
+                                )
+                                .ok();
+                        }
+                    }
+                }
+                CaptureMethod::Auto => {
+                    // effective_method 已把 Auto 解析为 Wgc / Xcap，这里不会走到
                 }
             }
 
-            return match capture_hdr_image {
-                Some(image) => Some(image),
-                None => super::capture_target_monitor(
-                    &self.monitor,
-                    crop_area,
-                    exclude_window,
-                    capture_option.color_format,
-                ),
-            };
+            capture_hdr_image
         }
     }
 }
@@ -613,19 +655,26 @@ impl MonitorList {
                     None
                 };
 
-                // 诊断日志：本次走 WGC 还是 xcap 回退
-                let capture_source = if monitor.monitor_hdr_info.hdr_enabled
-                    || monitor.monitor_hdr_info.sdr_white_level > 0
-                {
-                    "WGC(HDR)"
-                } else {
-                    "xcap(SDR/回退)"
+                // 诊断日志：按用户设置的采集方式与 HDR 状态推算本次实际使用的引擎
+                // 注意：不能只用 hdr_enabled / sdr_white_level 判断——HDR 面板的
+                // sdr_white_level 恒 > 0，会导致标签永远显示 WGC(HDR)，误导排查。
+                let capture_source = match capture_option.capture_method {
+                    CaptureMethod::Wgc => "WGC",
+                    CaptureMethod::Xcap => "xcap",
+                    CaptureMethod::Auto => {
+                        if monitor.monitor_hdr_info.hdr_enabled {
+                            "Auto->WGC"
+                        } else {
+                            "Auto->xcap"
+                        }
+                    }
                 };
                 log::info!(
-                    "[MonitorInfoList::capture] capturing monitor: name={:?}, rect={:?}, hdr_enabled={}, source={}",
+                    "[MonitorInfoList::capture] capturing monitor: name={:?}, rect={:?}, hdr_enabled={}, capture_method={:?}, source={}",
                     monitor.monitor.name(),
                     monitor.rect,
                     monitor.monitor_hdr_info.hdr_enabled,
+                    capture_option.capture_method,
                     capture_source
                 );
 
