@@ -330,6 +330,8 @@ pub fn capture_target_monitor(
             }
         };
 
+        crate::monitor_info::log_image_state("capture_target_monitor (xcap)", &image);
+
         return Some(image);
     }
 

@@ -35,6 +35,66 @@ pub enum ColorFormat {
     Rgb8,
 }
 
+/// 采样统计图像状态，输出诊断日志：尺寸、alpha 分布、亮度分布。
+/// 用于黑屏排查——区分「RGB 全黑」与「alpha=0 透明黑屏」两种根因。
+pub(crate) fn log_image_state(tag: &str, image: &image::DynamicImage) {
+    let (width, height) = image.dimensions();
+    if width == 0 || height == 0 {
+        log::warn!("[image_state] {} empty image {}x{}", tag, width, height);
+        return;
+    }
+
+    let step = ((width * height) as usize / 4000).max(1) as u32;
+    let mut sampled = 0u32;
+    let mut alpha_zero = 0u32;
+    let mut alpha_below_10 = 0u32;
+    let mut black_rgb = 0u32;
+    let mut dark_rgb = 0u32;
+    let has_alpha = image.color().has_alpha();
+
+    for y in (0..height).step_by(step as usize) {
+        for x in (0..width).step_by(step as usize) {
+            let pixel = image.get_pixel(x, y);
+            sampled += 1;
+            if has_alpha && pixel.0.len() > 3 {
+                if pixel[3] == 0 {
+                    alpha_zero += 1;
+                } else if pixel[3] < 10 {
+                    alpha_below_10 += 1;
+                }
+            }
+            let lum = (pixel[0] as u32 + pixel[1] as u32 + pixel[2] as u32) / 3;
+            if lum < 8 {
+                black_rgb += 1;
+            } else if lum < 40 {
+                dark_rgb += 1;
+            }
+        }
+    }
+
+    let alpha_zero_ratio = if has_alpha {
+        alpha_zero as f32 / sampled as f32
+    } else {
+        -1.0
+    };
+    let alpha_below_10_ratio = if has_alpha {
+        alpha_below_10 as f32 / sampled as f32
+    } else {
+        -1.0
+    };
+    log::info!(
+        "[image_state] {} size={}x{} has_alpha={} alpha_zero_ratio={:.3} alpha_below10_ratio={:.3} black_rgb_ratio={:.3} dark_rgb_ratio={:.3}",
+        tag,
+        width,
+        height,
+        has_alpha,
+        alpha_zero_ratio,
+        alpha_below_10_ratio,
+        black_rgb as f32 / sampled as f32,
+        dark_rgb as f32 / sampled as f32,
+    );
+}
+
 /// 判断图像是否「全黑 / 近全黑」。采样像素统计近黑比例，超过阈值即视为黑屏。
 /// 与 windows_capture_image::is_black_image 逻辑一致，用于多屏合成层对单屏结果二次校验。
 /// 注意：不仅统计 RGB 亮度，也统计 Alpha。若整幅图像 Alpha 均为 0（透明黑屏），
@@ -433,6 +493,18 @@ impl MonitorInfo {
                 CaptureMethod::Auto => {
                     // effective_method 已把 Auto 解析为 Wgc / Xcap，这里不会走到
                 }
+            }
+
+            if let Some(ref image) = capture_hdr_image {
+                log_image_state(
+                    &format!("MonitorInfo::capture end (method={:?})", effective_method),
+                    image,
+                );
+            } else {
+                log::warn!(
+                    "[MonitorInfo::capture] capture_hdr_image is None, monitor: {:?}",
+                    self.monitor.name()
+                );
             }
 
             capture_hdr_image
@@ -860,6 +932,7 @@ impl MonitorList {
             capture_image.height(),
             monitor_image_list.len()
         );
+        log_image_state("MonitorInfoList::capture composite final", &capture_image);
 
         Ok(capture_image)
     }
