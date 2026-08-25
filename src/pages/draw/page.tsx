@@ -186,6 +186,10 @@ const DrawPageCore: React.FC<{
 	const imageBufferRef = useRef<
 		ImageBuffer | ImageSharedBufferData | undefined
 	>(undefined);
+	// 截图 sharedBuffer 的独立拷贝，避免 buffer 被 transfer 给 worker 后主线程无法访问
+	const capturedSharedBufferRef = useRef<ImageSharedBufferData | undefined>(
+		undefined,
+	);
 	const captureBoundingBoxInfoRef = useRef<CaptureBoundingBoxInfo | undefined>(
 		undefined,
 	);
@@ -520,6 +524,7 @@ const DrawPageCore: React.FC<{
 				event: CaptureEvent.onCaptureFinish,
 			});
 			imageBufferRef.current = undefined;
+			capturedSharedBufferRef.current = undefined;
 			resetCaptureStep();
 			resetDrawState();
 			resetScreenshotType();
@@ -642,6 +647,20 @@ const DrawPageCore: React.FC<{
 			) {
 				result = await imageBufferFromSharedBufferPromise;
 			}
+
+			// 保留一份 sharedBuffer 的独立拷贝。截图的 sharedBuffer 之后会 transfer 给渲染 worker，
+			// 主线程不再持有底层数据；保存历史时若 worker 内部 ref 丢失（worker 重建等）会保存失败。
+			// 这里在主线程持有一份拷贝，保存时用它直接编码，保证不依赖 worker 状态。
+			capturedSharedBufferRef.current =
+				result && "sharedBuffer" in result
+					? {
+							sharedBuffer: new Uint8ClampedArray(
+								result.sharedBuffer.slice(),
+							),
+							width: result.width,
+							height: result.height,
+						}
+					: undefined;
 
 			if (
 				excuteScreenshotType === ScreenshotType.Delay &&
@@ -826,8 +845,17 @@ const DrawPageCore: React.FC<{
 			if (imageBufferRef.current && "sharedBuffer" in imageBufferRef.current) {
 				// 截图的图像数据已经被 transfer 到了 worker，无法在此访问
 				// 所以直接从 ImageLayer 渲染出 PNG 数据
-				const pngBuffer =
+				let pngBuffer =
 					await imageLayerActionRef.current?.renderImageSharedBufferToPng();
+				// 兜底：worker 内部 sharedBuffer ref 丢失（worker 重建/多窗口实例）时，
+				// 用主线程持有的独立拷贝直接编码，避免保存失败（invalid imageBuffer）。
+				if (!pngBuffer && capturedSharedBufferRef.current) {
+					appInfo("[DrawPageCore] worker sharedBuffer ref lost, using captured copy");
+					pngBuffer =
+						await imageLayerActionRef.current?.renderImageSharedBufferToPng(
+							capturedSharedBufferRef.current,
+						);
+				}
 				if (pngBuffer) {
 					imageBuffer = {
 						encoder: ImageEncoder.Png,
@@ -1174,6 +1202,7 @@ const DrawPageCore: React.FC<{
 		);
 
 		imageBufferRef.current = undefined;
+		capturedSharedBufferRef.current = undefined;
 	}, [
 		finishCapture,
 		getAppSettings,

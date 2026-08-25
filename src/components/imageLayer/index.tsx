@@ -72,7 +72,9 @@ export type ImageLayerActionType = {
 	getLayerContainerElement: () => HTMLDivElement | null;
 	changeCursor: (cursor: Required<React.CSSProperties>["cursor"]) => string;
 	transferImageSharedBuffer: () => Promise<ImageSharedBufferData | undefined>;
-	renderImageSharedBufferToPng: () => Promise<ArrayBuffer | undefined>;
+	renderImageSharedBufferToPng: (
+		imageSharedBuffer?: ImageSharedBufferData,
+	) => Promise<ArrayBuffer | undefined>;
 	getImageBitmap: (
 		selectRect: ElementRect,
 		renderContainerKey?: string,
@@ -446,15 +448,21 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 
 	const renderImageSharedBufferToPng = useCallback<
 		ImageLayerActionType["renderImageSharedBufferToPng"]
-	>(async () => {
-		const imageSharedBuffer = await transferImageSharedBufferAction(
-			rendererWorker,
-			imageSharedBufferRef,
-		);
-		if (!imageSharedBuffer) {
+	>(async (imageSharedBuffer?: ImageSharedBufferData) => {
+		// 优先使用外部传入的 sharedBuffer（主线程保存的独立拷贝，不受 worker transfer 影响）；
+		// 否则回退到 worker 内部同步的 imageSharedBufferRef。
+		// 修复：截图的 sharedBuffer 传给 worker 时会被 transfer（所有权转移），主线程无法再访问，
+		// 一旦 worker 侧 ref 丢失（worker 重建 / 多窗口实例），保存历史就会 invalid imageBuffer。
+		const buffer =
+			imageSharedBuffer ??
+			(await transferImageSharedBufferAction(
+				rendererWorker,
+				imageSharedBufferRef,
+			));
+		if (!buffer) {
 			return undefined;
 		}
-		return await encodeImage(encodeImageWorker, imageSharedBuffer);
+		return await encodeImage(encodeImageWorker, buffer);
 	}, [encodeImageWorker, rendererWorker]);
 
 	const renderToPng = useCallback<ImageLayerActionType["renderToPng"]>(
