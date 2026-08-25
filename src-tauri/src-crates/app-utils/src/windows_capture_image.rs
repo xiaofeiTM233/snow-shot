@@ -258,7 +258,9 @@ fn is_black_image(image: &image::DynamicImage, black_ratio_threshold: f32) -> bo
             let g = pixel[1] as u32;
             let b = pixel[2] as u32;
             let lum = (r + g + b) / 3;
-            if lum < 8 {
+            // 有 Alpha 通道且接近透明（< 10），或 RGB 接近全黑，均视为"黑"像素
+            let is_transparent = pixel.0.len() > 3 && pixel[3] < 10;
+            if lum < 8 || is_transparent {
                 black += 1;
             }
         }

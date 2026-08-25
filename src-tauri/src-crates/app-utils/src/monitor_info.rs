@@ -37,6 +37,8 @@ pub enum ColorFormat {
 
 /// 判断图像是否「全黑 / 近全黑」。采样像素统计近黑比例，超过阈值即视为黑屏。
 /// 与 windows_capture_image::is_black_image 逻辑一致，用于多屏合成层对单屏结果二次校验。
+/// 注意：不仅统计 RGB 亮度，也统计 Alpha。若整幅图像 Alpha 均为 0（透明黑屏），
+/// 即使 RGB 有内容，前端渲染也会显示为全黑（透明背景），同样应判为黑屏触发回退。
 fn is_black_image(image: &image::DynamicImage, black_ratio_threshold: f32) -> bool {
     let (width, height) = image.dimensions();
     if width == 0 || height == 0 {
@@ -52,7 +54,9 @@ fn is_black_image(image: &image::DynamicImage, black_ratio_threshold: f32) -> bo
             let pixel = image.get_pixel(x, y);
             sampled += 1;
             let lum = (pixel[0] as u32 + pixel[1] as u32 + pixel[2] as u32) / 3;
-            if lum < 8 {
+            // 有 Alpha 通道且接近透明（< 10），或 RGB 接近全黑，均视为"黑"像素
+            let is_transparent = pixel.0.len() > 3 && pixel[3] < 10;
+            if lum < 8 || is_transparent {
                 black += 1;
             }
         }
