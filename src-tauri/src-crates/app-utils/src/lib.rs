@@ -279,6 +279,9 @@ pub fn capture_target_monitor(
     #[cfg(target_os = "windows")]
     {
         // 0.9.8 仅提供 RGBA 的 capture_image()/capture_region()，Rgb8 时取 RGBA 再转。
+        // 注意：xcap（DXGI 桌面复制）返回的 RGBA 帧 Alpha 通道可能为 0，
+        // 与 WGC 相同——若直接透传会导致整幅图像透明、预览/保存显示为黑屏，
+        // 因此返回前统一强制不透明（与 windows_capture_image 的修复保持一致）。
         let image = if let Some(crop_area) = crop_area {
             match monitor.capture_region(
                 crop_area.min_x as u32,
@@ -290,7 +293,13 @@ pub fn capture_target_monitor(
                     ColorFormat::Rgb8 => {
                         DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(rgba).to_rgb8())
                     }
-                    ColorFormat::Rgba8 => DynamicImage::ImageRgba8(rgba),
+                    ColorFormat::Rgba8 => {
+                        let mut rgba = rgba;
+                        for p in rgba.pixels_mut() {
+                            p.0[3] = 255;
+                        }
+                        DynamicImage::ImageRgba8(rgba)
+                    }
                 },
                 Err(e) => {
                     log::error!(
@@ -306,7 +315,13 @@ pub fn capture_target_monitor(
                     ColorFormat::Rgb8 => {
                         DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(rgba).to_rgb8())
                     }
-                    ColorFormat::Rgba8 => DynamicImage::ImageRgba8(rgba),
+                    ColorFormat::Rgba8 => {
+                        let mut rgba = rgba;
+                        for p in rgba.pixels_mut() {
+                            p.0[3] = 255;
+                        }
+                        DynamicImage::ImageRgba8(rgba)
+                    }
                 },
                 Err(e) => {
                     log::error!("[capture_target_monitor] failed to capture image: {:?}", e);
