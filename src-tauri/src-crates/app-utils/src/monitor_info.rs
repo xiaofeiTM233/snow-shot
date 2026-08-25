@@ -832,14 +832,25 @@ impl MonitorList {
                 )
                 .unwrap(),
             ),
-            ColorFormat::Rgba8 => image::DynamicImage::ImageRgba8(
-                image::RgbaImage::from_raw(
-                    capture_image_width as u32,
-                    capture_image_height as u32,
-                    capture_image_pixels,
+            ColorFormat::Rgba8 => {
+                // 合成缓冲初始化为全 0（alpha 为 0）。若单屏图（尤其 xcap 路径）alpha 为 0，
+                // 合成图会整幅透明，前端渲染显示为黑屏。因此合成后统一强制 alpha=255，
+                // 确保最终交付给前端的图一定不透明（截图场景不需要透明通道）。
+                for y in 0..capture_image_height {
+                    for x in 0..capture_image_width {
+                        let index = (y * capture_image_width + x) * 4 + 3;
+                        capture_image_pixels[index] = 255;
+                    }
+                }
+                image::DynamicImage::ImageRgba8(
+                    image::RgbaImage::from_raw(
+                        capture_image_width as u32,
+                        capture_image_height as u32,
+                        capture_image_pixels,
+                    )
+                    .unwrap(),
                 )
-                .unwrap(),
-            ),
+            }
         };
 
         // 诊断日志：合成完成，输出最终尺寸
