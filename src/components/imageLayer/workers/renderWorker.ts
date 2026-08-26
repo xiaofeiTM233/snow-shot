@@ -147,6 +147,8 @@ const handleClearCanvas = () => {
 		canvasContainerChildCountRef,
 		currentImageTextureRef,
 		baseImageTextureRef,
+		sharedBufferImageTextureRef,
+		imageSharedBufferRef,
 	);
 };
 

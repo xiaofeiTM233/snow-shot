@@ -104,6 +104,8 @@ export const renderClearCanvasAction = (
 	canvasContainerChildCountRef: RefType<number>,
 	currentImageTextureRef: RefType<PIXI.Texture | undefined>,
 	baseImageTextureRef: RefType<PIXI.Texture | undefined>,
+	sharedBufferImageTextureRef?: RefType<PIXI.Texture | undefined>,
+	imageSharedBufferRef?: RefType<ImageSharedBufferData | undefined>,
 ) => {
 	const canvasApp = canvasAppRef.current;
 	if (!canvasApp) {
@@ -114,6 +116,11 @@ export const renderClearCanvasAction = (
 	canvasContainerChildCountRef.current = 0;
 	currentImageTextureRef.current = undefined;
 	baseImageTextureRef.current = undefined;
+	// 必须同步清空 sharedBuffer 缓存：若残留旧截图的纹理/数据，下次截图走
+	// shared_buffer_image_texture 分支时会复用已失效的旧纹理（GPU 资源已释放），
+	// 导致预览/保存/复制全部黑屏。
+	sharedBufferImageTextureRef && (sharedBufferImageTextureRef.current = undefined);
+	imageSharedBufferRef && (imageSharedBufferRef.current = undefined);
 
 	canvasApp.render();
 };

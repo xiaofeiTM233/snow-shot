@@ -384,6 +384,8 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 			canvasContainerChildCountRef,
 			currentImageTextureRef,
 			baseImageTextureRef,
+			sharedBufferImageTextureRef,
+			imageSharedBufferRef,
 		);
 	}, [rendererWorker]);
 
