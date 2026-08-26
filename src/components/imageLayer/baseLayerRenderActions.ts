@@ -152,6 +152,16 @@ export const renderGetImageBitmapAction = async (
 		hasChangeAlpha = true;
 	}
 
+	// 诊断日志：导出前检查渲染容器内容，定位保存/复制黑屏
+	console.info(
+		"[renderGetImageBitmapAction] export, imageContainer:",
+		!!imageContainer,
+		"childrenCount:",
+		imageContainer?.children.length ?? -1,
+		"hasTexture:",
+		!!(imageContainer?.children[0] && imageContainer.children[0].texture),
+	);
+
 	const canvas = canvasApp.renderer.extract.canvas({
 		target: renderContainer,
 		frame: selectRect
@@ -386,6 +396,12 @@ export const renderAddImageToContainerAction = async (
 				baseImageTextureRef.current = undefined;
 			} else if (imageSrc.type === "shared_buffer_image_texture") {
 				texture = sharedBufferImageTextureRef.current;
+				console.info(
+					"[renderAddImageToContainerAction] shared_buffer_image_texture branch, cached texture:",
+					!!texture,
+					"cached imageSharedBuffer:",
+					!!imageSharedBufferRef.current,
+				);
 			}
 		} else if (imageSrc instanceof ImageBitmap) {
 			texture = PIXI.Texture.from(imageSrc);
@@ -395,6 +411,14 @@ export const renderAddImageToContainerAction = async (
 				imageSrc.sharedBuffer,
 				imageSrc.width,
 				imageSrc.height,
+			);
+			console.info(
+				"[renderAddImageToContainerAction] raw sharedBuffer branch, size:",
+				imageSrc.width,
+				"x",
+				imageSrc.height,
+				"bufferLength:",
+				imageSrc.sharedBuffer?.length ?? -1,
 			);
 			texture = new PIXI.Texture({
 				source: new PIXI.BufferImageSource({
@@ -424,6 +448,13 @@ export const renderAddImageToContainerAction = async (
 	const image = new PIXI.Sprite(texture);
 	image.alpha = hideImageSprite ? 0 : 1;
 	container.addChild(image);
+
+	if (!texture) {
+		console.warn(
+			"[renderAddImageToContainerAction] texture is undefined after add, result will be blank/black",
+			containerKey,
+		);
+	}
 
 	currentImageTextureRef.current = texture;
 

@@ -24,7 +24,7 @@ import {
 } from "@/types/appSettings";
 import { getCaptureHistoryImageAbsPath } from "@/utils/captureHistory";
 import { supportOffscreenCanvas } from "@/utils/environment";
-import { appWarn } from "@/utils/log";
+import { appInfo, appWarn } from "@/utils/log";
 import {
 	addImageToContainerAction,
 	applyProcessImageConfigToCanvasAction,
@@ -259,6 +259,19 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 		const worker = supportOffscreenCanvas()
 			? new Worker(new URL("./workers/renderWorker.ts", import.meta.url))
 			: undefined;
+		// 将 worker 的未捕获异常/消息错误落盘到本地日志，便于排查渲染黑屏
+		if (worker) {
+			worker.onerror = (event) => {
+				appError(
+					`[ImageLayer] rendererWorker error: ${event.message} (${event.filename}:${event.lineno})`,
+				);
+			};
+			worker.onmessageerror = (event) => {
+				appError(
+					`[ImageLayer] rendererWorker messageerror: ${event.type}`,
+				);
+			};
+		}
 		setRendererWorker(worker);
 		setHasInitRendererWorker(true);
 		return () => {
@@ -722,6 +735,26 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 				currentCaptureImageSrcRef.current = isSharedBuffer
 					? imageBuffer
 					: imageSrc;
+			}
+			// 诊断日志：记录 onCaptureReady 收到的数据形态，定位黑屏是哪种路径
+			if (isSharedBuffer) {
+				appInfo(
+					`[onCaptureReady] sharedBuffer path, size: ${imageBuffer.width}x${imageBuffer.height}, bufferLen: ${
+						imageBuffer.sharedBuffer?.length ?? -1
+					}, bufferByteLength: ${
+						imageBuffer.sharedBuffer?.buffer?.byteLength ?? -1
+					}`,
+				);
+			} else {
+				appInfo(
+					`[onCaptureReady] non-sharedBuffer path, imageSrc: ${typeof imageSrc}, ${
+						imageSrc ? imageSrc.slice(0, 40) : ""
+					}, imageBufferType: ${
+						imageBuffer && "type" in imageBuffer
+							? imageBuffer.type
+							: typeof imageBuffer
+					}`,
+				);
 			}
 			if (imageSrc) {
 				await addImageToContainer(
