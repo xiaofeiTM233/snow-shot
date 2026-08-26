@@ -503,6 +503,12 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 		ImageLayerActionType["addImageToContainer"]
 	>(
 		async (containerKey, imageSrc, hideImageSprite) => {
+			// 兜底：确保目标容器已创建。worker 侧 renderAddImageToContainerAction 在容器不存在时
+			// 会静默 return（不渲染、不报错），若 INIT_CONTAINER_KEY 容器尚未创建（渲染初始化
+			// 与截图并行时的竞态），画面就会保持透明/黑屏。这里先创建再添加，消除竞态。
+			if (containerKey === INIT_CONTAINER_KEY) {
+				await createNewCanvasContainer(INIT_CONTAINER_KEY);
+			}
 			await addImageToContainerAction(
 				rendererWorker,
 				canvasContainerMapRef,
@@ -516,7 +522,7 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 				hideImageSprite,
 			);
 		},
-		[rendererWorker],
+		[rendererWorker, createNewCanvasContainer],
 	);
 
 	const clearContainer = useCallback<ImageLayerActionType["clearContainer"]>(

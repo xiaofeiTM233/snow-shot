@@ -361,6 +361,10 @@ export const renderAddImageToContainerAction = async (
 ): Promise<void> => {
 	const container = canvasContainerMapRef.current.get(containerKey);
 	if (!container) {
+		console.warn(
+			"[renderAddImageToContainerAction] container not found, skip rendering:",
+			containerKey,
+		);
 		return;
 	}
 
