@@ -14,7 +14,7 @@ use windows::Win32::Graphics::Gdi::{
     MONITORINFOEXW,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MonitorInfo {
     pub monitor: Monitor,
     pub rect: ElementRect,

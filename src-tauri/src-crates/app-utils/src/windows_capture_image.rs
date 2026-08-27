@@ -395,6 +395,50 @@ pub fn capture_monitor_image(
     color_format: ColorFormat,
     algorithm: CorrectHdrColorAlgorithm,
 ) -> Result<image::DynamicImage, String> {
+    // WGC 的 windows-capture 会在调用线程上执行 RoInitialize(RO_INIT_MULTITHREADED)，
+    // 若该线程已被 Tauri/WebView2/其他库初始化为 STA，会返回 RPC_E_CHANGED_MODE
+    // 导致 FailedToInitWinRT（冷启动首次截图黑屏的根因）。
+    // 修复：在干净的新线程上执行 WGC（新线程 COM 状态干净，RoInitialize 必然成功），
+    // 主线程等待结果。MonitorInfo 已 unsafe impl Send，可安全 move 进线程。
+    let monitor_clone = monitor.clone();
+    let window_clone = window;
+    let crop_area_clone = crop_area;
+    let (tx, rx) = channel::<Result<image::DynamicImage, String>>();
+
+    std::thread::Builder::new()
+        .name("wgc-capture-thread".to_string())
+        .spawn(move || {
+            let result = capture_monitor_image_impl(
+                &monitor_clone,
+                window_clone,
+                crop_area_clone,
+                color_format,
+                algorithm,
+            );
+            let _ = tx.send(result);
+        })
+        .map_err(|e| {
+            format!(
+                "[windows_capture_image::capture_monitor_image] failed to spawn wgc thread: {:?}",
+                e
+            )
+        })?;
+
+    rx.recv().map_err(|e| {
+        format!(
+            "[windows_capture_image::capture_monitor_image] failed to join wgc thread: {:?}",
+            e
+        )
+    })?
+}
+
+fn capture_monitor_image_impl(
+    monitor: &MonitorInfo,
+    window: Option<HWND>,
+    crop_area: Option<ElementRect>,
+    color_format: ColorFormat,
+    algorithm: CorrectHdrColorAlgorithm,
+) -> Result<image::DynamicImage, String> {
     // 是否使用 Rgba16F 取决于"是否开启 HDR 颜色校正"且"系统 HDR 当前开启"：
     // - 未开启校正（algorithm == None）：全部走系统合成的 Rgba8 直拷，损失就损失，简单稳定；
     // - 开启校正且系统 HDR 开启：用 Rgba16F 捕获线性帧并做亮度校正，不损失 HDR 信息；
@@ -411,7 +455,7 @@ pub fn capture_monitor_image(
     };
 
     log::info!(
-        "[windows_capture_image::capture_monitor_image] hdr_enabled: {}, sdr_white_level: {}, capture_is_rgba8: {}",
+        "[windows_capture_image::capture_monitor_image_impl] hdr_enabled: {}, sdr_white_level: {}, capture_is_rgba8: {}",
         monitor.monitor_hdr_info.hdr_enabled,
         monitor.monitor_hdr_info.sdr_white_level,
         capture_is_rgba8
@@ -454,7 +498,7 @@ pub fn capture_monitor_image(
         }
         None => {
             let settings = Settings::new(
-                capture_monitor.clone(),
+                capture_monitor,
                 CursorCaptureSettings::WithoutCursor,
                 draw_border_setting,
                 SecondaryWindowSettings::Default,
@@ -650,90 +694,16 @@ pub fn capture_monitor_image(
                 }
             }
             _ => {
-                // 本次 WGC 启动失败（常见于冷启动 FailedToInitWinRT），
-                // 立即重试一次 WGC——WinRT 首次初始化失败往往是临时性的，第二次能成功，
-                // 避免直接回退 xcap 导致 HDR 组合下黑屏。
-                log::warn!(
-                    "[windows_capture_image::capture_monitor_image] WGC start failed, retrying once: {:?}",
+                // 本次 WGC 启动失败，回退到 xcap（由上层处理），不永久禁用 WGC
+                log::error!(
+                    "[windows_capture_image::capture_monitor_image] HDR image capture failed: {:?}",
                     e
                 );
 
-                let (retry_sender, retry_receiver) = channel();
-                let retry_start_result: Result<(), GraphicsCaptureApiError<String>> =
-                    match window {
-                        Some(window) => WindowsCaptureImage::start(Settings::new(
-                            window,
-                            CursorCaptureSettings::WithoutCursor,
-                            draw_border_setting,
-                            SecondaryWindowSettings::Default,
-                            MinimumUpdateIntervalSettings::Default,
-                            DirtyRegionSettings::Default,
-                            capture_color_format,
-                            CaptureFlags {
-                                on_frame_arrived: retry_sender,
-                                crop_area,
-                                capture_is_rgba8,
-                            },
-                        )),
-                        None => WindowsCaptureImage::start(Settings::new(
-                            capture_monitor,
-                            CursorCaptureSettings::WithoutCursor,
-                            draw_border_setting,
-                            SecondaryWindowSettings::Default,
-                            MinimumUpdateIntervalSettings::Default,
-                            DirtyRegionSettings::Default,
-                            capture_color_format,
-                            CaptureFlags {
-                                on_frame_arrived: retry_sender,
-                                crop_area,
-                                capture_is_rgba8,
-                            },
-                        )),
-                    };
-
-                match retry_start_result {
-                    Ok(_capturer) => {
-                        // 重试成功，处理捕获的图像（同样做黑屏检测）
-                        match process_captured_image(
-                            retry_receiver,
-                            monitor,
-                            color_format,
-                            algorithm,
-                            capture_is_rgba8,
-                        ) {
-                            Ok(image) => {
-                                if is_black_image(&image, 0.99) {
-                                    log::warn!(
-                                        "[windows_capture_image::capture_monitor_image] retry returned black frame, falling back to xcap"
-                                    );
-                                    return Err(format!(
-                                        "[windows_capture_image::capture_monitor_image] retry captured black frame"
-                                    ));
-                                }
-                                Ok(image)
-                            }
-                            Err(retry_err) => {
-                                log::error!(
-                                    "[windows_capture_image::capture_monitor_image] retry process failed: {:?}",
-                                    retry_err
-                                );
-                                Err(retry_err)
-                            }
-                        }
-                    }
-                    Err(retry_e) => {
-                        // 重试也失败，回退到 xcap（由上层处理），不永久禁用 WGC
-                        log::error!(
-                            "[windows_capture_image::capture_monitor_image] HDR image capture failed after retry: {:?}",
-                            retry_e
-                        );
-
-                        Err(format!(
-                            "[windows_capture_image::capture_monitor_image] failed to start capturer after retry: {:?}",
-                            retry_e
-                        ))
-                    }
-                }
+                Err(format!(
+                    "[windows_capture_image::capture_monitor_image] failed to start capturer: {:?}",
+                    e
+                ))
             }
         },
     }
