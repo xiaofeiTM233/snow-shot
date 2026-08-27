@@ -400,6 +400,18 @@ pub fn capture_monitor_image(
     // 导致 FailedToInitWinRT（冷启动首次截图黑屏的根因）。
     // 修复：在干净的新线程上执行 WGC（新线程 COM 状态干净，RoInitialize 必然成功），
     // 主线程等待结果。MonitorInfo 已 unsafe impl Send，可安全 move 进线程。
+    let caller_thread_id = std::thread::current().id();
+    log::info!(
+        "[windows_capture_image::capture_monitor_image] spawning wgc thread, caller thread: {:?}, hdr_enabled: {}, capture_is_rgba8: {}",
+        caller_thread_id,
+        monitor.monitor_hdr_info.hdr_enabled,
+        !(algorithm != CorrectHdrColorAlgorithm::None && monitor.monitor_hdr_info.hdr_enabled)
+    );
+
+    // 诊断：探测调用线程的 WinRT 初始化状态（不改变它，只观察）。
+    // RoInitialize 会改变线程状态，这里探测后立即 RoUninitialize 还原，避免副作用。
+    probe_winrt_thread_state("caller");
+
     let monitor_clone = monitor.clone();
     let window_clone = window;
     let crop_area_clone = crop_area;
@@ -408,6 +420,11 @@ pub fn capture_monitor_image(
     std::thread::Builder::new()
         .name("wgc-capture-thread".to_string())
         .spawn(move || {
+            log::info!(
+                "[windows_capture_image::capture_monitor_image] wgc thread started, thread: {:?}",
+                std::thread::current().id()
+            );
+            probe_winrt_thread_state("wgc-thread");
             let result = capture_monitor_image_impl(
                 &monitor_clone,
                 window_clone,
@@ -415,6 +432,17 @@ pub fn capture_monitor_image(
                 color_format,
                 algorithm,
             );
+            match &result {
+                Ok(_) => log::info!(
+                    "[windows_capture_image::capture_monitor_image] wgc thread done OK, thread: {:?}",
+                    std::thread::current().id()
+                ),
+                Err(e) => log::error!(
+                    "[windows_capture_image::capture_monitor_image] wgc thread returned error, thread: {:?}, err: {}",
+                    std::thread::current().id(),
+                    e
+                ),
+            }
             let _ = tx.send(result);
         })
         .map_err(|e| {
@@ -424,12 +452,52 @@ pub fn capture_monitor_image(
             )
         })?;
 
-    rx.recv().map_err(|e| {
-        format!(
+    match rx.recv() {
+        Ok(result) => result,
+        Err(e) => Err(format!(
             "[windows_capture_image::capture_monitor_image] failed to join wgc thread: {:?}",
             e
-        )
-    })?
+        )),
+    }
+}
+
+/// 诊断：探测当前线程的 WinRT 初始化状态并打日志。
+/// 通过尝试 RoInitialize(RO_INIT_MULTITHREADED) 观察返回值，随后 RoUninitialize 还原，
+/// 以便判断线程是否已被 STA 初始化（返回 RPC_E_CHANGED_MODE 即说明是 STA）。
+fn probe_winrt_thread_state(tag: &str) {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::System::WinRT::{RoInitialize, RoUninitialize, RO_INIT_MULTITHREADED};
+        let thread_id = std::thread::current().id();
+        let hr = unsafe { RoInitialize(RO_INIT_MULTITHREADED) };
+        let (hr_code, description) = match &hr {
+            Ok(_) => (0x00000000, "MTA/OK"),
+            Err(e) => {
+                let code = e.code().0;
+                if code == 0x80010106 {
+                    // RPC_E_CHANGED_MODE
+                    (code, "RPC_E_CHANGED_MODE: thread is STA, WGC will fail on this thread")
+                } else if code == 0x00000001 {
+                    // S_FALSE：已初始化（RoInitialize 不会返回 S_FALSE，但保留判断）
+                    (code, "S_FALSE/already initialized")
+                } else {
+                    (code, "other error")
+                }
+            }
+        };
+        log::info!(
+            "[probe_winrt] {} thread: {:?}, RoInitialize(MTA) hr: 0x{:08X} ({})",
+            tag,
+            thread_id,
+            hr_code as u32,
+            description
+        );
+        // 探测后还原线程状态。RoInitialize 成功后必须 RoUninitialize，避免影响后续
+        // windows-capture 在同一线程上的 RoInitialize（否则它会认为已初始化而走 S_FALSE 分支）。
+        if hr.is_ok() {
+            unsafe { RoUninitialize() };
+        }
+    }
 }
 
 fn capture_monitor_image_impl(
