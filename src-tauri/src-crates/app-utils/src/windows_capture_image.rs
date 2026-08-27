@@ -413,7 +413,9 @@ pub fn capture_monitor_image(
     probe_winrt_thread_state("caller");
 
     let monitor_clone = monitor.clone();
-    let window_clone = window;
+    // HWND 是 *mut c_void 裸指针，不是 Send，不能直接 move 进线程。
+    // 转成 isize（指针整数）传输，在线程内恢复为 HWND（HWND 是只读句柄，跨线程安全）。
+    let window_clone = window.map(|w| w.0 as isize);
     let crop_area_clone = crop_area;
     let (tx, rx) = channel::<Result<image::DynamicImage, String>>();
 
@@ -425,9 +427,10 @@ pub fn capture_monitor_image(
                 std::thread::current().id()
             );
             probe_winrt_thread_state("wgc-thread");
+            let window_restored = window_clone.map(|w| HWND(w as *mut core::ffi::c_void));
             let result = capture_monitor_image_impl(
                 &monitor_clone,
-                window_clone,
+                window_restored,
                 crop_area_clone,
                 color_format,
                 algorithm,
