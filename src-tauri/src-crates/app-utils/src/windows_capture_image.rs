@@ -477,10 +477,12 @@ fn probe_winrt_thread_state(tag: &str) {
             Ok(_) => (0x00000000, "MTA/OK"),
             Err(e) => {
                 let code = e.code().0;
-                if code == 0x80010106 {
+                // HRESULT 是 i32，RPC_E_CHANGED_MODE = 0x80010106 需按 u32 比较
+                let code_u32 = code as u32;
+                if code_u32 == 0x80010106 {
                     // RPC_E_CHANGED_MODE
                     (code, "RPC_E_CHANGED_MODE: thread is STA, WGC will fail on this thread")
-                } else if code == 0x00000001 {
+                } else if code_u32 == 0x00000001 {
                     // S_FALSE：已初始化（RoInitialize 不会返回 S_FALSE，但保留判断）
                     (code, "S_FALSE/already initialized")
                 } else {
