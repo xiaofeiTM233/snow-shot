@@ -186,6 +186,9 @@ const DrawPageCore: React.FC<{
 	const imageBufferRef = useRef<
 		ImageBuffer | ImageSharedBufferData | undefined
 	>(undefined);
+	// 标记当前截图画面是否已就绪等待用户操作（readyCapture 完成后置 true）。
+	// 用于区分"正在捕获中"（应拒绝新截图）与"画面已显示待操作"（新截图应取消当前并重开）。
+	const captureScreenReadyRef = useRef(false);
 	// 截图 sharedBuffer 的独立拷贝，避免 buffer 被 transfer 给 worker 后主线程无法访问
 	const capturedSharedBufferRef = useRef<ImageSharedBufferData | undefined>(
 		undefined,
@@ -393,6 +396,8 @@ const DrawPageCore: React.FC<{
 				imageBuffer,
 				captureBoundingBoxInfo,
 			);
+			// 截图画面已就绪，标记允许下一次截图请求"取消当前并重开"
+			captureScreenReadyRef.current = true;
 			appInfo("[DIAG] readyCapture: done");
 		},
 		[onCaptureLoad, setCaptureLoading, setCaptureEvent],
@@ -525,6 +530,7 @@ const DrawPageCore: React.FC<{
 			});
 			imageBufferRef.current = undefined;
 			capturedSharedBufferRef.current = undefined;
+			captureScreenReadyRef.current = false;
 			resetCaptureStep();
 			resetDrawState();
 			resetScreenshotType();
@@ -686,15 +692,37 @@ const DrawPageCore: React.FC<{
 				drawPageState: drawPageStateRef.current,
 			});
 
-			// 防重入：截图进行中，或上一次截图窗口尚未完全释放（WaitRelease/Release）
+			// 防重入：截图捕获中，或上一次截图窗口尚未完全释放（WaitRelease/Release）
 			// 时，拒绝再次触发截图，避免快速连按导致 WGC 把截图控件也截进画面。
+			// 例外：当前截图画面已就绪等待用户操作（captureScreenReadyRef）时，
+			// 新截图请求应"取消当前截图并重新开始"，而不是卡死（无法再次截图）。
 			if (
-				capturingRef.current ||
+				(capturingRef.current && !captureScreenReadyRef.current) ||
 				drawPageStateRef.current === DrawPageState.WaitRelease ||
 				drawPageStateRef.current === DrawPageState.Release
 			) {
 				appInfo("[DIAG] excuteScreenshot: ignored (already capturing or releasing)");
 				return;
+			}
+
+			// 画面已就绪但收到新截图请求：放弃当前画面，重新开始截图。
+			// 不能 await finishCapture（它内部会 hideWindow / 重置状态 / releasePage），
+			// 否则新截图流程会与窗口释放冲突。这里只做轻量重置，直接进入新捕获。
+			if (capturingRef.current && captureScreenReadyRef.current) {
+				appInfo("[DIAG] excuteScreenshot: cancel current capture and restart");
+				// 取消当前截图的各层状态（同 finishCapture 的核心清理，但不动窗口）
+				await Promise.all([
+					imageLayerActionRef.current?.onCaptureFinish(),
+					selectLayerActionRef.current?.onCaptureFinish(),
+					drawLayerActionRef.current?.onCaptureFinish(),
+				]);
+				imageBufferRef.current = undefined;
+				capturedSharedBufferRef.current = undefined;
+				captureScreenReadyRef.current = false;
+				resetCaptureStep();
+				resetDrawState();
+				resetScreenshotType();
+				drawToolbarActionRef.current?.setEnable(false);
 			}
 
 			capturingRef.current = true;
@@ -821,6 +849,9 @@ const DrawPageCore: React.FC<{
 			finishCapture,
 			readyCapture,
 			setCaptureStateAction,
+			resetCaptureStep,
+			resetDrawState,
+			resetScreenshotType,
 		],
 	);
 
