@@ -10,6 +10,30 @@ import type { RefWrap } from "./workers/renderWorkerTypes";
 
 export type RefType<T> = RefWrap<T> | RefObject<T>;
 
+/**
+ * 渲染层日志：worker 线程的 console 不通过 tauri-log 落盘，黑屏排查时看不到 worker 内部状态。
+ * 由 renderWorker 入口设置 forwardLog 为 postMessage 转发，主线程收到后 appInfo/appWarn 落盘；
+ * 未设置时（主线程直接跑无 worker 分支）fallback 到 console。
+ */
+export type ForwardLogFn = (level: "info" | "warn" | "error", message: string) => void;
+let forwardLogFn: ForwardLogFn | undefined;
+export const setForwardLog = (fn: ForwardLogFn | undefined) => {
+	forwardLogFn = fn;
+};
+export const renderLog = (level: "info" | "warn" | "error", message: string) => {
+	if (forwardLogFn) {
+		forwardLogFn(level, message);
+	} else {
+		if (level === "error") {
+			console.error(message);
+		} else if (level === "warn") {
+			console.warn(message);
+		} else {
+			console.info(message);
+		}
+	}
+};
+
 export const renderInitBaseImageTextureAction = async (
 	baseImageTextureRef: RefType<PIXI.Texture | undefined>,
 	imageUrl: string,
@@ -153,13 +177,13 @@ export const renderGetImageBitmapAction = async (
 	}
 
 	// 诊断日志：导出前检查渲染容器内容，定位保存/复制黑屏
-	console.info(
-		"[renderGetImageBitmapAction] export, imageContainer:",
-		!!imageContainer,
-		"childrenCount:",
-		imageContainer?.children.length ?? -1,
-		"hasTexture:",
-		!!(imageContainer?.children[0] && imageContainer.children[0].texture),
+	renderLog(
+		"info",
+		`[renderGetImageBitmapAction] export, imageContainer: ${!!imageContainer}, childrenCount: ${
+			imageContainer?.children.length ?? -1
+		}, hasTexture: ${
+			!!(imageContainer?.children[0] && imageContainer.children[0].texture)
+		}`,
 	);
 
 	const canvas = canvasApp.renderer.extract.canvas({
@@ -378,9 +402,9 @@ export const renderAddImageToContainerAction = async (
 ): Promise<void> => {
 	const container = canvasContainerMapRef.current.get(containerKey);
 	if (!container) {
-		console.warn(
-			"[renderAddImageToContainerAction] container not found, skip rendering:",
-			containerKey,
+		renderLog(
+			"warn",
+			`[renderAddImageToContainerAction] container not found, skip rendering: ${containerKey}`,
 		);
 		return;
 	}
@@ -396,11 +420,11 @@ export const renderAddImageToContainerAction = async (
 				baseImageTextureRef.current = undefined;
 			} else if (imageSrc.type === "shared_buffer_image_texture") {
 				texture = sharedBufferImageTextureRef.current;
-				console.info(
-					"[renderAddImageToContainerAction] shared_buffer_image_texture branch, cached texture:",
-					!!texture,
-					"cached imageSharedBuffer:",
-					!!imageSharedBufferRef.current,
+				renderLog(
+					"info",
+					`[renderAddImageToContainerAction] shared_buffer_image_texture branch, cached texture: ${
+						!!texture
+					}, cached imageSharedBuffer: ${!!imageSharedBufferRef.current}`,
 				);
 			}
 		} else if (imageSrc instanceof ImageBitmap) {
@@ -412,13 +436,11 @@ export const renderAddImageToContainerAction = async (
 				imageSrc.width,
 				imageSrc.height,
 			);
-			console.info(
-				"[renderAddImageToContainerAction] raw sharedBuffer branch, size:",
-				imageSrc.width,
-				"x",
-				imageSrc.height,
-				"bufferLength:",
-				imageSrc.sharedBuffer?.length ?? -1,
+			renderLog(
+				"info",
+				`[renderAddImageToContainerAction] raw sharedBuffer branch, size: ${imageSrc.width}x${imageSrc.height}, bufferLength: ${
+					imageSrc.sharedBuffer?.length ?? -1
+				}`,
 			);
 			texture = new PIXI.Texture({
 				source: new PIXI.BufferImageSource({
@@ -450,9 +472,9 @@ export const renderAddImageToContainerAction = async (
 	container.addChild(image);
 
 	if (!texture) {
-		console.warn(
-			"[renderAddImageToContainerAction] texture is undefined after add, result will be blank/black",
-			containerKey,
+		renderLog(
+			"warn",
+			`[renderAddImageToContainerAction] texture is undefined after add, result will be blank/black, container: ${containerKey}`,
 		);
 	}
 

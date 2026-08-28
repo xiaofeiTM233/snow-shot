@@ -37,6 +37,8 @@ export enum BaseLayerRenderMessageType {
 	TransferImageSharedBuffer = "transferImageSharedBuffer",
 	InitBaseImageTexture = "initBaseImageTexture",
 	ApplyProcessImageConfigToCanvas = "applyProcessImageConfigToCanvas",
+	// worker 内部诊断日志转发（worker 的 console 不落盘，需转发到主线程由 appInfo/appWarn 落盘）
+	ForwardLog = "forwardLog",
 }
 
 export type BaseLayerRenderInitData = {
@@ -200,6 +202,15 @@ export type BaseLayerRenderApplyProcessImageConfigToCanvasData = {
 	};
 };
 
+// worker 诊断日志转发：主线程收到后调用 appInfo/appWarn 落盘
+export type BaseLayerRenderForwardLogData = {
+	type: BaseLayerRenderMessageType.ForwardLog;
+	payload: {
+		level: "info" | "warn" | "error";
+		message: string;
+	};
+};
+
 export type BaseLayerRenderData =
 	| BaseLayerRenderInitData
 	| BaseLayerRenderDisposeData
@@ -342,6 +353,11 @@ export type RenderTransferImageSharedBufferResult = {
 	};
 };
 
+export type RenderForwardLogResult = {
+	type: BaseLayerRenderMessageType.ForwardLog;
+	payload: undefined;
+};
+
 export type RenderBlurSpriteResult =
 	| RenderCreateBlurSpriteResult
 	| RenderUpdateBlurSpriteResult
@@ -370,4 +386,5 @@ export type RenderResult =
 	| RenderUpdateHighlightResult
 	| RenderInitBaseImageTextureResult
 	| RenderTransferImageSharedBufferResult
-	| RenderApplyProcessImageConfigToCanvasResult;
+	| RenderApplyProcessImageConfigToCanvasResult
+	| RenderForwardLogResult;

@@ -271,6 +271,27 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 					`[ImageLayer] rendererWorker messageerror: ${event.type}`,
 				);
 			};
+			// 处理 worker 自发转发的诊断日志（worker console 不落盘，转发到主线程落盘）
+			worker.addEventListener(
+				"message",
+				(event: MessageEvent<{ type?: string; payload?: { level?: string; message?: string } }>) => {
+					const data = event.data;
+					if (
+						data &&
+						data.type === "forwardLog" &&
+						data.payload?.message
+					) {
+						const msg = `[worker-render] ${data.payload.message}`;
+						if (data.payload.level === "warn") {
+							appWarn(msg);
+						} else if (data.payload.level === "error") {
+							appError(msg);
+						} else {
+							appInfo(msg);
+						}
+					}
+				},
+			);
 		}
 		setRendererWorker(worker);
 		setHasInitRendererWorker(true);
