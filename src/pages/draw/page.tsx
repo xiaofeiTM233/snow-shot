@@ -1551,7 +1551,10 @@ const DrawPageCore: React.FC<{
 				return;
 			}
 
-			if (capturingRef.current) {
+			// 防重入：捕获中且画面未就绪（真在截图处理中）时拦截；
+			// 若画面已就绪等待用户操作（captureScreenReadyRef），放行到 excuteScreenshot，
+			// 由其"取消当前截图并重新开始"，避免卡死（无法再次截图）。
+			if (capturingRef.current && !captureScreenReadyRef.current) {
 				return;
 			}
 
