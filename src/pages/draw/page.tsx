@@ -746,7 +746,8 @@ const DrawPageCore: React.FC<{
 			// 切换截图历史 / 录屏时，不进行截图，只进行显示
 			if (
 				!imageBuffer &&
-				excuteScreenshotType !== ScreenshotType.SwitchCaptureHistory
+				excuteScreenshotType !== ScreenshotType.SwitchCaptureHistory &&
+				excuteScreenshotType !== ScreenshotType.VideoRecord
 			) {
 				appInfo("[DIAG] excuteScreenshot: no imageBuffer, finishing capture");
 				sendErrorMessage(intl.formatMessage({ id: "draw.captureError" }));
