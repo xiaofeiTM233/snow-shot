@@ -49,6 +49,29 @@ fn main() {
         }
     }
 
+    // 重启场景：新进程携带 --restart_wait_pid=<旧进程PID> 启动，
+    // 等待旧进程完全退出（释放单实例锁）后再初始化应用，
+    // 避免单实例机制把新实例当作重复启动而退出。
+    #[cfg(target_os = "windows")]
+    {
+        let restart_wait_pid = args.iter().find_map(|arg| {
+            arg.strip_prefix("--restart_wait_pid=")
+                .and_then(|value| value.parse::<u32>().ok())
+        });
+        if let Some(pid) = restart_wait_pid {
+            println!(
+                "[main] --restart_wait_pid={} detected, waiting for old process to exit",
+                pid
+            );
+            let exited = snow_shot_app_os::utils::wait_for_process_exit(pid, 10_000);
+            if !exited {
+                eprintln!(
+                    "[main] old process did not exit within timeout, proceeding anyway (app may fail to start)"
+                );
+            }
+        }
+    }
+
     // 在创建 WebView2 渲染子进程之前设置主进程优先级。
     #[cfg(target_os = "windows")]
     {

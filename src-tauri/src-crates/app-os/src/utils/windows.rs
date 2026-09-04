@@ -532,11 +532,12 @@ pub fn restart_with_admin() -> Result<(), String> {
     let exe_path = current_exe.to_string_lossy();
 
     unsafe {
-        // 使用 cmd.exe 延迟启动新进程，确保旧进程有足够时间退出并释放单实例锁
-        // ping 127.0.0.1 -n 2 大约延迟 1 秒
+        // 通过 cmd.exe 启动新进程并传入当前 PID，
+        // 新进程会等待当前进程完全退出（释放单实例锁）后再初始化应用
         let cmd_args = format!(
-            "/C ping 127.0.0.1 -n 2 > nul && \"{}\"",
-            exe_path
+            "/C \"\"{}\" --restart_wait_pid={}\"",
+            exe_path,
+            std::process::id()
         );
 
         let mut sei: SHELLEXECUTEINFOW = std::mem::zeroed();
@@ -565,6 +566,47 @@ pub fn restart_with_admin() -> Result<(), String> {
     }
 }
 
+/// 等待指定 PID 的进程退出（重启场景使用）。
+///
+/// 重启时新进程携带 `--restart_wait_pid=<旧进程PID>` 启动，在这里等待旧进程
+/// 完全退出（单实例锁随进程退出释放）后再继续初始化应用，避免单实例机制
+/// 将新实例误判为重复启动而自行退出。
+///
+/// * `max_wait_ms`：最长等待时间（毫秒）。返回是否确认进程已退出。
+pub fn wait_for_process_exit(pid: u32, max_wait_ms: u64) -> bool {
+    use std::time::Instant;
+    use windows::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0};
+    use windows::Win32::System::Threading::{
+        OpenProcess, WaitForSingleObject, PROCESS_SYNCHRONIZE,
+    };
+
+    let start = Instant::now();
+    loop {
+        // OpenProcess 失败说明进程已不存在（单实例锁已释放）
+        let handle = match unsafe { OpenProcess(PROCESS_SYNCHRONIZE, false, pid) } {
+            Ok(handle) => handle,
+            Err(_) => return true,
+        };
+
+        // 每次等待 100ms：返回 WAIT_OBJECT_0 表示进程已退出
+        let wait_result = unsafe { WaitForSingleObject(handle, 100) };
+        let _ = unsafe { CloseHandle(handle) };
+
+        if wait_result == WAIT_OBJECT_0 {
+            return true;
+        }
+
+        if start.elapsed().as_millis() as u64 >= max_wait_ms {
+            log::warn!(
+                "[wait_for_process_exit] timed out after {}ms waiting for pid {}",
+                max_wait_ms,
+                pid
+            );
+            return false;
+        }
+    }
+}
+
 /// 重启应用程序（不使用管理员权限）
 pub fn restart() -> Result<(), String> {
     // 获取当前可执行文件的路径
@@ -577,40 +619,21 @@ pub fn restart() -> Result<(), String> {
             ));
         }
     };
-    let exe_path = current_exe.to_string_lossy();
 
-    unsafe {
-        // 使用 cmd.exe 延迟启动新进程，确保旧进程有足够时间退出并释放单实例锁
-        // ping 127.0.0.1 -n 2 大约延迟 1 秒
-        let cmd_args = format!(
-            "/C ping 127.0.0.1 -n 2 > nul && \"{}\"",
-            exe_path
-        );
+    // 直接启动新进程并传入当前进程 PID，
+    // 新进程会等待当前进程完全退出（释放单实例锁）后再初始化应用，
+    // 避免固定延迟不足时旧进程尚未退出，导致新实例被单实例机制退出
+    let current_pid = std::process::id();
+    let spawn_result = std::process::Command::new(&current_exe)
+        .arg(format!("--restart_wait_pid={}", current_pid))
+        .spawn();
 
-        let mut sei: SHELLEXECUTEINFOW = std::mem::zeroed();
-        sei.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
-        sei.fMask = SEE_MASK_NOCLOSEPROCESS;
-        let verb = "open\0".encode_utf16().collect::<Vec<u16>>();
-        let file = "cmd.exe\0".encode_utf16().collect::<Vec<u16>>();
-        let args = cmd_args.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
-        sei.lpVerb = PCWSTR::from_raw(verb.as_ptr());
-        sei.lpFile = PCWSTR::from_raw(file.as_ptr());
-        sei.lpParameters = PCWSTR::from_raw(args.as_ptr());
-        sei.nShow = windows::Win32::UI::WindowsAndMessaging::SW_HIDE.0 as i32;
-
-        let result = ShellExecuteExW(&mut sei);
-        if result.is_err() {
-            return Err("[restart] ShellExecuteExW failed".into());
-        }
-
-        // 检查是否成功启动
-        if sei.hProcess.is_invalid() {
-            return Err("[restart] ShellExecuteExW failed".into());
-        }
-
-        // 退出当前进程，让单实例锁释放
-        std::process::exit(0);
+    if let Err(e) = spawn_result {
+        return Err(format!("[restart] failed to spawn new process: {:?}", e));
     }
+
+    // 退出当前进程，释放单实例锁；新进程在旧进程退出后自动继续启动
+    std::process::exit(0);
 }
 
 /// 设置当前进程优先级（仅 Windows 有效）
