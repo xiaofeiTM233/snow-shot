@@ -69,10 +69,11 @@ pub async fn init_ui_elements(ui_elements: tauri::State<'_, Mutex<UIElements>>) 
 
 #[command]
 pub async fn init_ui_elements_cache(
+    app: tauri::AppHandle,
     ui_elements: tauri::State<'_, Mutex<UIElements>>,
     blacklist: Option<Vec<String>>,
 ) -> Result<(), String> {
-    snow_shot_tauri_commands_screenshot::init_ui_elements_cache(ui_elements, blacklist).await
+    snow_shot_tauri_commands_screenshot::init_ui_elements_cache(app, ui_elements, blacklist).await
 }
 
 #[command]

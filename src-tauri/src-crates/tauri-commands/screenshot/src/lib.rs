@@ -14,6 +14,18 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::ipc::Response;
 use tokio::sync::Mutex;
 
+/**
+ * 窗口子树全量枚举的软超时：枚举线程在元素之间检查，超时后返回已枚举的部分结果
+ */
+#[cfg(target_os = "windows")]
+const ELEMENT_ENUMERATION_SOFT_DEADLINE_MS: u64 = 1500;
+
+/**
+ * 命令等待枚举结果的硬超时，超时后该窗口在本截图会话内退回窗口级矩形
+ */
+#[cfg(target_os = "windows")]
+const ELEMENT_ENUMERATION_HARD_TIMEOUT_MS: u64 = 2000;
+
 pub async fn capture_current_monitor(
     #[allow(unused_variables)] window: tauri::Window,
     encoder: String,
@@ -387,19 +399,93 @@ pub async fn init_ui_elements(ui_elements: tauri::State<'_, Mutex<UIElements>>) 
 }
 
 pub async fn init_ui_elements_cache(
+    #[allow(unused_variables)] app: tauri::AppHandle,
     ui_elements: tauri::State<'_, Mutex<UIElements>>,
     #[allow(unused_variables)] blacklist: Option<Vec<String>>,
 ) -> Result<(), String> {
-    let mut ui_elements = ui_elements.lock().await;
+    {
+        let mut ui_elements = ui_elements.lock().await;
 
-    ui_elements.init_cache().map_err(|e| format!("[init_ui_elements_cache] error: {:?}", e))?;
+        ui_elements
+            .init_cache()
+            .map_err(|e| format!("[init_ui_elements_cache] error: {:?}", e))?;
 
-    #[cfg(target_os = "windows")]
-    if let Some(blacklist) = blacklist {
-        ui_elements.set_blacklist(&blacklist);
+        #[cfg(target_os = "windows")]
+        if let Some(blacklist) = blacklist {
+            ui_elements.set_blacklist(&blacklist);
+        }
     }
 
+    // 预热：冻结瞬间在后台枚举鼠标所在窗口与 z 序靠前的若干窗口
+    #[cfg(target_os = "windows")]
+    prewarm_ui_elements(app).await;
+
     Ok(())
+}
+
+/**
+ * 预热：在后台枚举鼠标所在窗口（优先）与 z 序靠前的若干窗口的 UIA 子树，
+ * 把"首次进入窗口"的枚举延迟藏进冻结动画期间。
+ * 每个窗口一个阻塞任务并行枚举，超时语义与按需枚举一致（超时窗口本会话内退回窗口级矩形）。
+ */
+#[cfg(target_os = "windows")]
+async fn prewarm_ui_elements(app: tauri::AppHandle) {
+    use snow_shot_app_os::ui_automation::enumerate_window_subtree;
+    use tauri::Manager;
+
+    const PREWARM_WINDOW_COUNT: usize = 4;
+
+    let targets = {
+        let ui_elements = app.state::<Mutex<UIElements>>();
+        let mut ui_elements = ui_elements.lock().await;
+        // 物理像素坐标，与 UIA 矩形同一坐标系
+        let (mouse_x, mouse_y) =
+            snow_shot_app_utils::get_mouse_position(&app).unwrap_or((i32::MIN, i32::MIN));
+        ui_elements.begin_prewarm_enumeration(mouse_x, mouse_y, PREWARM_WINDOW_COUNT)
+    };
+
+    for target in targets {
+        let window_index = target.window_index;
+        let session_id = target.session_id;
+        // AppHandle 可 Clone 不可 Copy，每个预热任务用独立的克隆
+        let app = app.clone();
+        let task = tokio::task::spawn_blocking(move || {
+            enumerate_window_subtree(
+                target.hwnd,
+                target.window_rect,
+                ELEMENT_ENUMERATION_SOFT_DEADLINE_MS,
+            )
+        });
+
+        let _ = tauri::async_runtime::spawn(async move {
+            let merge_result = tokio::time::timeout(
+                std::time::Duration::from_millis(ELEMENT_ENUMERATION_HARD_TIMEOUT_MS),
+                task,
+            )
+            .await;
+
+            let ui_elements = app.state::<Mutex<UIElements>>();
+            let mut ui_elements = ui_elements.lock().await;
+            match merge_result {
+                Ok(Ok(Ok(subtree))) => {
+                    ui_elements.merge_window_enumeration(window_index, session_id, subtree);
+                }
+                Ok(Ok(Err(error))) => {
+                    log::warn!("[prewarm_ui_elements] 枚举窗口子树失败: {error:?}");
+                    ui_elements.mark_window_enumeration_failed(window_index, session_id);
+                }
+                Ok(Err(join_error)) => {
+                    log::warn!("[prewarm_ui_elements] 枚举窗口子树任务异常: {join_error}");
+                    ui_elements.mark_window_enumeration_failed(window_index, session_id);
+                }
+                Err(_elapsed) => {
+                    // 阻塞任务无法被取消，会在软超时后自行结束，结果随 JoinHandle 丢弃
+                    log::warn!("[prewarm_ui_elements] 枚举窗口子树超时");
+                    ui_elements.mark_window_enumeration_failed(window_index, session_id);
+                }
+            }
+        });
+    }
 }
 
 #[derive(PartialEq, Eq, Serialize, Clone, Debug, Copy, Hash)]
@@ -560,19 +646,97 @@ pub async fn switch_always_on_top(#[allow(unused_variables)] window_id: u32) -> 
 
 pub async fn get_element_from_position(
     ui_elements: tauri::State<'_, Mutex<UIElements>>,
+    #[allow(unused_variables)] mouse_x: i32,
+    #[allow(unused_variables)] mouse_y: i32,
+) -> Result<Vec<ElementRect>, ()> {
+    #[cfg(target_os = "windows")]
+    {
+        get_element_from_position_windows(ui_elements, mouse_x, mouse_y).await
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let mut ui_elements = ui_elements.lock().await;
+        ui_elements.get_element_from_point_walker(mouse_x, mouse_y)
+    }
+}
+
+/**
+ * Windows 实现：首次命中某窗口时，在独立线程中全量枚举该窗口的 UIA 子树（带超时），
+ * 之后鼠标移动只做本地空间索引查询，不再逐元素发起 COM 调用
+ */
+#[cfg(target_os = "windows")]
+async fn get_element_from_position_windows(
+    ui_elements: tauri::State<'_, Mutex<UIElements>>,
     mouse_x: i32,
     mouse_y: i32,
 ) -> Result<Vec<ElementRect>, ()> {
-    let mut ui_elements = ui_elements.lock().await;
+    use snow_shot_app_os::ui_automation::{PointQueryResult, enumerate_window_subtree};
 
-    let element_rect_list = match ui_elements.get_element_from_point_walker(mouse_x, mouse_y) {
-        Ok(element_rect) => element_rect,
-        Err(_) => {
-            return Err(());
+    // 首次点查放在独立作用域内，枚举期间不持有全局锁
+    let (window_index, fallback, enum_target) = {
+        let mut ui_elements = ui_elements.lock().await;
+        match ui_elements.get_element_rects_from_point(mouse_x, mouse_y) {
+            Err(_) => return Err(()),
+            Ok(PointQueryResult::Rects(rect_list)) => return Ok(rect_list),
+            Ok(PointQueryResult::NeedsEnumeration {
+                window_index,
+                fallback,
+            }) => {
+                let enum_target = ui_elements.begin_window_enumeration(window_index);
+                (window_index, fallback, enum_target)
+            }
         }
     };
 
-    Ok(element_rect_list)
+    // 已在枚举中或已失败：返回窗口级兜底矩形
+    let Some(enum_target) = enum_target else {
+        return Ok(fallback);
+    };
+
+    // 在阻塞线程池中枚举：UIA/COM 实例在该任务内创建（CoInitializeEx MTA），
+    // COM 指针不跨线程传递；async 运行时线程只等待结果。锁在上方块结束时已释放。
+    let session_id = enum_target.session_id;
+    let enumeration_task = tokio::task::spawn_blocking(move || {
+        enumerate_window_subtree(
+            enum_target.hwnd,
+            enum_target.window_rect,
+            ELEMENT_ENUMERATION_SOFT_DEADLINE_MS,
+        )
+    });
+
+    let merge_result = tokio::time::timeout(
+        std::time::Duration::from_millis(ELEMENT_ENUMERATION_HARD_TIMEOUT_MS),
+        enumeration_task,
+    )
+    .await;
+
+    let mut ui_elements = ui_elements.lock().await;
+    match merge_result {
+        Ok(Ok(Ok(subtree))) => {
+            ui_elements.merge_window_enumeration(window_index, session_id, subtree);
+        }
+        Ok(Ok(Err(error))) => {
+            log::warn!("[get_element_from_position] 枚举窗口子树失败: {error:?}");
+            ui_elements.mark_window_enumeration_failed(window_index, session_id);
+        }
+        Ok(Err(join_error)) => {
+            // 枚举任务 panic：本会话内不再重试该窗口
+            log::warn!("[get_element_from_position] 枚举窗口子树任务异常: {join_error}");
+            ui_elements.mark_window_enumeration_failed(window_index, session_id);
+        }
+        Err(_elapsed) => {
+            // 硬超时：本会话内不再重试该窗口。阻塞任务无法被取消，
+            // 会在软超时后自行结束，其结果随 JoinHandle 一并丢弃。
+            log::warn!("[get_element_from_position] 枚举窗口子树超时");
+            ui_elements.mark_window_enumeration_failed(window_index, session_id);
+        }
+    }
+
+    match ui_elements.get_element_rects_from_point(mouse_x, mouse_y) {
+        Ok(PointQueryResult::Rects(rect_list)) => Ok(rect_list),
+        _ => Ok(fallback),
+    }
 }
 
 pub async fn get_mouse_position(app: tauri::AppHandle) -> Result<(i32, i32), String> {
