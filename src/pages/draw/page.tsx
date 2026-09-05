@@ -766,22 +766,6 @@ const DrawPageCore: React.FC<{
 				return;
 			}
 
-			// 录屏类型不需要渲染截图画面，只等待窗口和选区初始化完成即可
-			if (excuteScreenshotType === ScreenshotType.VideoRecord) {
-				appInfo("[DIAG] excuteScreenshot: VideoRecord type, awaiting layer init");
-				try {
-					await layerOnExecuteScreenshotPromise;
-					appInfo("[DIAG] excuteScreenshot: VideoRecord layer init done");
-				} catch {
-					appInfo("[DIAG] excuteScreenshot: VideoRecord layer init failed");
-					// ignore
-				}
-				capturingRef.current = false;
-				setCaptureStateAction(false);
-				appInfo("[DIAG] excuteScreenshot: VideoRecord exit");
-				return;
-			}
-
 			try {
 				appInfo("[DIAG] excuteScreenshot: entering readyCapture");
 				// 因为窗口是空的，所以窗口显示和图片显示先后顺序倒无所谓
