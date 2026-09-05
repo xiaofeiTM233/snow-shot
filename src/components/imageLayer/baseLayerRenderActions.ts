@@ -57,6 +57,12 @@ export const renderDisposeCanvasAction = (
 	canvasAppRef.current = undefined;
 };
 
+// 渲染初始化与截图并行时的竞态兜底：resizeCanvasAction 可能先于 Init 消息到达，
+// 此时画布应用尚未创建，若直接丢弃，画布会停留在默认尺寸（如 300x150），
+// 截图被画进去后经 CSS 拉伸铺满窗口，表现为冻结画面被放大。这里记录待应用的
+// 尺寸，在初始化完成后补齐
+let pendingResizeCanvasSize: { width: number; height: number } | undefined;
+
 export const renderInitCanvasAction = async (
 	canvasAppRef: RefType<Application | undefined>,
 	appOptions: Partial<ApplicationOptions>,
@@ -85,6 +91,13 @@ export const renderInitCanvasAction = async (
 	}
 	canvasAppRef.current = canvasApp;
 	canvasApp.stage.interactiveChildren = false;
+	if (pendingResizeCanvasSize) {
+		canvasApp.renderer.resize(
+			pendingResizeCanvasSize.width,
+			pendingResizeCanvasSize.height,
+		);
+		pendingResizeCanvasSize = undefined;
+	}
 	return canvasApp.canvas;
 };
 
@@ -116,9 +129,12 @@ export const renderResizeCanvasAction = (
 ) => {
 	const canvasApp = canvasAppRef.current;
 	if (!canvasApp) {
+		// 画布应用尚未初始化，记录尺寸待初始化完成后补应用
+		pendingResizeCanvasSize = { width, height };
 		return;
 	}
 
+	pendingResizeCanvasSize = undefined;
 	canvasApp.renderer.resize(width, height);
 };
 

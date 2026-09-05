@@ -1486,6 +1486,10 @@ const DrawPageCore: React.FC<{
 		  }
 		| undefined
 	>(undefined);
+	// 渲染画布尚未初始化（DrawPageState.Init）时收到的截图请求，等画布就绪后再执行
+	const initWaitExecuteScreenshotTimerRef = useRef<NodeJS.Timeout | undefined>(
+		undefined,
+	);
 
 	useEffect(() => {
 		// 监听截图命令
@@ -1535,7 +1539,52 @@ const DrawPageCore: React.FC<{
 				};
 
 				return;
-			} else if (drawPageStateRef.current === DrawPageState.WaitRelease) {
+			}
+
+			// 窗口刚创建、渲染画布尚未初始化完成时收到截图请求：此时 worker 侧画布应用
+			// 还不存在，resize 会被静默丢弃，截图会被画进默认尺寸的画布再拉伸铺满窗口
+			// （表现为冻结画面被放大）。等画布初始化完成（Active）后再执行
+			if (drawPageStateRef.current === DrawPageState.Init) {
+				appInfo("[DIAG] draw: canvas init not ready, defer execute-screenshot");
+				if (initWaitExecuteScreenshotTimerRef.current) {
+					clearInterval(initWaitExecuteScreenshotTimerRef.current);
+				}
+				let initWaitCount = 0;
+				initWaitExecuteScreenshotTimerRef.current = setInterval(() => {
+					if (
+						drawPageStateRef.current === DrawPageState.WaitRelease ||
+						drawPageStateRef.current === DrawPageState.Release
+					) {
+						// 窗口已进入释放流程，本次请求已过时，放弃等待
+						if (initWaitExecuteScreenshotTimerRef.current) {
+							clearInterval(initWaitExecuteScreenshotTimerRef.current);
+							initWaitExecuteScreenshotTimerRef.current = undefined;
+						}
+						return;
+					}
+
+					if (drawPageStateRef.current !== DrawPageState.Active) {
+						initWaitCount += 1;
+						// 初始化正常 1s 左右完成，超过 5s 视为初始化异常，放弃等待直接执行：
+						// 保留“用户 ESC 退出 -> finishCapture -> releasePage 重建窗口”的自恢复路径
+						if (initWaitCount < 40) {
+							return;
+						}
+						appError(
+							"[DrawPageCore] canvas init wait timeout, execute screenshot anyway",
+						);
+					}
+
+					if (initWaitExecuteScreenshotTimerRef.current) {
+						clearInterval(initWaitExecuteScreenshotTimerRef.current);
+						initWaitExecuteScreenshotTimerRef.current = undefined;
+					}
+					excuteScreenshot(payload.type, payload);
+				}, 128);
+				return;
+			}
+
+			if (drawPageStateRef.current === DrawPageState.WaitRelease) {
 				// 重置为激活状态
 				drawPageStateRef.current = DrawPageState.Active;
 			}
