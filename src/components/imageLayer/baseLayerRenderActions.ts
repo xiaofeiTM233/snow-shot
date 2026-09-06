@@ -98,6 +98,11 @@ export const renderInitCanvasAction = async (
 		);
 		pendingResizeCanvasSize = undefined;
 	}
+	// 诊断日志：定位"冻结画面被放大"，确认初始化后画布实际尺寸
+	renderLog(
+		"info",
+		`[renderInitCanvasAction] init, renderer: ${canvasApp.renderer.width}x${canvasApp.renderer.height}, canvas: ${canvasApp.canvas.width}x${canvasApp.canvas.height}`,
+	);
 	return canvasApp.canvas;
 };
 
@@ -136,6 +141,11 @@ export const renderResizeCanvasAction = (
 
 	pendingResizeCanvasSize = undefined;
 	canvasApp.renderer.resize(width, height);
+	// 诊断日志：定位"冻结画面被放大"，确认 resize 后画布实际尺寸
+	renderLog(
+		"info",
+		`[renderResizeCanvasAction] resize ${width}x${height}, renderer: ${canvasApp.renderer.width}x${canvasApp.renderer.height}, canvas: ${canvasApp.canvas.width}x${canvasApp.canvas.height}`,
+	);
 };
 
 export const renderClearCanvasAction = (
@@ -491,6 +501,13 @@ export const renderAddImageToContainerAction = async (
 		renderLog(
 			"warn",
 			`[renderAddImageToContainerAction] texture is undefined after add, result will be blank/black, container: ${containerKey}`,
+		);
+	} else {
+		// 诊断日志：定位"冻结画面被放大"，确认贴图尺寸
+		// （渲染器尺寸由 renderInitCanvasAction / renderResizeCanvasAction 的诊断日志输出）
+		renderLog(
+			"info",
+			`[renderAddImageToContainerAction] sprite texture: ${texture.width}x${texture.height}`,
 		);
 	}
 
