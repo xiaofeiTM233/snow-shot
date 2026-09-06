@@ -17,13 +17,10 @@
 		"build": "rsbuild build",
 		"dev": "rsbuild dev --port 8083",
 		"preview": "rsbuild preview",
-		"lint": "biome format ./ && biome check ./",
-		"lint:fix": "biome format ./ --write && biome check --write ./src",
 		"update:excalidraw": "cd ../excalidraw && rimraf ./packages/excalidraw/dist && yarn build:packages && cd ../snow-shot && pnpm update @mg-chao/excalidraw",
 		"dev:rsdoctor": "cross-env RSDOCTOR=true rsbuild dev",
 		"build:rsdoctor": "cross-env RSDOCTOR=true rsbuild build",
-		"build:analyze": "cross-env BUNDLE_ANALYZE=true pnpm build",
-		"prepare": "husky"
+		"build:analyze": "cross-env BUNDLE_ANALYZE=true pnpm build"
 	},
 	"dependencies": {
 		"@ant-design/icons": "^6.3.2",

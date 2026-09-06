@@ -44,3 +44,6 @@ tsconfig.tsbuildinfo
 
 # env files (can opt-in for committing if needed)
 .env*
+/.mimosa
+/src-tauri/.mimosa
+/src-tauri/src-crates/tauri-commands/http-service/.mimosa
