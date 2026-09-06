@@ -130,6 +130,10 @@ export const tools = {
 	"tools.chat.noSelectedModel": "Please select a model first",
 	"tools.translation.type.custom": "Custom",
 	"tools.translation.type.official": "Snow Shot",
+	"tools.translation.type.youdaoApi": "Youdao Translation",
+	"tools.translation.type.tencent": "Tencent Cloud Translation",
+	"tools.translation.tencentAutoSourceNotSupported":
+		"Tencent Cloud text translation does not support auto source language detection, please select a source language",
 	"tools.captureHistory.clearSelection": "Deselect All",
 	"tools.captureHistory.selectAll": "Select All",
 	"tools.captureHistory.selectInvert": "Invert Selection",

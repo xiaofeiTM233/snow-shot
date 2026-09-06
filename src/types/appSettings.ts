@@ -119,6 +119,10 @@ export type ChatApiConfig = {
 export enum TranslationApiType {
 	DeepL = "translation_api_deepl",
 	Custom = "translation_api_custom",
+	/** 有道智云 */
+	Youdao = "translation_api_youdao",
+	/** 腾讯云机器翻译 */
+	Tencent = "translation_api_tencent",
 }
 
 export type DeepLApiConfig = {
@@ -138,7 +142,29 @@ export type CustomApiConfig = {
 	max_paragraph_count?: number;
 };
 
-export type TranslationApiConfig = DeepLApiConfig | CustomApiConfig;
+export type YoudaoApiConfig = {
+	api_type: TranslationApiType.Youdao;
+	/** 有道 应用ID（appKey） */
+	app_key: string;
+	/** 有道 应用密钥 */
+	app_secret: string;
+};
+
+export type TencentApiConfig = {
+	api_type: TranslationApiType.Tencent;
+	/** 腾讯云 SecretId */
+	secret_id: string;
+	/** 腾讯云 SecretKey */
+	secret_key: string;
+	/** 腾讯云 地域 */
+	region: string;
+};
+
+export type TranslationApiConfig =
+	| DeepLApiConfig
+	| CustomApiConfig
+	| YoudaoApiConfig
+	| TencentApiConfig;
 
 export enum AppSettingsGroup {
 	Common = "common",

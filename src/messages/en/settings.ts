@@ -536,6 +536,38 @@ export const settings = {
 		"Max Paragraphs Per Request",
 	"settings.functionSettings.translationSettings.apiConfig.maxParagraphCount.tip":
 		"Number of paragraphs sent to the translation service per request, too many paragraphs may slow down the interface response",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.youdao":
+		"Youdao",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.tencent":
+		"Tencent Cloud",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoAppKey":
+		"App ID",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoAppKey.tip":
+		"Your Youdao app ID (appKey), stored locally in plain text and never uploaded to the cloud",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoAppKey.required":
+		"Please enter the App ID",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoAppSecret":
+		"App Secret",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoAppSecret.tip":
+		"Your Youdao app secret, stored locally in plain text and never uploaded to the cloud",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoAppSecret.required":
+		"Please enter the App Secret",
+	"settings.functionSettings.translationSettings.apiConfig.tencentSecretId":
+		"SecretId",
+	"settings.functionSettings.translationSettings.apiConfig.tencentSecretId.tip":
+		"Your Tencent Cloud SecretId, stored locally in plain text and never uploaded to the cloud",
+	"settings.functionSettings.translationSettings.apiConfig.tencentSecretId.required":
+		"Please enter the SecretId",
+	"settings.functionSettings.translationSettings.apiConfig.tencentSecretKey":
+		"SecretKey",
+	"settings.functionSettings.translationSettings.apiConfig.tencentSecretKey.tip":
+		"Your Tencent Cloud SecretKey, stored locally in plain text and never uploaded to the cloud",
+	"settings.functionSettings.translationSettings.apiConfig.tencentSecretKey.required":
+		"Please enter the SecretKey",
+	"settings.functionSettings.translationSettings.apiConfig.tencentRegion":
+		"Region",
+	"settings.functionSettings.translationSettings.apiConfig.tencentRegion.tip":
+		"The region of the machine translation service, e.g. ap-guangzhou, stored locally in plain text and never uploaded to the cloud",
 	"settings.functionSettings.trayIconSettings": "Tray Icon",
 	"settings.functionSettings.trayIconSettings.iconClickAction":
 		"Left Click Action",

@@ -123,6 +123,10 @@ export const tools = {
 	"tools.chat.noSelectedModel": "請先選擇模型",
 	"tools.translation.type.custom": "自訂",
 	"tools.translation.type.official": "Snow Shot",
+	"tools.translation.type.youdaoApi": "有道智雲翻譯",
+	"tools.translation.type.tencent": "騰訊雲翻譯",
+	"tools.translation.tencentAutoSourceNotSupported":
+		"騰訊雲文本翻譯不支援自動識別源語言，請選擇源語言",
 	"tools.captureHistory.clearSelection": "取消選取",
 	"tools.captureHistory.selectAll": "全選",
 	"tools.captureHistory.selectInvert": "反選",

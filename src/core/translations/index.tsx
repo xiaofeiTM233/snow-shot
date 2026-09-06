@@ -24,6 +24,10 @@ import {
 	translateTextMicrosoft,
 } from "@/services/tools/translation";
 import {
+	translateTextTencent,
+	translateTextYoudao,
+} from "@/commands/translation";
+import {
 	type AppSettingsData,
 	AppSettingsGroup,
 	type ChatApiConfig,
@@ -207,6 +211,10 @@ export const useTranslationRequest = (options?: {
 					return intl.formatMessage({ id: "tools.translation.type.deepl" });
 				case TranslationApiType.Custom:
 					return intl.formatMessage({ id: "tools.translation.type.custom" });
+				case TranslationApiType.Youdao:
+					return intl.formatMessage({ id: "tools.translation.type.youdaoApi" });
+				case TranslationApiType.Tencent:
+					return intl.formatMessage({ id: "tools.translation.type.tencent" });
 				default:
 					return apiConfigType;
 			}
@@ -403,6 +411,95 @@ export const useTranslationRequest = (options?: {
 						result: customTranslatedResults,
 					};
 				}
+
+				if (apiConfig.api_type === TranslationApiType.Youdao) {
+					setStartTranslateLoading(true);
+
+					let result: string[] | undefined;
+					try {
+						result = await translateTextYoudao(
+							apiConfig,
+							params.sourceContent,
+							params.sourceLanguage,
+							params.targetLanguage,
+						);
+					} catch (error) {
+						appError("[customTranslation] translateTextYoudao error", error);
+					}
+
+					setStartTranslateLoading(false);
+
+					if (!result) {
+						return {
+							success: false,
+						};
+					}
+
+					// 个别条目翻译失败时保持原文
+					const youdaoTranslatedResults = result.map((content, index) => ({
+						content: content || params.sourceContent[index] || "",
+					}));
+
+					options?.onComplete?.(youdaoTranslatedResults, params.requestId);
+					setTranslatedContent(
+						youdaoTranslatedResults.map((item) => item.content).join("\n"),
+					);
+
+					return {
+						success: true,
+						result: youdaoTranslatedResults,
+					};
+				}
+
+				if (apiConfig.api_type === TranslationApiType.Tencent) {
+					if (params.sourceLanguage === "auto") {
+						message.error(
+							intl.formatMessage({
+								id: "tools.translation.tencentAutoSourceNotSupported",
+							}),
+						);
+						return {
+							success: false,
+						};
+					}
+
+					setStartTranslateLoading(true);
+
+					let result: string[] | undefined;
+					try {
+						result = await translateTextTencent(
+							apiConfig,
+							params.sourceContent,
+							params.sourceLanguage,
+							params.targetLanguage,
+						);
+					} catch (error) {
+						appError("[customTranslation] translateTextTencent error", error);
+					}
+
+					setStartTranslateLoading(false);
+
+					if (!result) {
+						return {
+							success: false,
+						};
+					}
+
+					// 个别条目翻译失败时保持原文
+					const tencentTranslatedResults = result.map((content, index) => ({
+						content: content || params.sourceContent[index] || "",
+					}));
+
+					options?.onComplete?.(tencentTranslatedResults, params.requestId);
+					setTranslatedContent(
+						tencentTranslatedResults.map((item) => item.content).join("\n"),
+					);
+
+					return {
+						success: true,
+						result: tencentTranslatedResults,
+					};
+				}
 			}
 
 			if (!("apiConfig" in config)) {
@@ -490,6 +587,8 @@ export const useTranslationRequest = (options?: {
 			options,
 			translationConfig?.translationSystemPrompt,
 			setTranslatedContent,
+			intl,
+			message,
 		],
 	);
 

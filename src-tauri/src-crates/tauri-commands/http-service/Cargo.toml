@@ -18,3 +18,14 @@ log = { workspace = true }
 
 # 序列化
 serde = { workspace = true }
+serde_json = { workspace = true }
+
+# 请求
+reqwest = { workspace = true }
+
+# 加密与编码
+base64 = { workspace = true }
+sha2 = { workspace = true }
+hmac = { workspace = true }
+hex = { workspace = true }
+percent-encoding = { workspace = true }

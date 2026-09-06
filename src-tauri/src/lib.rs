@@ -538,6 +538,10 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             core::write_image_pixels_to_clipboard_with_shared_buffer,
             http_services::upload_to_s3,
+            http_services::translate_text_youdao,
+            http_services::translate_text_tencent,
+            http_services::translate_image_youdao,
+            http_services::translate_image_tencent,
             hot_load_page::hot_load_page_init,
             hot_load_page::hot_load_page_add_page,
             global_state::set_capture_state,

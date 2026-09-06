@@ -18,6 +18,11 @@ import {
 	ocrDetectOnline,
 	ocrDetectWithSharedBuffer,
 } from "@/commands/ocr";
+import {
+	type MachineTranslatedImageLine,
+	translateImageTencent,
+	translateImageYoudao,
+} from "@/commands/translation";
 import { createWebViewSharedBufferChannel } from "@/commands/webview";
 import { PLUGIN_ID_RAPID_OCR } from "@/constants/pluginService";
 import { AntdContext } from "@/contexts/antdContext";
@@ -40,7 +45,12 @@ import {
 import { CUSTOM_MODEL_PREFIX, MarkdownContent } from "@/pages/tools/chat/page";
 import { appFetch, getUrl } from "@/services/tools";
 import { getChatModelsWithCache } from "@/services/tools/chat";
-import { AppSettingsGroup, type ChatApiConfig } from "@/types/appSettings";
+import {
+	AppSettingsGroup,
+	type ChatApiConfig,
+	TranslationApiType,
+	type TranslationApiConfig,
+} from "@/types/appSettings";
 import type { OcrDetectResult } from "@/types/commands/ocr";
 import type { ElementRect } from "@/types/commands/screenshot";
 import { writeHtmlToClipboard, writeTextToClipboard } from "@/utils/clipboard";
@@ -256,6 +266,8 @@ export const OcrResult: React.FC<{
 	);
 
 	const selectRectRef = useRef<ElementRect>(undefined);
+	/** 记录当前 OCR 对应的画布，用于图片翻译 */
+	const ocrCanvasRef = useRef<HTMLCanvasElement>(undefined);
 	const monitorScaleFactorRef = useRef<number>(undefined);
 	const updateOcrTextElements = useCallback(
 		async (
@@ -628,6 +640,7 @@ export const OcrResult: React.FC<{
 
 			const { selectRect, canvas } = params;
 
+			ocrCanvasRef.current = canvas;
 			monitorScaleFactorRef.current = window.devicePixelRatio;
 
 			let ocrResult:
@@ -761,6 +774,7 @@ export const OcrResult: React.FC<{
 			setVisionModelMarkdownResult(undefined);
 			const { canvas } = params;
 
+			ocrCanvasRef.current = canvas;
 			selectRectRef.current = {
 				min_x: 0,
 				min_y: 0,
@@ -1254,6 +1268,90 @@ export const OcrResult: React.FC<{
 	);
 
 	const requestTranslateLoadingIdRef = useRef<number | undefined>(undefined);
+
+	/** 使用支持图片翻译的机器翻译 API 直接翻译当前画布 */
+	const translateByMachineImage = useCallback(
+		async (
+			apiConfig: TranslationApiConfig | undefined,
+		): Promise<MachineTranslatedImageLine[]> => {
+			const canvas = ocrCanvasRef.current;
+			if (!canvas) {
+				throw new Error("[OcrResult.startTranslate] Canvas is not initialized");
+			}
+
+			if (apiConfig?.api_type === TranslationApiType.Youdao) {
+				const imageBlob = await new Promise<Blob | null>((resolve) => {
+					canvas.toBlob(resolve, "image/png", 1);
+				});
+				if (!imageBlob) {
+					throw new Error(
+						"[OcrResult.startTranslate] Failed to encode canvas image",
+					);
+				}
+
+				const translationSettings =
+					getAppSettings()[AppSettingsGroup.FunctionTranslation];
+				return translateImageYoudao(await imageBlob.arrayBuffer(), {
+					app_key: apiConfig.app_key,
+					app_secret: apiConfig.app_secret,
+					from: translationSettings.sourceLanguage,
+					to: translationSettings.targetLanguage,
+				});
+			}
+
+			if (apiConfig?.api_type === TranslationApiType.Tencent) {
+				const imageBlob = await new Promise<Blob | null>((resolve) => {
+					canvas.toBlob(resolve, "image/png", 1);
+				});
+				if (!imageBlob) {
+					throw new Error(
+						"[OcrResult.startTranslate] Failed to encode canvas image",
+					);
+				}
+
+				const translationSettings =
+					getAppSettings()[AppSettingsGroup.FunctionTranslation];
+				return translateImageTencent(await imageBlob.arrayBuffer(), {
+					secret_id: apiConfig.secret_id,
+					secret_key: apiConfig.secret_key,
+					region: apiConfig.region,
+					to: translationSettings.targetLanguage,
+				});
+			}
+
+			throw new Error(
+				"[OcrResult.startTranslate] Translation API does not support image translation",
+			);
+		},
+		[getAppSettings],
+	);
+
+	/** 将图片翻译结果转换为 OCR 结果（在原文位置显示译文） */
+	const buildMachineImageTranslateResult = useCallback(
+		(imageLines: MachineTranslatedImageLine[]): AppOcrResult => {
+			return {
+				ignoreScale: ocrResultRef.current?.ignoreScale ?? false,
+				result: {
+					text_blocks: imageLines.map((line) => ({
+						text: line.translated_text,
+						box_points: [
+							{ x: line.box_x, y: line.box_y },
+							{ x: line.box_x + line.box_width, y: line.box_y },
+							{
+								x: line.box_x + line.box_width,
+								y: line.box_y + line.box_height,
+							},
+							{ x: line.box_x, y: line.box_y + line.box_height },
+						],
+						text_score: 1,
+					})),
+					scale_factor: 1,
+				},
+			};
+		},
+		[ocrResultRef],
+	);
+
 	useImperativeHandle(
 		actionRef,
 		() => ({
@@ -1311,10 +1409,47 @@ export const OcrResult: React.FC<{
 				onTranslateLoading?.(true);
 
 				try {
-					await requestTranslate(
-						ocrResultRef.current.result.text_blocks.map((block) => block.text),
-						requestIdRef.current,
-					);
+					// 选中的翻译类型支持图片翻译时，直接对当前画布调用图片翻译接口
+					const translationSettings =
+						getAppSettings()[AppSettingsGroup.FunctionTranslation];
+					const translationApiConfig =
+						translationSettings.translationApiConfigList?.find(
+							(item) => item.api_type === translationSettings.translationType,
+						);
+					const isMachineImageTranslation =
+						translationApiConfig?.api_type === TranslationApiType.Youdao ||
+						translationApiConfig?.api_type === TranslationApiType.Tencent;
+
+					if (isMachineImageTranslation && translationApiConfig) {
+						const imageLines =
+							await translateByMachineImage(translationApiConfig);
+
+						if (
+							imageLines.length > 0 &&
+							requestTranslateLoadingIdRef.current === requestIdRef.current
+						) {
+							const machineTranslatedResult = buildMachineImageTranslateResult(
+								imageLines,
+							);
+							setTranslatorOcrResult(machineTranslatedResult);
+							updateOcrTextElements(
+								machineTranslatedResult.result,
+								machineTranslatedResult.ignoreScale,
+								OcrResultType.Translated,
+							);
+						} else if (imageLines.length === 0) {
+							message.error(
+								intl.formatMessage({ id: "draw.ocrResult.translateError" }),
+							);
+						}
+					} else {
+						await requestTranslate(
+							ocrResultRef.current.result.text_blocks.map(
+								(block) => block.text,
+							),
+							requestIdRef.current,
+						);
+					}
 				} catch (error) {
 					appError("[OcrResult.startTranslate] requestTranslate error", error);
 					message.error(
@@ -1405,6 +1540,9 @@ export const OcrResult: React.FC<{
 			convertImageToVisionModelFormat,
 			visionModelHtmlResultRef,
 			visionModelMarkdownResultRef,
+			getAppSettings,
+			translateByMachineImage,
+			buildMachineImageTranslateResult,
 		],
 	);
 

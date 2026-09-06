@@ -55,6 +55,8 @@ import {
 	type RunLogLevel,
 	type TrayIconClickAction,
 	type TrayIconDefaultIcon,
+	TranslationApiType,
+	type TranslationApiConfig,
 	type VideoMaxSize,
 } from "@/types/appSettings";
 import type {
@@ -77,6 +79,66 @@ import { appError, appWarn, formatErrorDetails } from "@/utils/log";
 const getFilePath = async (group: AppSettingsGroup) => {
 	const configDirPath = await getConfigDirPath();
 	return `${configDirPath}/${group}.json`;
+};
+
+type RawTranslationApiConfigItem = {
+	api_type?: TranslationApiType | string;
+	api_uri?: unknown;
+	api_key?: unknown;
+	deepl_prefer_quality_optimized?: unknown;
+	max_requests_per_second?: unknown;
+	max_paragraph_count?: unknown;
+	app_key?: unknown;
+	app_secret?: unknown;
+	secret_id?: unknown;
+	secret_key?: unknown;
+	region?: unknown;
+};
+
+/** 翻译 API 配置规范化：按配置类型保留对应字段 */
+const normalizeTranslationApiConfigItem = (
+	item: RawTranslationApiConfigItem,
+): TranslationApiConfig => {
+	if (item.api_type === TranslationApiType.Youdao) {
+		return {
+			api_type: TranslationApiType.Youdao,
+			app_key: typeof item.app_key === "string" ? item.app_key : "",
+			app_secret: typeof item.app_secret === "string" ? item.app_secret : "",
+		};
+	}
+
+	if (item.api_type === TranslationApiType.Tencent) {
+		return {
+			api_type: TranslationApiType.Tencent,
+			secret_id: typeof item.secret_id === "string" ? item.secret_id : "",
+			secret_key: typeof item.secret_key === "string" ? item.secret_key : "",
+			region: typeof item.region === "string" ? item.region : "",
+		};
+	}
+
+	if (item.api_type === TranslationApiType.Custom) {
+		return {
+			api_type: TranslationApiType.Custom,
+			api_uri: `${item.api_uri ?? ""}`,
+			api_key: `${item.api_key ?? ""}`,
+			max_requests_per_second:
+				typeof item.max_requests_per_second === "number"
+					? item.max_requests_per_second
+					: undefined,
+			max_paragraph_count:
+				typeof item.max_paragraph_count === "number"
+					? item.max_paragraph_count
+					: undefined,
+		};
+	}
+
+	return {
+		api_type: TranslationApiType.DeepL,
+		api_uri: `${item.api_uri ?? ""}`,
+		api_key: `${item.api_key ?? ""}`,
+		deepl_prefer_quality_optimized:
+			item.deepl_prefer_quality_optimized === true,
+	};
 };
 
 const AppSettingsContextProviderCore: React.FC<{
@@ -922,24 +984,9 @@ const AppSettingsContextProviderCore: React.FC<{
 					translationApiConfigList: Array.isArray(
 						newSettings?.translationApiConfigList,
 					)
-						? newSettings.translationApiConfigList.map((item) => ({
-								api_uri: `${item.api_uri ?? ""}`,
-								api_key: `${item.api_key ?? ""}`,
-								api_type: item.api_type,
-								deepl_prefer_quality_optimized:
-									"deepl_prefer_quality_optimized" in item &&
-									typeof item.deepl_prefer_quality_optimized === "boolean"
-										? item.deepl_prefer_quality_optimized
-										: false,
-								max_requests_per_second:
-									typeof item.max_requests_per_second === "number"
-										? item.max_requests_per_second
-										: undefined,
-								max_paragraph_count:
-									typeof item.max_paragraph_count === "number"
-										? item.max_paragraph_count
-										: undefined,
-							}))
+						? newSettings.translationApiConfigList.map(
+								normalizeTranslationApiConfigItem,
+							)
 						: (prevSettings?.translationApiConfigList ??
 							defaultAppSettingsData[group].translationApiConfigList),
 					sourceLanguage:

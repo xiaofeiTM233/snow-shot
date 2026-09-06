@@ -1,6 +1,7 @@
 use snow_shot_app_utils::{
     get_request_bool_header, get_request_optional_string_header, get_request_string_header,
 };
+use snow_shot_tauri_commands_http_service::translation::MachineTranslatedImageLine;
 use tauri::command;
 
 #[command]
@@ -35,4 +36,47 @@ pub async fn upload_to_s3(request: tauri::ipc::Request<'_>) -> Result<String, St
         content_type,
     )
     .await
+}
+
+#[command]
+pub async fn translate_text_youdao(
+    app_key: String,
+    app_secret: String,
+    texts: Vec<String>,
+    from: String,
+    to: String,
+) -> Result<Vec<String>, String> {
+    snow_shot_tauri_commands_http_service::translation::translate_text_youdao(
+        app_key, app_secret, texts, from, to,
+    )
+    .await
+}
+
+#[command]
+pub async fn translate_text_tencent(
+    secret_id: String,
+    secret_key: String,
+    region: String,
+    texts: Vec<String>,
+    from: String,
+    to: String,
+) -> Result<Vec<String>, String> {
+    snow_shot_tauri_commands_http_service::translation::translate_text_tencent(
+        secret_id, secret_key, region, texts, from, to,
+    )
+    .await
+}
+
+#[command]
+pub async fn translate_image_youdao(
+    request: tauri::ipc::Request<'_>,
+) -> Result<Vec<MachineTranslatedImageLine>, String> {
+    snow_shot_tauri_commands_http_service::translation::translate_image_youdao(request).await
+}
+
+#[command]
+pub async fn translate_image_tencent(
+    request: tauri::ipc::Request<'_>,
+) -> Result<Vec<MachineTranslatedImageLine>, String> {
+    snow_shot_tauri_commands_http_service::translation::translate_image_tencent(request).await
 }

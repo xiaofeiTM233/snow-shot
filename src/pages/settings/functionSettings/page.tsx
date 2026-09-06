@@ -591,6 +591,18 @@ export const FunctionSettingsPage = () => {
 				}),
 				value: TranslationApiType.Custom,
 			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.translationSettings.apiConfig.apiType.youdao",
+				}),
+				value: TranslationApiType.Youdao,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.translationSettings.apiConfig.apiType.tencent",
+				}),
+				value: TranslationApiType.Tencent,
+			},
 		];
 	}, [intl]);
 
@@ -1838,29 +1850,46 @@ export const FunctionSettingsPage = () => {
 													options={translationApiTypeOptions}
 												/>
 											</Col>
-											<Col span={12}>
-												<ProFormText
-													name="api_uri"
-													label={
-														<IconLabel
-															label={
-																<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiUri" />
-															}
-															tooltipTitle={
-																<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiUri.tip" />
-															}
-														/>
-													}
-													rules={[
-														{
-															required: true,
-															message: intl.formatMessage({
-																id: "settings.functionSettings.translationSettings.apiConfig.apiUri.required",
-															}),
-														},
-													]}
-												/>
-											</Col>
+											<ProFormDependency<{ api_type: TranslationApiType }>
+												name={["api_type"]}
+											>
+												{({ api_type }) => {
+													const isMachineTranslationApi =
+														api_type === TranslationApiType.Youdao ||
+														api_type === TranslationApiType.Tencent;
+
+													return (
+														<Col span={12}>
+															<ProFormText
+																name="api_uri"
+																label={
+																	<IconLabel
+																		label={
+																			<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiUri" />
+																		}
+																		tooltipTitle={
+																			<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiUri.tip" />
+																		}
+																	/>
+																}
+																hidden={isMachineTranslationApi}
+																rules={
+																	isMachineTranslationApi
+																		? []
+																		: [
+																				{
+																					required: true,
+																					message: intl.formatMessage({
+																						id: "settings.functionSettings.translationSettings.apiConfig.apiUri.required",
+																					}),
+																				},
+																			]
+																}
+															/>
+														</Col>
+													);
+												}}
+											</ProFormDependency>
 											<ProFormDependency<{ api_type: TranslationApiType }>
 												name={["api_type"]}
 											>
@@ -1963,6 +1992,129 @@ export const FunctionSettingsPage = () => {
 																		fieldProps={{
 																			precision: 0,
 																		}}
+																	/>
+																</Col>
+															</>
+														);
+													}
+
+													if (api_type === TranslationApiType.Youdao) {
+														return (
+															<>
+																<Col span={12}>
+																	<ProFormText
+																		name="app_key"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.youdaoAppKey" />
+																				}
+																				tooltipTitle={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.youdaoAppKey.tip" />
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: "settings.functionSettings.translationSettings.apiConfig.youdaoAppKey.required",
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormText.Password
+																		name="app_secret"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.youdaoAppSecret" />
+																				}
+																				tooltipTitle={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.youdaoAppSecret.tip" />
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: "settings.functionSettings.translationSettings.apiConfig.youdaoAppSecret.required",
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+															</>
+														);
+													}
+
+													if (api_type === TranslationApiType.Tencent) {
+														return (
+															<>
+																<Col span={12}>
+																	<ProFormText
+																		name="secret_id"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.tencentSecretId" />
+																				}
+																				tooltipTitle={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.tencentSecretId.tip" />
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: "settings.functionSettings.translationSettings.apiConfig.tencentSecretId.required",
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormText.Password
+																		name="secret_key"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.tencentSecretKey" />
+																				}
+																				tooltipTitle={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.tencentSecretKey.tip" />
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: "settings.functionSettings.translationSettings.apiConfig.tencentSecretKey.required",
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormText
+																		name="region"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.tencentRegion" />
+																				}
+																				tooltipTitle={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.tencentRegion.tip" />
+																				}
+																			/>
+																		}
+																		initialValue="ap-guangzhou"
+																		placeholder="ap-guangzhou"
 																	/>
 																</Col>
 															</>

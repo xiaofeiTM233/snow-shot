@@ -507,6 +507,38 @@ export const settings = {
 		"每次请求最大段落数",
 	"settings.functionSettings.translationSettings.apiConfig.maxParagraphCount.tip":
 		"每次发送给翻译服务的段落数量，如果段落数量过多，可能会导致接口的响应变慢",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.youdao":
+		"有道智云",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.tencent":
+		"腾讯云",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoAppKey":
+		"应用ID",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoAppKey.tip":
+		"有道智云的应用 ID（appKey），该配置在本地明文保存且不会上传到云端",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoAppKey.required":
+		"请输入应用ID",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoAppSecret":
+		"应用密钥",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoAppSecret.tip":
+		"有道智云的应用密钥，该配置在本地明文保存且不会上传到云端",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoAppSecret.required":
+		"请输入应用密钥",
+	"settings.functionSettings.translationSettings.apiConfig.tencentSecretId":
+		"SecretId",
+	"settings.functionSettings.translationSettings.apiConfig.tencentSecretId.tip":
+		"腾讯云的 SecretId，该配置在本地明文保存且不会上传到云端",
+	"settings.functionSettings.translationSettings.apiConfig.tencentSecretId.required":
+		"请输入 SecretId",
+	"settings.functionSettings.translationSettings.apiConfig.tencentSecretKey":
+		"SecretKey",
+	"settings.functionSettings.translationSettings.apiConfig.tencentSecretKey.tip":
+		"腾讯云的 SecretKey，该配置在本地明文保存且不会上传到云端",
+	"settings.functionSettings.translationSettings.apiConfig.tencentSecretKey.required":
+		"请输入 SecretKey",
+	"settings.functionSettings.translationSettings.apiConfig.tencentRegion":
+		"地域",
+	"settings.functionSettings.translationSettings.apiConfig.tencentRegion.tip":
+		"机器翻译服务所在地域，如 ap-guangzhou，该配置在本地明文保存且不会上传到云端",
 	"settings.functionSettings.trayIconSettings": "托盘",
 	"settings.functionSettings.trayIconSettings.iconClickAction": "左键点击后",
 	"settings.functionSettings.trayIconSettings.iconClickAction.screenshot":
