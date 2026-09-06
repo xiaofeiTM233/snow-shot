@@ -120,9 +120,12 @@ export const settings = {
 	"settings.systemSettings.commonSettings.logRetentionDuration.three": "3 天",
 	"settings.systemSettings.commonSettings.logRetentionDuration.week": "7 天",
 	"settings.systemSettings.commonSettings.logRetentionDuration.month": "30 天",
-	"settings.systemSettings.commonSettings.logRetentionDuration.forever": "永久保留",
-	"settings.systemSettings.commonSettings.rememberWindowGeometry": "记住关闭时窗口的位置和大小",
-	"settings.systemSettings.commonSettings.boostProcessPriority": "提升进程优先级",
+	"settings.systemSettings.commonSettings.logRetentionDuration.forever":
+		"永久保留",
+	"settings.systemSettings.commonSettings.rememberWindowGeometry":
+		"记住关闭时窗口的位置和大小",
+	"settings.systemSettings.commonSettings.boostProcessPriority":
+		"提升进程优先级",
 	"settings.systemSettings.commonSettings.boostProcessPriority.tip":
 		"将应用进程优先级提升为「高于正常」，使截图与全局快捷键的响应更及时（仅 Windows）",
 	"settings.hotKeySettings.translation": "翻译",
@@ -584,8 +587,7 @@ export const settings = {
 		"更正颜色滤镜",
 	"settings.systemSettings.screenshotSettings.correctColorFilter.tip":
 		"系统应用颜色滤镜后，截取到的图片也将应用颜色滤镜，开启后将截取原始颜色",
-	"settings.systemSettings.screenshotSettings.captureMethod":
-		"采集方式",
+	"settings.systemSettings.screenshotSettings.captureMethod": "采集方式",
 	"settings.systemSettings.screenshotSettings.captureMethod.auto": "自动",
 	"settings.systemSettings.screenshotSettings.captureMethod.wgc": "WGC",
 	"settings.systemSettings.screenshotSettings.captureMethod.xcap": "xcap",
@@ -595,8 +597,7 @@ export const settings = {
 		"线性转换",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection.linear.tip":
 		"以 Rgba16F 捕获线性帧并做亮度校正，可将 HDR 中的 SDR 内容还原为 SDR；但当 Windows 的 HDR 设置中的 SDR 内容亮度不等于 50% 时，HDR 内容可能严重失真。仅在系统开启 HDR 时生效。Windows 下需要 Windows 10 2004 或更高版本",
-	"settings.systemSettings.screenshotSettings.hdrColorCorrection.off":
-		"关闭",
+	"settings.systemSettings.screenshotSettings.hdrColorCorrection.off": "关闭",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection.off.tip":
 		"直接截取系统合成好的 SDR 画面（可能偏暗）",
 	"settings.systemSettings.screenshotSettings.enableBrowserClipboard.tip":
@@ -638,15 +639,78 @@ export const settings = {
 	"settings.functionSettings.ocrSettings.htmlVisionModel": "视觉理解模型",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.tip":
 		"将图片转为 HTML 的视觉理解模型",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig": "文本识别模型配置",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig": "本地OCR配置",
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.tip":
 		"从 {link} 下载 ONNX 模型文件放置到插件数据目录后，可在此配置文本识别模型",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig.tip.link": "此仓库",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig.add": "添加文本识别模型配置",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig.modelName": "模型名称",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig.detModel": "检测(det)",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig.recModel": "识别(rec)",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig.clsModel": "方向(cls)",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.tip.link":
+		"此仓库",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.add":
+		"添加本地OCR配置",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.modelName":
+		"模型名称",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.modelName.tip":
+		"模型名称用于 Snow Shot 的展示",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.detModel":
+		"检测(det)",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.recModel":
+		"识别(rec)",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.clsModel":
+		"方向(cls)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig": "在线OCR配置",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.add":
+		"添加在线OCR配置",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelName":
+		"模型名称",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelName.tip":
+		"模型名称用于 Snow Shot 的展示",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.local":
+		"本地识别",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.online":
+		"在线识别",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.serviceType":
+		"服务类型",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language":
+		"识别语言",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.youdao":
+		"网易有道",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.tencent":
+		"腾讯云",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoOcr":
+		"通用文字识别",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralBasicOcr":
+		"通用印刷体识别",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralAccurateOcr":
+		"通用文字识别（高精度版）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.appKey":
+		"应用ID（appKey）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.appKey.required":
+		"请输入应用ID（appKey）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.appSecret":
+		"应用密钥（appSecret）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.appSecret.required":
+		"请输入应用密钥（appSecret）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.secretId":
+		"SecretId",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.secretId.required":
+		"请输入 SecretId",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.secretKey":
+		"SecretKey",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.secretKey.required":
+		"请输入 SecretKey",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.region":
+		"地域（Region）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.region.required":
+		"请输入地域（Region）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelName.required":
+		"请输入模型名称",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language.autoChineseEnglish":
+		"自动检测（中英文）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language.rareChinese":
+		"简体中文（生僻字）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language.chineseEnglishMix":
+		"中英混合",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language.multipleLanguages":
+		"多语种",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.default": "默认",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.default.tip":
 		"默认使用首个支持视觉理解的模型",

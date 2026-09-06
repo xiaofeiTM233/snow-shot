@@ -294,6 +294,35 @@ export type CustomOcrModelConfig = {
 	cls_model: string;
 };
 
+/** 在线 OCR 服务类型，格式为 `provider:service` */
+export enum OnlineOcrServiceType {
+	/** 有道 通用文字识别 */
+	YoudaoOcr = "youdao:ocr",
+	/** 腾讯云 通用印刷体识别 */
+	TencentGeneralBasicOcr = "tencent:GeneralBasicOCR",
+	/** 腾讯云 通用文字识别（高精度版） */
+	TencentGeneralAccurateOcr = "tencent:GeneralAccurateOCR",
+}
+
+export type OnlineOcrModelConfig = {
+	/** 模型名称 */
+	model_name: string;
+	/** 服务类型 */
+	service_type: OnlineOcrServiceType | string;
+	/** 识别语言，取值跟随对应平台文档 */
+	language: string;
+	/** 有道 应用ID（appKey） */
+	app_key?: string;
+	/** 有道 应用密钥 */
+	app_secret?: string;
+	/** 腾讯云 SecretId */
+	secret_id?: string;
+	/** 腾讯云 SecretKey */
+	secret_key?: string;
+	/** 腾讯云 地域 */
+	region?: string;
+};
+
 export enum KeyDisplayDirection {
 	Horizontal = "horizontal",
 	Vertical = "vertical",
@@ -480,6 +509,8 @@ export type AppSettingsData = {
 		ocrModel: string;
 		/** 自定义文本识别模型配置列表 */
 		customOcrModelConfigList: CustomOcrModelConfig[];
+		/** 在线 OCR 配置列表 */
+		onlineOcrModelConfigList: OnlineOcrModelConfig[];
 		/** 将图片转为 HTML 的视觉理解模型 */
 		htmlVisionModel: string;
 		/** 图片转为 HTML 的 System 提示词 */

@@ -123,12 +123,15 @@ export const settings = {
 	"settings.systemSettings.commonSettings.runLog": "Run Log",
 	"settings.systemSettings.commonSettings.runLog.tip":
 		"Output logs to a log file for troubleshooting",
-	"settings.systemSettings.commonSettings.logRetentionDuration": "Log Retention Duration",
+	"settings.systemSettings.commonSettings.logRetentionDuration":
+		"Log Retention Duration",
 	"settings.systemSettings.commonSettings.logRetentionDuration.day": "1 Day",
 	"settings.systemSettings.commonSettings.logRetentionDuration.three": "3 Days",
 	"settings.systemSettings.commonSettings.logRetentionDuration.week": "7 Days",
-	"settings.systemSettings.commonSettings.logRetentionDuration.month": "30 Days",
-	"settings.systemSettings.commonSettings.logRetentionDuration.forever": "Forever",
+	"settings.systemSettings.commonSettings.logRetentionDuration.month":
+		"30 Days",
+	"settings.systemSettings.commonSettings.logRetentionDuration.forever":
+		"Forever",
 	"settings.systemSettings.commonSettings.rememberWindowGeometry":
 		"Remember window position and size on close",
 	"settings.systemSettings.commonSettings.boostProcessPriority":
@@ -614,8 +617,7 @@ export const settings = {
 		"Correct Color Filter",
 	"settings.systemSettings.screenshotSettings.correctColorFilter.tip":
 		"When system applies color filter, captured image will also apply it. When enabled, will capture original colors",
-	"settings.systemSettings.screenshotSettings.captureMethod":
-		"Capture Method",
+	"settings.systemSettings.screenshotSettings.captureMethod": "Capture Method",
 	"settings.systemSettings.screenshotSettings.captureMethod.auto": "Auto",
 	"settings.systemSettings.screenshotSettings.captureMethod.wgc": "WGC",
 	"settings.systemSettings.screenshotSettings.captureMethod.xcap": "xcap",
@@ -625,8 +627,7 @@ export const settings = {
 		"Linear",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection.linear.tip":
 		"Capture a linear frame with Rgba16F and apply brightness correction to convert SDR content in HDR to SDR; but when SDR content brightness in Windows HDR settings is not equal to 50%, HDR content may be severely distorted. Only takes effect when system HDR is enabled. Requires Windows 10 2004 or later on Windows",
-	"settings.systemSettings.screenshotSettings.hdrColorCorrection.off":
-		"Off",
+	"settings.systemSettings.screenshotSettings.hdrColorCorrection.off": "Off",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection.off.tip":
 		"Captures the system-composited SDR image directly (may look darker)",
 	"settings.systemSettings.screenshotSettings.enableBrowserClipboard.tip":
@@ -673,15 +674,79 @@ export const settings = {
 	"settings.functionSettings.ocrSettings.htmlVisionModel": "Vision Model",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.tip":
 		"Vision model for converting images to HTML",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig": "OCR Model Configuration",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig":
+		"Local OCR Configuration",
 	"settings.functionSettings.ocrSettings.customOcrModelConfig.tip":
 		"Download ONNX model files from {link} and place them in the plugin data directory, then configure OCR models here",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig.tip.link": "this repository",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig.add": "Add OCR Model Config",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig.modelName": "Model Name",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig.detModel": "Detection(det)",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig.recModel": "Recognition(rec)",
-	"settings.functionSettings.ocrSettings.customOcrModelConfig.clsModel": "Orientation(cls)",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.tip.link":
+		"this repository",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.add":
+		"Add Local OCR Config",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.modelName":
+		"Model Name",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.modelName.tip":
+		"The model name is used for display in Snow Shot",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.detModel":
+		"Detection(det)",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.recModel":
+		"Recognition(rec)",
+	"settings.functionSettings.ocrSettings.customOcrModelConfig.clsModel":
+		"Orientation(cls)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig":
+		"Online OCR Configuration",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.add":
+		"Add Online OCR Config",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelName":
+		"Model Name",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelName.tip":
+		"The model name is used for display in Snow Shot",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.local":
+		"Local Recognition",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.online":
+		"Online Recognition",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.serviceType":
+		"Service Type",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language":
+		"Recognition Language",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.youdao":
+		"NetEase Youdao",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.tencent":
+		"Tencent Cloud",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoOcr":
+		"General OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralBasicOcr":
+		"General Printed Text OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralAccurateOcr":
+		"General Accurate OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.appKey":
+		"App ID (appKey)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.appKey.required":
+		"Please enter the App ID (appKey)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.appSecret":
+		"App Secret (appSecret)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.appSecret.required":
+		"Please enter the App Secret (appSecret)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.secretId":
+		"SecretId",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.secretId.required":
+		"Please enter the SecretId",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.secretKey":
+		"SecretKey",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.secretKey.required":
+		"Please enter the SecretKey",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.region": "Region",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.region.required":
+		"Please enter the Region",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelName.required":
+		"Please enter the model name",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language.autoChineseEnglish":
+		"Auto Detect (Chinese & English)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language.rareChinese":
+		"Simplified Chinese (Rare Characters)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language.chineseEnglishMix":
+		"Chinese & English Mixed",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language.multipleLanguages":
+		"Multiple Languages",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.default": "Default",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.default.tip":
 		"Use the first vision model by default",
