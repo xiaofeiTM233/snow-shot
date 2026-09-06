@@ -37,12 +37,12 @@ const LayoutAboutLazyRouteImport = createFileRoute('/_layout/about')()
 const LayoutToolsTranslationLazyRouteImport = createFileRoute(
   '/_layout/tools/translation',
 )()
+const LayoutToolsCollageLazyRouteImport = createFileRoute(
+  '/_layout/tools/collage',
+)()
 const LayoutToolsChatLazyRouteImport = createFileRoute('/_layout/tools/chat')()
 const LayoutToolsCaptureHistoryLazyRouteImport = createFileRoute(
   '/_layout/tools/captureHistory',
-)()
-const LayoutToolsCollageLazyRouteImport = createFileRoute(
-  '/_layout/tools/collage',
 )()
 const LayoutSettingsSystemSettingsLazyRouteImport = createFileRoute(
   '/_layout/settings/systemSettings',
@@ -141,6 +141,13 @@ const LayoutToolsTranslationLazyRoute =
   } as any).lazy(() =>
     import('./routes/_layout/tools/translation.lazy').then((d) => d.Route),
   )
+const LayoutToolsCollageLazyRoute = LayoutToolsCollageLazyRouteImport.update({
+  id: '/tools/collage',
+  path: '/tools/collage',
+  getParentRoute: () => LayoutRouteRoute,
+} as any).lazy(() =>
+  import('./routes/_layout/tools/collage.lazy').then((d) => d.Route),
+)
 const LayoutToolsChatLazyRoute = LayoutToolsChatLazyRouteImport.update({
   id: '/tools/chat',
   path: '/tools/chat',
@@ -156,13 +163,6 @@ const LayoutToolsCaptureHistoryLazyRoute =
   } as any).lazy(() =>
     import('./routes/_layout/tools/captureHistory.lazy').then((d) => d.Route),
   )
-const LayoutToolsCollageLazyRoute = LayoutToolsCollageLazyRouteImport.update({
-  id: '/tools/collage',
-  path: '/tools/collage',
-  getParentRoute: () => LayoutRouteRoute,
-} as any).lazy(() =>
-  import('./routes/_layout/tools/collage.lazy').then((d) => d.Route),
-)
 const LayoutSettingsSystemSettingsLazyRoute =
   LayoutSettingsSystemSettingsLazyRouteImport.update({
     id: '/settings/systemSettings',
@@ -221,6 +221,7 @@ const LayoutPersonalizationAppearanceRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof LayoutIndexLazyRoute
   '/about': typeof LayoutAboutLazyRoute
   '/draw': typeof NoLayoutDrawLazyRoute
   '/fixedContent': typeof NoLayoutFixedContentLazyRoute
@@ -229,7 +230,6 @@ export interface FileRoutesByFullPath {
   '/idle': typeof NoLayoutIdleLazyRoute
   '/videoRecord': typeof NoLayoutVideoRecordLazyRoute
   '/videoRecordToolbar': typeof NoLayoutVideoRecordToolbarLazyRoute
-  '/': typeof LayoutIndexLazyRoute
   '/personalization/appearance': typeof LayoutPersonalizationAppearanceRoute
   '/personalization/plugins': typeof LayoutPersonalizationPluginsLazyRoute
   '/settings/functionSettings': typeof LayoutSettingsFunctionSettingsLazyRoute
@@ -238,10 +238,11 @@ export interface FileRoutesByFullPath {
   '/settings/systemSettings': typeof LayoutSettingsSystemSettingsLazyRoute
   '/tools/captureHistory': typeof LayoutToolsCaptureHistoryLazyRoute
   '/tools/chat': typeof LayoutToolsChatLazyRoute
-  '/tools/translation': typeof LayoutToolsTranslationLazyRoute
   '/tools/collage': typeof LayoutToolsCollageLazyRoute
+  '/tools/translation': typeof LayoutToolsTranslationLazyRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof LayoutIndexLazyRoute
   '/about': typeof LayoutAboutLazyRoute
   '/draw': typeof NoLayoutDrawLazyRoute
   '/fixedContent': typeof NoLayoutFixedContentLazyRoute
@@ -250,7 +251,6 @@ export interface FileRoutesByTo {
   '/idle': typeof NoLayoutIdleLazyRoute
   '/videoRecord': typeof NoLayoutVideoRecordLazyRoute
   '/videoRecordToolbar': typeof NoLayoutVideoRecordToolbarLazyRoute
-  '/': typeof LayoutIndexLazyRoute
   '/personalization/appearance': typeof LayoutPersonalizationAppearanceRoute
   '/personalization/plugins': typeof LayoutPersonalizationPluginsLazyRoute
   '/settings/functionSettings': typeof LayoutSettingsFunctionSettingsLazyRoute
@@ -259,8 +259,8 @@ export interface FileRoutesByTo {
   '/settings/systemSettings': typeof LayoutSettingsSystemSettingsLazyRoute
   '/tools/captureHistory': typeof LayoutToolsCaptureHistoryLazyRoute
   '/tools/chat': typeof LayoutToolsChatLazyRoute
-  '/tools/translation': typeof LayoutToolsTranslationLazyRoute
   '/tools/collage': typeof LayoutToolsCollageLazyRoute
+  '/tools/translation': typeof LayoutToolsTranslationLazyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -283,12 +283,13 @@ export interface FileRoutesById {
   '/_layout/settings/systemSettings': typeof LayoutSettingsSystemSettingsLazyRoute
   '/_layout/tools/captureHistory': typeof LayoutToolsCaptureHistoryLazyRoute
   '/_layout/tools/chat': typeof LayoutToolsChatLazyRoute
-  '/_layout/tools/translation': typeof LayoutToolsTranslationLazyRoute
   '/_layout/tools/collage': typeof LayoutToolsCollageLazyRoute
+  '/_layout/tools/translation': typeof LayoutToolsTranslationLazyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/about'
     | '/draw'
     | '/fixedContent'
@@ -297,7 +298,6 @@ export interface FileRouteTypes {
     | '/idle'
     | '/videoRecord'
     | '/videoRecordToolbar'
-    | '/'
     | '/personalization/appearance'
     | '/personalization/plugins'
     | '/settings/functionSettings'
@@ -306,10 +306,11 @@ export interface FileRouteTypes {
     | '/settings/systemSettings'
     | '/tools/captureHistory'
     | '/tools/chat'
-    | '/tools/translation'
     | '/tools/collage'
+    | '/tools/translation'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/about'
     | '/draw'
     | '/fixedContent'
@@ -318,7 +319,6 @@ export interface FileRouteTypes {
     | '/idle'
     | '/videoRecord'
     | '/videoRecordToolbar'
-    | '/'
     | '/personalization/appearance'
     | '/personalization/plugins'
     | '/settings/functionSettings'
@@ -327,8 +327,8 @@ export interface FileRouteTypes {
     | '/settings/systemSettings'
     | '/tools/captureHistory'
     | '/tools/chat'
-    | '/tools/translation'
     | '/tools/collage'
+    | '/tools/translation'
   id:
     | '__root__'
     | '/_layout'
@@ -350,8 +350,8 @@ export interface FileRouteTypes {
     | '/_layout/settings/systemSettings'
     | '/_layout/tools/captureHistory'
     | '/_layout/tools/chat'
-    | '/_layout/tools/translation'
     | '/_layout/tools/collage'
+    | '/_layout/tools/translation'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -364,14 +364,14 @@ declare module '@tanstack/react-router' {
     '/_noLayout': {
       id: '/_noLayout'
       path: ''
-      fullPath: ''
+      fullPath: '/'
       preLoaderRoute: typeof NoLayoutRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_layout': {
       id: '/_layout'
       path: ''
-      fullPath: ''
+      fullPath: '/'
       preLoaderRoute: typeof LayoutRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
@@ -445,6 +445,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutToolsTranslationLazyRouteImport
       parentRoute: typeof LayoutRouteRoute
     }
+    '/_layout/tools/collage': {
+      id: '/_layout/tools/collage'
+      path: '/tools/collage'
+      fullPath: '/tools/collage'
+      preLoaderRoute: typeof LayoutToolsCollageLazyRouteImport
+      parentRoute: typeof LayoutRouteRoute
+    }
     '/_layout/tools/chat': {
       id: '/_layout/tools/chat'
       path: '/tools/chat'
@@ -457,13 +464,6 @@ declare module '@tanstack/react-router' {
       path: '/tools/captureHistory'
       fullPath: '/tools/captureHistory'
       preLoaderRoute: typeof LayoutToolsCaptureHistoryLazyRouteImport
-      parentRoute: typeof LayoutRouteRoute
-    }
-    '/_layout/tools/collage': {
-      id: '/_layout/tools/collage'
-      path: '/tools/collage'
-      fullPath: '/tools/collage'
-      preLoaderRoute: typeof LayoutToolsCollageLazyRouteImport
       parentRoute: typeof LayoutRouteRoute
     }
     '/_layout/settings/systemSettings': {
@@ -522,8 +522,8 @@ interface LayoutRouteRouteChildren {
   LayoutSettingsSystemSettingsLazyRoute: typeof LayoutSettingsSystemSettingsLazyRoute
   LayoutToolsCaptureHistoryLazyRoute: typeof LayoutToolsCaptureHistoryLazyRoute
   LayoutToolsChatLazyRoute: typeof LayoutToolsChatLazyRoute
-  LayoutToolsTranslationLazyRoute: typeof LayoutToolsTranslationLazyRoute
   LayoutToolsCollageLazyRoute: typeof LayoutToolsCollageLazyRoute
+  LayoutToolsTranslationLazyRoute: typeof LayoutToolsTranslationLazyRoute
 }
 
 const LayoutRouteRouteChildren: LayoutRouteRouteChildren = {
@@ -539,8 +539,8 @@ const LayoutRouteRouteChildren: LayoutRouteRouteChildren = {
   LayoutSettingsSystemSettingsLazyRoute: LayoutSettingsSystemSettingsLazyRoute,
   LayoutToolsCaptureHistoryLazyRoute: LayoutToolsCaptureHistoryLazyRoute,
   LayoutToolsChatLazyRoute: LayoutToolsChatLazyRoute,
-  LayoutToolsTranslationLazyRoute: LayoutToolsTranslationLazyRoute,
   LayoutToolsCollageLazyRoute: LayoutToolsCollageLazyRoute,
+  LayoutToolsTranslationLazyRoute: LayoutToolsTranslationLazyRoute,
 }
 
 const LayoutRouteRouteWithChildren = LayoutRouteRoute._addFileChildren(
