@@ -416,6 +416,23 @@ const DrawPageCore: React.FC<{
 				layerContainerRef.current.style.height = `${documentHeight}px`;
 			}
 
+			// 诊断日志：定位"冻结画面被放大"，输出窗口与页面几何信息
+			appInfo("[DIAG] showWindow geometry", {
+				rect: { min_x, min_y, max_x, max_y },
+				devicePixelRatio: window.devicePixelRatio,
+				documentSize: `${(max_x - min_x) / window.devicePixelRatio}x${
+					(max_y - min_y) / window.devicePixelRatio
+				}`,
+				viewportSize: `${window.innerWidth}x${window.innerHeight}`,
+				windowScaleFactor: await appWindow
+					.scaleFactor()
+					.catch(() => undefined),
+				windowInnerPhysicalSize: await appWindow
+					.innerSize()
+					.then((size) => `${size.width}x${size.height}`)
+					.catch(() => undefined),
+			});
+
 			await showCurrentWindow();
 			if (
 				process.env.NODE_ENV === "development" &&

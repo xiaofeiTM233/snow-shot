@@ -24,7 +24,7 @@ import {
 } from "@/types/appSettings";
 import { getCaptureHistoryImageAbsPath } from "@/utils/captureHistory";
 import { supportOffscreenCanvas } from "@/utils/environment";
-import { appInfo, appWarn } from "@/utils/log";
+import { appError, appInfo, appWarn } from "@/utils/log";
 import {
 	addImageToContainerAction,
 	applyProcessImageConfigToCanvasAction,
@@ -402,6 +402,10 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 	/** 调整画布大小 */
 	const resizeCanvas = useCallback(
 		async (width: number, height: number) => {
+			// 诊断日志：定位"冻结画面被放大"，确认画布请求尺寸与页面环境
+			appInfo(
+				`[DIAG] resizeCanvas: ${width}x${height}, devicePixelRatio: ${window.devicePixelRatio}, innerSize: ${window.innerWidth}x${window.innerHeight}`,
+			);
 			await createNewCanvasContainer(INIT_CONTAINER_KEY);
 			await resizeCanvasAction(rendererWorker, canvasAppRef, width, height);
 		},

@@ -4,7 +4,7 @@ import { captureFocusedWindow } from "@/commands/screenshot";
 import { copyToClipboard } from "@/pages/draw/actions";
 
 import { type AppSettingsData, AppSettingsGroup } from "@/types/appSettings";
-import { getCorrectHdrColorAlgorithm } from "@/utils/appSettings";
+import { getCorrectHdrColorAlgorithm, getCaptureMethod } from "@/utils/appSettings";
 import { playCameraShutterSound } from "@/utils/audio";
 import { getImagePathFromSettings } from "@/utils/file";
 import { appError, appInfo } from "@/utils/log";
