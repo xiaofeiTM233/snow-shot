@@ -712,12 +712,50 @@ export const settings = {
 		"NetEase Youdao",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.tencent":
 		"Tencent Cloud",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.baidu":
+		"Baidu Intelligent Cloud",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.aliyun":
+		"Alibaba Cloud",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.volcengine":
+		"Volcengine",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.custom":
+		"Custom",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoOcr":
 		"General OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralBasicOcr":
 		"General Printed Text OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralAccurateOcr":
 		"General Accurate OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.custom":
+		"Custom",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneralBasic":
+		"General OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneralAccurateBasic":
+		"General Accurate OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunRecognizeGeneral":
+		"General OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.volcengineOcrNormal":
+		"General OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri": "API URI",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri.required":
+		"Please enter the API URI",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey": "API Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey.required":
+		"Please enter the API Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey": "Secret Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey.required":
+		"Please enter the Secret Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId": "AccessKeyId",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId.required":
+		"Please enter the AccessKeyId",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeySecret":
+		"AccessKeySecret",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeySecret.required":
+		"Please enter the AccessKeySecret",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.secretAccessKey":
+		"SecretAccessKey",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.secretAccessKey.required":
+		"Please enter the SecretAccessKey",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.appKey":
 		"App ID (appKey)",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.appKey.required":

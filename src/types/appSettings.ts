@@ -302,6 +302,16 @@ export enum OnlineOcrServiceType {
 	TencentGeneralBasicOcr = "tencent:GeneralBasicOCR",
 	/** 腾讯云 通用文字识别（高精度版） */
 	TencentGeneralAccurateOcr = "tencent:GeneralAccurateOCR",
+	/** 百度 通用文字识别（标准版） */
+	BaiduGeneralBasic = "baidu:GeneralBasic",
+	/** 百度 通用文字识别（高精度版） */
+	BaiduGeneralAccurateBasic = "baidu:GeneralAccurateBasic",
+	/** 阿里云 通用文字识别 */
+	AliyunRecognizeGeneral = "aliyun:RecognizeGeneral",
+	/** 火山引擎 通用文字识别 */
+	VolcengineOcrNormal = "volcengine:OCRNormal",
+	/** 自定义 API */
+	Custom = "custom:custom",
 }
 
 export type OnlineOcrModelConfig = {
@@ -311,13 +321,17 @@ export type OnlineOcrModelConfig = {
 	service_type: OnlineOcrServiceType | string;
 	/** 识别语言，取值跟随对应平台文档 */
 	language: string;
+	/** 自定义 API 地址 */
+	api_uri?: string;
+	/** 百度 API Key */
+	api_key?: string;
 	/** 有道 应用ID（appKey） */
 	app_key?: string;
 	/** 有道 应用密钥 */
 	app_secret?: string;
-	/** 腾讯云 SecretId */
+	/** 腾讯云 SecretId / 阿里云 AccessKeyId / 火山引擎 AccessKeyId */
 	secret_id?: string;
-	/** 腾讯云 SecretKey */
+	/** 腾讯云 SecretKey / 阿里云 AccessKeySecret / 火山引擎 SecretAccessKey / 百度 Secret Key */
 	secret_key?: string;
 	/** 腾讯云 地域 */
 	region?: string;

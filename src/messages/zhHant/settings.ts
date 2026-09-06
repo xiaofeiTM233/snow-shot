@@ -675,12 +675,50 @@ export const settings = {
 		"網易有道",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.tencent":
 		"騰訊雲",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.baidu":
+		"百度智能雲",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.aliyun":
+		"阿里雲",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.volcengine":
+		"火山引擎",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.custom":
+		"自訂",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoOcr":
 		"通用文字識別",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralBasicOcr":
 		"通用印刷體識別",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralAccurateOcr":
 		"通用文字識別（高精度版）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.custom":
+		"自訂",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneralBasic":
+		"通用文字識別",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneralAccurateBasic":
+		"通用文字識別（高精度版）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunRecognizeGeneral":
+		"通用文字識別",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.volcengineOcrNormal":
+		"通用文字識別",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri": "API 位址",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri.required":
+		"請輸入 API 位址",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey": "API Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey.required":
+		"請輸入 API Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey": "Secret Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey.required":
+		"請輸入 Secret Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId": "AccessKeyId",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId.required":
+		"請輸入 AccessKeyId",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeySecret":
+		"AccessKeySecret",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeySecret.required":
+		"請輸入 AccessKeySecret",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.secretAccessKey":
+		"SecretAccessKey",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.secretAccessKey.required":
+		"請輸入 SecretAccessKey",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.appKey":
 		"應用ID（appKey）",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.appKey.required":

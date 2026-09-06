@@ -832,6 +832,8 @@ const AppSettingsContextProviderCore: React.FC<{
 								model_name: `${item.model_name ?? ""}`,
 								service_type: `${item.service_type ?? ""}`,
 								language: `${item.language ?? "auto"}`,
+								api_uri: `${item.api_uri ?? ""}`,
+								api_key: `${item.api_key ?? ""}`,
 								app_key: `${item.app_key ?? ""}`,
 								app_secret: `${item.app_secret ?? ""}`,
 								secret_id: `${item.secret_id ?? ""}`,

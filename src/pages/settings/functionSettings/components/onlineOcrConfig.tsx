@@ -34,6 +34,31 @@ const ONLINE_OCR_SERVICE_TYPE_LIST: OnlineOcrServiceTypeItem[] = [
 		value: OnlineOcrServiceType.TencentGeneralAccurateOcr,
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.tencentGeneralAccurateOcr`,
 	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduGeneralBasic,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneralBasic`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduGeneralAccurateBasic,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneralAccurateBasic`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.aliyun`,
+		value: OnlineOcrServiceType.AliyunRecognizeGeneral,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.aliyunRecognizeGeneral`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.volcengine`,
+		value: OnlineOcrServiceType.VolcengineOcrNormal,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.volcengineOcrNormal`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.custom`,
+		value: OnlineOcrServiceType.Custom,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.custom`,
+	},
 ];
 
 type OnlineOcrLanguageItem = {
@@ -110,6 +135,37 @@ const TENCENT_GENERAL_ACCURATE_LANGUAGE_LIST: OnlineOcrLanguageItem[] = [
 	},
 ];
 
+const BAIDU_LANGUAGE_LIST: OnlineOcrLanguageItem[] = [
+	{ value: "auto_detect", labelId: "tools.translation.language.auto" },
+	{
+		value: "CHN_ENG",
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.language.chineseEnglishMix`,
+	},
+	{ value: "ENG", labelId: "tools.translation.language.english" },
+	{ value: "JAP", labelId: "tools.translation.language.japanese" },
+	{ value: "KOR", labelId: "tools.translation.language.korean" },
+	{ value: "FRE", labelId: "tools.translation.language.french" },
+	{ value: "SPA", labelId: "tools.translation.language.spanish" },
+	{ value: "POR", labelId: "tools.translation.language.portuguese" },
+	{ value: "GER", labelId: "tools.translation.language.german" },
+	{ value: "ITA", labelId: "tools.translation.language.italian" },
+	{ value: "RUS", labelId: "tools.translation.language.russian" },
+	{ value: "DAN", labelId: "tools.translation.language.danish" },
+	{ value: "DUT", labelId: "tools.translation.language.dutch" },
+	{ value: "MAL", labelId: "tools.translation.language.malay" },
+	{ value: "SWE", labelId: "tools.translation.language.swedish" },
+	{ value: "IND", labelId: "tools.translation.language.indonesian" },
+	{ value: "POL", labelId: "tools.translation.language.polish" },
+	{ value: "ROM", labelId: "tools.translation.language.romanian" },
+	{ value: "TUR", labelId: "tools.translation.language.turkish" },
+	{ value: "GRE", labelId: "tools.translation.language.greek" },
+	{ value: "HUN", labelId: "tools.translation.language.hungarian" },
+	{ value: "THA", labelId: "tools.translation.language.thai" },
+	{ value: "VIE", labelId: "tools.translation.language.vietnamese" },
+	{ value: "ARA", labelId: "tools.translation.language.arabic" },
+	{ value: "HIN", labelId: "tools.translation.language.hindi" },
+];
+
 export const useOnlineOcrServiceTypeOptions = () => {
 	const intl = useIntl();
 
@@ -153,6 +209,10 @@ const useOnlineOcrLanguageOptions = (serviceType: string | undefined) => {
 				break;
 			case OnlineOcrServiceType.TencentGeneralAccurateOcr:
 				languageList = TENCENT_GENERAL_ACCURATE_LANGUAGE_LIST;
+				break;
+			case OnlineOcrServiceType.BaiduGeneralBasic:
+			case OnlineOcrServiceType.BaiduGeneralAccurateBasic:
+				languageList = BAIDU_LANGUAGE_LIST;
 				break;
 			default:
 				return [];
@@ -236,6 +296,8 @@ export const OnlineOcrConfig = () => {
 				model_name: "",
 				service_type: OnlineOcrServiceType.TencentGeneralBasicOcr,
 				language: "auto",
+				api_uri: "",
+				api_key: "",
 				app_key: "",
 				app_secret: "",
 				secret_id: "",
@@ -286,6 +348,33 @@ export const OnlineOcrConfig = () => {
 				</ProFormDependency>
 				<ProFormDependency name={["service_type"]}>
 					{({ service_type }) => {
+						if (service_type === OnlineOcrServiceType.Custom) {
+							return (
+								<Col span={12}>
+									<ProFormText
+										name="api_uri"
+										label={
+											<IconLabel
+												label={
+													<FormattedMessage
+														id={`${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.apiUri`}
+													/>
+												}
+											/>
+										}
+										rules={[
+											{
+												required: true,
+												message: intl.formatMessage({
+													id: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.apiUri.required`,
+												}),
+											},
+										]}
+									/>
+								</Col>
+							);
+						}
+
 						if (service_type === OnlineOcrServiceType.YoudaoOcr) {
 							return (
 								<>
@@ -395,6 +484,162 @@ export const OnlineOcrConfig = () => {
 													required: true,
 													message: intl.formatMessage({
 														id: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.secretKey.required`,
+													}),
+												},
+											]}
+										/>
+									</Col>
+								</>
+							);
+						}
+
+						if (
+							service_type === OnlineOcrServiceType.BaiduGeneralBasic ||
+							service_type === OnlineOcrServiceType.BaiduGeneralAccurateBasic
+						) {
+							return (
+								<>
+									<Col span={12}>
+										<ProFormText
+											name="api_key"
+											label={
+												<IconLabel
+													label={
+														<FormattedMessage
+															id={`${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.baiduApiKey`}
+														/>
+													}
+												/>
+											}
+											rules={[
+												{
+													required: true,
+													message: intl.formatMessage({
+														id: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.baiduApiKey.required`,
+													}),
+												},
+											]}
+										/>
+									</Col>
+									<Col span={12}>
+										<ProFormText.Password
+											name="secret_key"
+											label={
+												<IconLabel
+													label={
+														<FormattedMessage
+															id={`${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.baiduSecretKey`}
+														/>
+													}
+												/>
+											}
+											rules={[
+												{
+													required: true,
+													message: intl.formatMessage({
+														id: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.baiduSecretKey.required`,
+													}),
+												},
+											]}
+										/>
+									</Col>
+								</>
+							);
+						}
+
+						if (service_type === OnlineOcrServiceType.AliyunRecognizeGeneral) {
+							return (
+								<>
+									<Col span={12}>
+										<ProFormText
+											name="secret_id"
+											label={
+												<IconLabel
+													label={
+														<FormattedMessage
+															id={`${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.accessKeyId`}
+														/>
+													}
+												/>
+											}
+											rules={[
+												{
+													required: true,
+													message: intl.formatMessage({
+														id: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.accessKeyId.required`,
+													}),
+												},
+											]}
+										/>
+									</Col>
+									<Col span={12}>
+										<ProFormText.Password
+											name="secret_key"
+											label={
+												<IconLabel
+													label={
+														<FormattedMessage
+															id={`${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.accessKeySecret`}
+														/>
+													}
+												/>
+											}
+											rules={[
+												{
+													required: true,
+													message: intl.formatMessage({
+														id: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.accessKeySecret.required`,
+													}),
+												},
+											]}
+										/>
+									</Col>
+								</>
+							);
+						}
+
+						if (service_type === OnlineOcrServiceType.VolcengineOcrNormal) {
+							return (
+								<>
+									<Col span={12}>
+										<ProFormText
+											name="secret_id"
+											label={
+												<IconLabel
+													label={
+														<FormattedMessage
+															id={`${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.accessKeyId`}
+														/>
+													}
+												/>
+											}
+											rules={[
+												{
+													required: true,
+													message: intl.formatMessage({
+														id: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.accessKeyId.required`,
+													}),
+												},
+											]}
+										/>
+									</Col>
+									<Col span={12}>
+										<ProFormText.Password
+											name="secret_key"
+											label={
+												<IconLabel
+													label={
+														<FormattedMessage
+															id={`${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.secretAccessKey`}
+														/>
+													}
+												/>
+											}
+											rules={[
+												{
+													required: true,
+													message: intl.formatMessage({
+														id: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.secretAccessKey.required`,
 													}),
 												},
 											]}
