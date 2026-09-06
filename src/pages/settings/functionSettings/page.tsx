@@ -10,6 +10,7 @@ import {
 	ProFormText,
 	ProFormTextArea,
 } from "@ant-design/pro-components";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
 	Alert,
 	Col,
@@ -35,7 +36,6 @@ import {
 	useState,
 } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { listOcrModelFiles } from "@/commands/ocr";
 import { videoRecordGetMicrophoneDeviceNames } from "@/commands/videoRecord";
 import { ContentWrap } from "@/components/contentWrap";
@@ -43,7 +43,10 @@ import { DirectoryInput } from "@/components/directoryInput";
 import { GroupTitle, SubGroupTitle } from "@/components/groupTitle";
 import { IconLabel } from "@/components/iconLable";
 import { ResetSettingsButton } from "@/components/resetSettingsButton";
-import { defaultAppSettingsData } from "@/constants/appSettings";
+import {
+	defaultAppSettingsData,
+	ONLINE_OCR_MODEL_PREFIX,
+} from "@/constants/appSettings";
 import { FOCUS_WINDOW_APP_NAME_ENV_VARIABLE } from "@/constants/components/chat";
 import {
 	SOURCE_LANGUAGE_ENV_VARIABLE,
@@ -67,6 +70,7 @@ import {
 	AppSettingsGroup,
 	CloudSaveUrlFormat,
 	CloudSaveUrlType,
+	type CustomOcrModelConfig,
 	DoubleClickAction,
 	DragOutsideSelectRectAction,
 	FixedContentDoubleClickAction,
@@ -74,7 +78,7 @@ import {
 	KeyDisplayDirection,
 	OcrDetectAfterAction,
 	OcrModel,
-	type CustomOcrModelConfig,
+	type OnlineOcrModelConfig,
 	TranslationApiType,
 	TrayIconClickAction,
 	VideoMaxSize,
@@ -86,6 +90,7 @@ import {
 	getImageSaveDirectory,
 	getVideoRecordSaveDirectory,
 } from "@/utils/file";
+import { OnlineOcrConfig } from "./components/onlineOcrConfig";
 import { TestChat } from "./components/testChat";
 import { TranslationConfig } from "./components/translationConfig";
 
@@ -942,36 +947,33 @@ export const FunctionSettingsPage = () => {
 						</Row>
 					)}
 
-				<Row gutter={token.marginLG}>
-					<Col span={12}>
-						<ProFormSelect
-							name="doubleClickAction"
-							layout="horizontal"
-							label={
-								<IconLabel
-									label={<FormattedMessage id="draw.doubleClickAction" />}
-								/>
-							}
-							options={doubleClickActionOptions}
-						/>
-					</Col>
+					<Row gutter={token.marginLG}>
+						<Col span={12}>
+							<ProFormSelect
+								name="doubleClickAction"
+								layout="horizontal"
+								label={
+									<IconLabel
+										label={<FormattedMessage id="draw.doubleClickAction" />}
+									/>
+								}
+								options={doubleClickActionOptions}
+							/>
+						</Col>
 
-					<Col span={12}>
-						<ProFormSelect
-							name="dragOutsideSelectRectAction"
-							layout="horizontal"
-							label={
-								<IconLabel
-									label={
-										<FormattedMessage id="draw.dragOutsideSelectRect" />
-									}
-								/>
-							}
-							options={dragOutsideSelectRectActionOptions}
-						/>
-					</Col>
-				</Row>
-
+						<Col span={12}>
+							<ProFormSelect
+								name="dragOutsideSelectRectAction"
+								layout="horizontal"
+								label={
+									<IconLabel
+										label={<FormattedMessage id="draw.dragOutsideSelectRect" />}
+									/>
+								}
+								options={dragOutsideSelectRectActionOptions}
+							/>
+						</Col>
+					</Row>
 
 					<Row gutter={token.marginLG}>
 						<Col span={12}>
@@ -1481,9 +1483,17 @@ export const FunctionSettingsPage = () => {
 						>
 							<Row gutter={token.marginLG}>
 								<Col span={12}>
-									<ProFormDependency name={["customOcrModelConfigList"]}>
-										{({ customOcrModelConfigList }) => {
-											const allOptions = [
+									<ProFormDependency
+										name={[
+											"customOcrModelConfigList",
+											"onlineOcrModelConfigList",
+										]}
+									>
+										{({
+											customOcrModelConfigList,
+											onlineOcrModelConfigList,
+										}) => {
+											const localOptions = [
 												...ocrModelOptions,
 												...(customOcrModelConfigList || [])
 													.filter((c: CustomOcrModelConfig) => c.model_name)
@@ -1492,6 +1502,38 @@ export const FunctionSettingsPage = () => {
 														value: c.model_name,
 													})),
 											];
+											const onlineOptions = (onlineOcrModelConfigList || [])
+												.filter((c: OnlineOcrModelConfig) => c.model_name)
+												.map((c: OnlineOcrModelConfig) => ({
+													label: c.model_name,
+													value: `${ONLINE_OCR_MODEL_PREFIX}${c.model_name}`,
+												}));
+
+											// 添加了在线识别时，按【本地识别】/【在线识别】分组展示
+											const allOptions =
+												onlineOptions.length > 0
+													? [
+															{
+																label: intl.formatMessage({
+																	id: "settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.local",
+																}),
+																title: intl.formatMessage({
+																	id: "settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.local",
+																}),
+																options: localOptions,
+															},
+															{
+																label: intl.formatMessage({
+																	id: "settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.online",
+																}),
+																title: intl.formatMessage({
+																	id: "settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.online",
+																}),
+																options: onlineOptions,
+															},
+														]
+													: localOptions;
+
 											return (
 												<ProFormSelect
 													label={
@@ -1590,6 +1632,9 @@ export const FunctionSettingsPage = () => {
 															label={
 																<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig.modelName" />
 															}
+															tooltipTitle={
+																<FormattedMessage id="settings.functionSettings.ocrSettings.customOcrModelConfig.modelName.tip" />
+															}
 														/>
 													}
 												/>
@@ -1638,6 +1683,12 @@ export const FunctionSettingsPage = () => {
 											</Col>
 										</Row>
 									</ProFormList>
+								</Col>
+							</Row>
+
+							<Row gutter={token.marginLG}>
+								<Col span={24}>
+									<OnlineOcrConfig />
 								</Col>
 							</Row>
 
@@ -2106,128 +2157,128 @@ export const FunctionSettingsPage = () => {
 											model_name: "",
 										})}
 									>
-									<Row gutter={token.marginLG}>
-										<Col span={12}>
-											<ProFormText
-												name="model_name"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.modelName" />
-														}
-														tooltipTitle={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.modelName.tip" />
-														}
-													/>
-												}
-												rules={[
-													{
-														required: true,
-														message: intl.formatMessage({
-															id: "settings.functionSettings.chatSettings.apiConfig.modelName.required",
-														}),
-													},
-												]}
-											/>
-										</Col>
-										<Col span={12}>
-											<ProFormText
-												name="api_model"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiModel" />
-														}
-														tooltipTitle={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiModel.tip" />
-														}
-													/>
-												}
-												rules={[
-													{
-														required: true,
-														message: intl.formatMessage({
-															id: "settings.functionSettings.chatSettings.apiConfig.apiModel.required",
-														}),
-													},
-												]}
-											/>
-										</Col>
-										<Col span={12}>
-											<ProFormText
-												name="api_uri"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiUri" />
-														}
-														tooltipTitle={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiUri.tip" />
-														}
-													/>
-												}
-												rules={[
-													{
-														required: true,
-														message: intl.formatMessage({
-															id: "settings.functionSettings.chatSettings.apiConfig.apiUri.required",
-														}),
-													},
-												]}
-											/>
-										</Col>
-										<Col span={12}>
-											<ProFormText.Password
-												name="api_key"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiKey" />
-														}
-														tooltipTitle={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiKey.tip" />
-														}
-													/>
-												}
-												rules={[
-													{
-														required: true,
-														message: intl.formatMessage({
-															id: "settings.functionSettings.chatSettings.apiConfig.apiKey.required",
-														}),
-													},
-												]}
-											/>
-										</Col>
-										<Col span={12}>
-											<ProFormSwitch
-												name="support_thinking"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.supportThinking" />
-														}
-													/>
-												}
-											/>
-										</Col>
-										{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
+										<Row gutter={token.marginLG}>
 											<Col span={12}>
-												<ProFormSwitch
-													name="support_vision"
+												<ProFormText
+													name="model_name"
 													label={
 														<IconLabel
 															label={
-																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.supportVision" />
+																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.modelName" />
 															}
 															tooltipTitle={
-																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.supportVision.tip" />
+																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.modelName.tip" />
+															}
+														/>
+													}
+													rules={[
+														{
+															required: true,
+															message: intl.formatMessage({
+																id: "settings.functionSettings.chatSettings.apiConfig.modelName.required",
+															}),
+														},
+													]}
+												/>
+											</Col>
+											<Col span={12}>
+												<ProFormText
+													name="api_model"
+													label={
+														<IconLabel
+															label={
+																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiModel" />
+															}
+															tooltipTitle={
+																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiModel.tip" />
+															}
+														/>
+													}
+													rules={[
+														{
+															required: true,
+															message: intl.formatMessage({
+																id: "settings.functionSettings.chatSettings.apiConfig.apiModel.required",
+															}),
+														},
+													]}
+												/>
+											</Col>
+											<Col span={12}>
+												<ProFormText
+													name="api_uri"
+													label={
+														<IconLabel
+															label={
+																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiUri" />
+															}
+															tooltipTitle={
+																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiUri.tip" />
+															}
+														/>
+													}
+													rules={[
+														{
+															required: true,
+															message: intl.formatMessage({
+																id: "settings.functionSettings.chatSettings.apiConfig.apiUri.required",
+															}),
+														},
+													]}
+												/>
+											</Col>
+											<Col span={12}>
+												<ProFormText.Password
+													name="api_key"
+													label={
+														<IconLabel
+															label={
+																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiKey" />
+															}
+															tooltipTitle={
+																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.apiKey.tip" />
+															}
+														/>
+													}
+													rules={[
+														{
+															required: true,
+															message: intl.formatMessage({
+																id: "settings.functionSettings.chatSettings.apiConfig.apiKey.required",
+															}),
+														},
+													]}
+												/>
+											</Col>
+											<Col span={12}>
+												<ProFormSwitch
+													name="support_thinking"
+													label={
+														<IconLabel
+															label={
+																<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.supportThinking" />
 															}
 														/>
 													}
 												/>
 											</Col>
-										)}
+											{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
+												<Col span={12}>
+													<ProFormSwitch
+														name="support_vision"
+														label={
+															<IconLabel
+																label={
+																	<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.supportVision" />
+																}
+																tooltipTitle={
+																	<FormattedMessage id="settings.functionSettings.chatSettings.apiConfig.supportVision.tip" />
+																}
+															/>
+														}
+													/>
+												</Col>
+											)}
 										</Row>
 									</ProFormList>
 								</Col>

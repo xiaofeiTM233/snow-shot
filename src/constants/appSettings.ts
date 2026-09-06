@@ -5,6 +5,7 @@ import {
 	AppSettingsGroup,
 	AppSettingsLanguage,
 	AppSettingsTheme,
+	CaptureMethod,
 	CloudSaveUrlFormat,
 	CloudSaveUrlType,
 	ColorPickerShowMode,
@@ -14,7 +15,6 @@ import {
 	FixedContentDoubleClickAction,
 	GifFormat,
 	HdrColorAlgorithm,
-	CaptureMethod,
 	HdrColorCorrection,
 	HistoryValidDuration,
 	KeyDisplayDirection,
@@ -28,6 +28,10 @@ import {
 	VideoMaxSize,
 } from "@/types/appSettings";
 import { DrawState } from "@/types/draw";
+
+/** 在线 OCR 模型在文本识别模型选项中的值前缀 */
+export const ONLINE_OCR_MODEL_PREFIX = "online_ocr_";
+
 import {
 	TranslationDomain,
 	TranslationType,
@@ -160,6 +164,7 @@ export const defaultAppSettingsData: AppSettingsData = {
 		htmlVisionModel: "",
 		ocrModel: OcrModel.RapidOcrV4,
 		customOcrModelConfigList: [],
+		onlineOcrModelConfigList: [],
 		htmlVisionModelSystemPrompt: `You are a professional image-to-HTML conversion engine. Your sole objective is to accurately convert images into clean, semantic HTML code.
 
 ## Conversion Rules (must follow)
@@ -326,7 +331,7 @@ Priority order (highest to lowest):
 		tryWriteBitmapImageToClipboard: true,
 		/** 启用多显示器截图 */
 		enableMultipleMonitor: true,
-			/** 更正颜色滤镜 */
+		/** 更正颜色滤镜 */
 		correctColorFilter: true,
 		/** 采集方式 */
 		captureMethod: CaptureMethod.Auto,

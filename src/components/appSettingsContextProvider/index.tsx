@@ -41,18 +41,18 @@ import {
 	AppSettingsGroup,
 	AppSettingsLanguage,
 	AppSettingsTheme,
+	CaptureMethod,
 	type CloudSaveUrlFormat,
 	CloudSaveUrlType,
 	type DoubleClickAction,
 	type DragOutsideSelectRectAction,
 	ExtraToolList,
-	CaptureMethod,
 	HdrColorCorrection,
 	type HistoryValidDuration,
+	type LogRetentionDuration,
 	OcrDetectAfterAction,
 	RenderBackend,
-	LogRetentionDuration,
-	RunLogLevel,
+	type RunLogLevel,
 	type TrayIconClickAction,
 	type TrayIconDefaultIcon,
 	type VideoMaxSize,
@@ -825,6 +825,21 @@ const AppSettingsContextProviderCore: React.FC<{
 						? newSettings.customOcrModelConfigList
 						: (prevSettings?.customOcrModelConfigList ??
 							defaultAppSettingsData[group].customOcrModelConfigList),
+					onlineOcrModelConfigList: Array.isArray(
+						newSettings?.onlineOcrModelConfigList,
+					)
+						? newSettings.onlineOcrModelConfigList.map((item) => ({
+								model_name: `${item.model_name ?? ""}`,
+								service_type: `${item.service_type ?? ""}`,
+								language: `${item.language ?? "auto"}`,
+								app_key: `${item.app_key ?? ""}`,
+								app_secret: `${item.app_secret ?? ""}`,
+								secret_id: `${item.secret_id ?? ""}`,
+								secret_key: `${item.secret_key ?? ""}`,
+								region: `${item.region ?? "ap-guangzhou"}`,
+							}))
+						: (prevSettings?.onlineOcrModelConfigList ??
+							defaultAppSettingsData[group].onlineOcrModelConfigList),
 				};
 			} else if (group === AppSettingsGroup.FunctionChat) {
 				newSettings = newSettings as AppSettingsData[typeof group];
@@ -1352,7 +1367,7 @@ const AppSettingsContextProviderCore: React.FC<{
 						typeof newSettings?.doubleClickAction === "string"
 							? newSettings.doubleClickAction
 							: (prevSettings?.doubleClickAction ??
-									defaultAppSettingsData[group].doubleClickAction),
+								defaultAppSettingsData[group].doubleClickAction),
 					showStickerRestoreDefaultSize:
 						typeof newSettings?.showStickerRestoreDefaultSize === "boolean"
 							? newSettings.showStickerRestoreDefaultSize
@@ -1419,11 +1434,13 @@ const AppSettingsContextProviderCore: React.FC<{
 								defaultAppSettingsData[group].captureMethod),
 					hdrColorCorrection:
 						newSettings?.hdrColorCorrection != null &&
-						Object.values(HdrColorCorrection).includes(newSettings.hdrColorCorrection)
+						Object.values(HdrColorCorrection).includes(
+							newSettings.hdrColorCorrection,
+						)
 							? newSettings.hdrColorCorrection
 							: (prevSettings?.hdrColorCorrection ??
 								defaultAppSettingsData[group].hdrColorCorrection),
-					};
+				};
 			} else if (group === AppSettingsGroup.SystemCore) {
 				newSettings = newSettings as AppSettingsData[typeof group];
 				const prevSettings = appSettingsRef.current[group] as

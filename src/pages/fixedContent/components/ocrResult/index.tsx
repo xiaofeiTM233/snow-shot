@@ -13,7 +13,11 @@ import {
 	useState,
 } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
-import { ocrDetect, ocrDetectWithSharedBuffer } from "@/commands/ocr";
+import {
+	ocrDetect,
+	ocrDetectOnline,
+	ocrDetectWithSharedBuffer,
+} from "@/commands/ocr";
 import { createWebViewSharedBufferChannel } from "@/commands/webview";
 import { PLUGIN_ID_RAPID_OCR } from "@/constants/pluginService";
 import { AntdContext } from "@/contexts/antdContext";
@@ -21,7 +25,10 @@ import { AppContext } from "@/contexts/appContext";
 import { AppSettingsPublisher } from "@/contexts/appSettingsActionContext";
 import { usePluginServiceContext } from "@/contexts/pluginServiceContext";
 import { useTranslationRequest } from "@/core/translations";
-import { releaseOcrSession } from "@/functions/ocr";
+import {
+	findSelectedOnlineOcrConfig,
+	releaseOcrSession,
+} from "@/functions/ocr";
 import { useHotkeysApp } from "@/hooks/useHotkeysApp";
 import { useStateRef } from "@/hooks/useStateRef";
 import { useStateSubscriber } from "@/hooks/useStateSubscriber";
@@ -527,32 +534,57 @@ export const OcrResult: React.FC<{
 			scaleFactor: number,
 			detectAngle: boolean,
 		): Promise<OcrDetectResult | undefined> => {
-			const ocrResultWithSharedBuffer = await ocrDetectWithSharedBufferAction(
-				canvas,
-				scaleFactor,
-				detectAngle,
+			// 选中的是在线 OCR 模型时，直接请求在线服务识别
+			const onlineConfig = findSelectedOnlineOcrConfig(
+				getAppSettings()[AppSettingsGroup.FunctionOcr],
 			);
 
-			if (ocrResultWithSharedBuffer) {
-				return ocrResultWithSharedBuffer;
+			if (onlineConfig) {
+				const imageBlob = await new Promise<Blob | null>((resolve) => {
+					canvas.toBlob(resolve, "image/png", 1);
+				});
+
+				if (!imageBlob) {
+					return undefined;
+				}
+
+				return ocrDetectOnline(
+					await imageBlob.arrayBuffer(),
+					onlineConfig,
+					detectAngle,
+				);
 			}
 
-			const imageBlob = await new Promise<Blob | null>((resolve) => {
-				canvas.toBlob(resolve, "image/png", 1);
-			});
+			try {
+				const ocrResultWithSharedBuffer = await ocrDetectWithSharedBufferAction(
+					canvas,
+					scaleFactor,
+					detectAngle,
+				);
 
-			if (!imageBlob) {
-				return undefined;
+				if (ocrResultWithSharedBuffer) {
+					return ocrResultWithSharedBuffer;
+				}
+
+				const imageBlob = await new Promise<Blob | null>((resolve) => {
+					canvas.toBlob(resolve, "image/png", 1);
+				});
+
+				if (!imageBlob) {
+					return undefined;
+				}
+
+				const ocrResult = await ocrDetect(
+					await imageBlob.arrayBuffer(),
+					scaleFactor,
+					detectAngle,
+				);
+				return ocrResult;
+			} finally {
+				releaseOcrSession();
 			}
-
-			const ocrResult = await ocrDetect(
-				await imageBlob.arrayBuffer(),
-				scaleFactor,
-				detectAngle,
-			);
-			return ocrResult;
 		},
-		[ocrDetectWithSharedBufferAction],
+		[getAppSettings, ocrDetectWithSharedBufferAction],
 	);
 
 	/** 请求 ID，避免 OCR 检测中切换工具后仍然触发 OCR 结果 */
@@ -576,7 +608,12 @@ export const OcrResult: React.FC<{
 	] = useStateRef<AppOcrResult | undefined>(undefined);
 	const initDrawCanvas = useCallback(
 		async (params: OcrResultInitDrawCanvasParams) => {
-			if (!isReady?.(PLUGIN_ID_RAPID_OCR)) {
+			if (
+				!isReady?.(PLUGIN_ID_RAPID_OCR) &&
+				!findSelectedOnlineOcrConfig(
+					getAppSettings()[AppSettingsGroup.FunctionOcr],
+				)
+			) {
 				return;
 			}
 
@@ -658,25 +695,21 @@ export const OcrResult: React.FC<{
 
 				return;
 			} else {
-				try {
-					const tempOcrResult = await ocrDetectByCanvas(
-						canvas,
-						monitorScaleFactorRef.current,
-						getAppSettings()[AppSettingsGroup.SystemScreenshot].ocrDetectAngle,
-					);
+				const tempOcrResult = await ocrDetectByCanvas(
+					canvas,
+					monitorScaleFactorRef.current,
+					getAppSettings()[AppSettingsGroup.SystemScreenshot].ocrDetectAngle,
+				);
 
-					if (!tempOcrResult) {
-						appError("[ocrDetectByCanvas] ocrDetectByCanvas failed");
-						return;
-					}
-
-					ocrResult = {
-						result: tempOcrResult,
-						ignoreScale: false,
-					};
-				} finally {
-					releaseOcrSession();
+				if (!tempOcrResult) {
+					appError("[ocrDetectByCanvas] ocrDetectByCanvas failed");
+					return;
 				}
+
+				ocrResult = {
+					result: tempOcrResult,
+					ignoreScale: false,
+				};
 			}
 
 			// 如果请求 ID 不一致，说明 OCR 检测中切换工具了，不进行更新
@@ -712,7 +745,12 @@ export const OcrResult: React.FC<{
 
 	const initImage = useCallback(
 		async (params: OcrResultInitImageParams) => {
-			if (!isReady?.(PLUGIN_ID_RAPID_OCR)) {
+			if (
+				!isReady?.(PLUGIN_ID_RAPID_OCR) &&
+				!findSelectedOnlineOcrConfig(
+					getAppSettings()[AppSettingsGroup.FunctionOcr],
+				)
+			) {
 				return;
 			}
 
@@ -731,16 +769,11 @@ export const OcrResult: React.FC<{
 			};
 			monitorScaleFactorRef.current = params.monitorScaleFactor;
 
-			let ocrResult: OcrDetectResult | undefined;
-			try {
-				ocrResult = await ocrDetectByCanvas(
-					canvas,
-					monitorScaleFactorRef.current,
-					getAppSettings()[AppSettingsGroup.SystemScreenshot].ocrDetectAngle,
-				);
-			} finally {
-				releaseOcrSession();
-			}
+			const ocrResult = await ocrDetectByCanvas(
+				canvas,
+				monitorScaleFactorRef.current,
+				getAppSettings()[AppSettingsGroup.SystemScreenshot].ocrDetectAngle,
+			);
 
 			if (!ocrResult) {
 				appError("[ocrDetectByCanvas] ocrDetectByCanvas failed");

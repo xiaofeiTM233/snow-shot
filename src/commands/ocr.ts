@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { OnlineOcrModelConfig } from "@/types/appSettings";
 import type { OcrDetectResult } from "@/types/commands/ocr";
 
 export const ocrDetect = async (
@@ -23,6 +24,19 @@ export const ocrDetectWithSharedBuffer = async (
 		channelId,
 		scaleFactor,
 		detectAngle,
+	});
+};
+
+export const ocrDetectOnline = async (
+	data: ArrayBuffer | Uint8Array,
+	config: OnlineOcrModelConfig,
+	detectAngle: boolean,
+): Promise<OcrDetectResult> => {
+	return await invoke<OcrDetectResult>("ocr_detect_online", data, {
+		headers: {
+			"x-ocr-config": encodeURIComponent(JSON.stringify(config)),
+			"x-detect-angle": detectAngle ? "true" : "false",
+		},
 	});
 };
 
