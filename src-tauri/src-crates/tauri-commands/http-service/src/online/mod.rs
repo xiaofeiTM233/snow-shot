@@ -1,11 +1,24 @@
+//! 在线服务适配器：在线 OCR、图片翻译、文本翻译
+//!
+//! 所有外部服务（有道、腾讯云、百度、阿里云、火山引擎、自定义）的适配逻辑都在本目录内，
+//! 按厂商拆分文件；命令层统一通过本模块的三个入口调用：
+//! - [`ocr_detect_online`]：在线文字识别（按 `service_type` 分发）
+//! - [`translate_image`]：图片翻译（按 `provider` 分发）
+//! - [`translate_text`]：文本翻译（按 `provider` 分发）
+
 mod aliyun;
 mod baidu;
 mod custom;
 mod tencent;
+mod tencent_ocr;
+mod tencent_translation;
 mod volcengine;
 mod youdao;
+mod youdao_ocr;
+mod youdao_translation;
 
 use std::io::Cursor;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -14,8 +27,7 @@ use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-
-use super::OcrDetectResult;
+use snow_shot_tauri_commands_ocr::OcrDetectResult;
 
 pub(crate) const YOUDAO_SERVICE_TYPE_PREFIX: &str = "youdao:";
 pub(crate) const TENCENT_SERVICE_TYPE_PREFIX: &str = "tencent:";
@@ -23,6 +35,9 @@ pub(crate) const BAIDU_SERVICE_TYPE_PREFIX: &str = "baidu:";
 pub(crate) const ALIYUN_SERVICE_TYPE_PREFIX: &str = "aliyun:";
 pub(crate) const VOLC_SERVICE_TYPE_PREFIX: &str = "volcengine:";
 pub(crate) const CUSTOM_SERVICE_TYPE_PREFIX: &str = "custom:";
+
+pub(crate) const YOUDAO_TRANSLATION_PROVIDER: &str = "youdao";
+pub(crate) const TENCENT_TRANSLATION_PROVIDER: &str = "tencent";
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -56,6 +71,48 @@ pub struct OnlineOcrConfig {
     pub region: String,
 }
 
+/// 在线翻译配置，按 provider 提供对应凭据
+#[derive(Debug, Clone, Deserialize)]
+pub struct OnlineTranslationConfig {
+    /// 服务提供方：`youdao` / `tencent`
+    pub provider: String,
+    /// 源语言（有道支持 auto；腾讯文本翻译不支持 auto，图片翻译自动识别源语言）
+    #[serde(default)]
+    pub from: String,
+    /// 目标语言
+    #[serde(default)]
+    pub to: String,
+    /// 有道 应用ID（appKey）
+    #[serde(default)]
+    pub app_key: String,
+    /// 有道 应用密钥
+    #[serde(default)]
+    pub app_secret: String,
+    /// 腾讯云 SecretId
+    #[serde(default)]
+    pub secret_id: String,
+    /// 腾讯云 SecretKey
+    #[serde(default)]
+    pub secret_key: String,
+    /// 腾讯云 地域
+    #[serde(default)]
+    pub region: String,
+}
+
+/// 图片翻译结果中的一行（区域或行级）
+#[derive(Debug, Clone, Serialize)]
+pub struct MachineTranslatedImageLine {
+    /// 原文
+    pub source_text: String,
+    /// 译文
+    pub translated_text: String,
+    /// 文本框（相对原图左上角）
+    pub box_x: u32,
+    pub box_y: u32,
+    pub box_width: u32,
+    pub box_height: u32,
+}
+
 pub async fn ocr_detect_online(
     request: tauri::ipc::Request<'_>,
 ) -> Result<OcrDetectResult, String> {
@@ -73,10 +130,7 @@ pub async fn ocr_detect_online(
     let config: OnlineOcrConfig = serde_json::from_str(&config_json)
         .map_err(|e| format!("[ocr_detect_online] Failed to parse ocr config: {}", e))?;
 
-    let image_data = match request.body() {
-        tauri::ipc::InvokeBody::Raw(data) => data,
-        _ => return Err("[ocr_detect_online] Invalid request body".to_string()),
-    };
+    let image_data = request_raw_body(&request, "[ocr_detect_online]")?;
 
     let detect_angle = request
         .headers()
@@ -89,9 +143,9 @@ pub async fn ocr_detect_online(
         .map_err(|_| "[ocr_detect_online] Invalid image".to_string())?;
 
     if config.service_type.starts_with(YOUDAO_SERVICE_TYPE_PREFIX) {
-        youdao::detect_with_youdao(&config, &image, detect_angle).await
+        youdao_ocr::detect(&config, &image, detect_angle).await
     } else if config.service_type.starts_with(TENCENT_SERVICE_TYPE_PREFIX) {
-        tencent::detect_with_tencent(&config, &image).await
+        tencent_ocr::detect(&config, &image).await
     } else if config.service_type.starts_with(BAIDU_SERVICE_TYPE_PREFIX) {
         baidu::detect_with_baidu(&config, &image, detect_angle).await
     } else if config.service_type.starts_with(ALIYUN_SERVICE_TYPE_PREFIX) {
@@ -108,12 +162,83 @@ pub async fn ocr_detect_online(
     }
 }
 
+/// 图片翻译：整图提交，返回逐行原文、译文与文本框
+pub async fn translate_image(
+    request: tauri::ipc::Request<'_>,
+) -> Result<Vec<MachineTranslatedImageLine>, String> {
+    let config: OnlineTranslationConfig =
+        parse_translation_config(&request, "[translate_image]")?;
+    let image_data = request_raw_body(&request, "[translate_image]")?;
+
+    match config.provider.as_str() {
+        YOUDAO_TRANSLATION_PROVIDER => {
+            youdao_translation::translate_image(&config, image_data).await
+        }
+        TENCENT_TRANSLATION_PROVIDER => {
+            tencent_translation::translate_image(&config, image_data).await
+        }
+        other => Err(format!("[translate_image] Unknown provider: {}", other)),
+    }
+}
+
+/// 文本翻译：请求体为 JSON 字符串数组
+pub async fn translate_text(
+    request: tauri::ipc::Request<'_>,
+) -> Result<Vec<String>, String> {
+    let config: OnlineTranslationConfig = parse_translation_config(&request, "[translate_text]")?;
+    let body = request_raw_body(&request, "[translate_text]")?;
+    let texts: Vec<String> = serde_json::from_slice(body)
+        .map_err(|e| format!("[translate_text] Failed to parse request body: {}", e))?;
+
+    match config.provider.as_str() {
+        YOUDAO_TRANSLATION_PROVIDER => youdao_translation::translate_text(&config, texts).await,
+        TENCENT_TRANSLATION_PROVIDER => {
+            tencent_translation::translate_text(&config, texts).await
+        }
+        other => Err(format!("[translate_text] Unknown provider: {}", other)),
+    }
+}
+
 fn build_http_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(10))
         .timeout(std::time::Duration::from_secs(60))
         .build()
         .map_err(|e| format!("[ocr_detect_online] Failed to build http client: {}", e))
+}
+
+fn now_unix_secs() -> Result<u64, String> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .map_err(|e| format!("[ocr_detect_online] Failed to get current time: {}", e))
+}
+
+fn parse_translation_config<T: serde::de::DeserializeOwned>(
+    request: &tauri::ipc::Request<'_>,
+    context: &str,
+) -> Result<T, String> {
+    let config_header = request
+        .headers()
+        .get("x-translation-config")
+        .ok_or(format!("[{}] Missing translation config header", context))?
+        .to_str()
+        .map_err(|_| format!("[{}] Invalid translation config header", context))?;
+    let config_json = percent_decode_str(config_header)
+        .decode_utf8()
+        .map_err(|e| format!("[{}] Failed to decode translation config: {}", context, e))?;
+    serde_json::from_str(&config_json)
+        .map_err(|e| format!("[{}] Failed to parse translation config: {}", context, e))
+}
+
+fn request_raw_body<'r>(
+    request: &'r tauri::ipc::Request<'_>,
+    context: &str,
+) -> Result<&'r [u8], String> {
+    match request.body() {
+        tauri::ipc::InvokeBody::Raw(data) => Ok(data.as_slice()),
+        _ => Err(format!("[{}] Invalid request body", context)),
+    }
 }
 
 /// 压缩图片以满足在线平台的限制：超过最大边长时等比缩放，体积仍超限时降级为 JPEG

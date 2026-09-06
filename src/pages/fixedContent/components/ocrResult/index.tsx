@@ -20,8 +20,8 @@ import {
 } from "@/commands/ocr";
 import {
 	type MachineTranslatedImageLine,
-	translateImageTencent,
-	translateImageYoudao,
+	translateImage,
+	toOnlineTranslationConfig,
 } from "@/commands/translation";
 import { createWebViewSharedBufferChannel } from "@/commands/webview";
 import { PLUGIN_ID_RAPID_OCR } from "@/constants/pluginService";
@@ -1279,7 +1279,10 @@ export const OcrResult: React.FC<{
 				throw new Error("[OcrResult.startTranslate] Canvas is not initialized");
 			}
 
-			if (apiConfig?.api_type === TranslationApiType.Youdao) {
+			if (
+				apiConfig?.api_type === TranslationApiType.Youdao ||
+				apiConfig?.api_type === TranslationApiType.Tencent
+			) {
 				const imageBlob = await new Promise<Blob | null>((resolve) => {
 					canvas.toBlob(resolve, "image/png", 1);
 				});
@@ -1291,32 +1294,12 @@ export const OcrResult: React.FC<{
 
 				const translationSettings =
 					getAppSettings()[AppSettingsGroup.FunctionTranslation];
-				return translateImageYoudao(await imageBlob.arrayBuffer(), {
-					app_key: apiConfig.app_key,
-					app_secret: apiConfig.app_secret,
-					from: translationSettings.sourceLanguage,
-					to: translationSettings.targetLanguage,
-				});
-			}
-
-			if (apiConfig?.api_type === TranslationApiType.Tencent) {
-				const imageBlob = await new Promise<Blob | null>((resolve) => {
-					canvas.toBlob(resolve, "image/png", 1);
-				});
-				if (!imageBlob) {
-					throw new Error(
-						"[OcrResult.startTranslate] Failed to encode canvas image",
-					);
-				}
-
-				const translationSettings =
-					getAppSettings()[AppSettingsGroup.FunctionTranslation];
-				return translateImageTencent(await imageBlob.arrayBuffer(), {
-					secret_id: apiConfig.secret_id,
-					secret_key: apiConfig.secret_key,
-					region: apiConfig.region,
-					to: translationSettings.targetLanguage,
-				});
+				return translateImage(
+					toOnlineTranslationConfig(apiConfig),
+					await imageBlob.arrayBuffer(),
+					translationSettings.sourceLanguage,
+					translationSettings.targetLanguage,
+				);
 			}
 
 			throw new Error(

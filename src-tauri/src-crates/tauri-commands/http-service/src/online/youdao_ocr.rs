@@ -1,21 +1,20 @@
+//! 有道智云 OCR 适配器
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
+use snow_shot_tauri_commands_ocr::OcrDetectResult;
 
 use super::OnlineOcrConfig;
 use super::build_http_client;
 use super::normalize_error_code;
 use super::ocr_line_to_text_block;
 use super::prepare_image_bytes;
-use crate::OcrDetectResult;
-
-const YOUDAO_OCR_ENDPOINT: &str = "https://openapi.youdao.com/ocrapi";
-const YOUDAO_MAX_IMAGE_SIDE: u32 = 2048;
-/// 有道限制 base64 编码后小于 2M
-const YOUDAO_MAX_BASE64_LENGTH: usize = 2_000_000;
+use super::youdao::{
+    YOUDAO_MAX_BASE64_LENGTH, YOUDAO_MAX_IMAGE_SIDE, YOUDAO_OCR_ENDPOINT, youdao_sign,
+};
 
 #[derive(Deserialize)]
 struct YoudaoOcrResponse {
@@ -37,7 +36,7 @@ struct YoudaoOcrRegion {
     lines: Vec<super::OcrLine>,
 }
 
-pub(super) async fn detect_with_youdao(
+pub(super) async fn detect(
     config: &OnlineOcrConfig,
     image: &image::DynamicImage,
     detect_angle: bool,
@@ -60,20 +59,7 @@ pub(super) async fn detect_with_youdao(
 
     // 签名规则：sha256(appKey + input + salt + curtime + appSecret)
     // input：img 长度大于 20 时取前 10 个字符 + 长度 + 后 10 个字符
-    let sign_input = if img_base64.len() > 20 {
-        format!(
-            "{}{}{}",
-            &img_base64[..10],
-            img_base64.len(),
-            &img_base64[img_base64.len() - 10..]
-        )
-    } else {
-        img_base64.clone()
-    };
-    let sign = hex::encode(Sha256::digest(format!(
-        "{}{}{}{}{}",
-        app_key, sign_input, salt, curtime, app_secret
-    )));
+    let sign = youdao_sign(app_key, &img_base64, &salt, &curtime, app_secret);
 
     let language = if config.language.is_empty() {
         "auto".to_string()

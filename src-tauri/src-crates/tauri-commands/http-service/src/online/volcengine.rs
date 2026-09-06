@@ -13,7 +13,7 @@ use super::hmac_sha256;
 use super::prepare_image_bytes;
 use super::rect_to_box_points;
 use super::utc_date_from_unix;
-use crate::OcrDetectResult;
+use snow_shot_tauri_commands_ocr::OcrDetectResult;
 
 const VOLC_OCR_ENDPOINT: &str = "https://visual.volcengineapi.com/";
 const VOLC_OCR_HOST: &str = "visual.volcengineapi.com";

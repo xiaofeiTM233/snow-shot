@@ -8,7 +8,7 @@ use super::OnlineOcrConfig;
 use super::build_http_client;
 use super::normalize_error_code;
 use super::ocr_line_to_text_block;
-use crate::OcrDetectResult;
+use snow_shot_tauri_commands_ocr::OcrDetectResult;
 
 #[derive(Deserialize)]
 struct CustomOcrResponse {

@@ -1,5 +1,3 @@
-pub mod online;
-
 use log;
 use paddle_ocr_rs::ocr_result::TextBlock;
 use rayon::iter::IntoParallelIterator;

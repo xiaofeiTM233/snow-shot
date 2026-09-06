@@ -8,7 +8,7 @@ use super::build_http_client;
 use super::normalize_error_code;
 use super::prepare_image_bytes;
 use super::rect_to_box_points;
-use crate::OcrDetectResult;
+use snow_shot_tauri_commands_ocr::OcrDetectResult;
 
 const BAIDU_TOKEN_ENDPOINT: &str = "https://aip.baidubce.com/oauth/2.0/token";
 const BAIDU_OCR_ENDPOINT: &str = "https://aip.baidubce.com/rest/2.0/ocr/v1";
@@ -79,7 +79,7 @@ pub(super) async fn detect_with_baidu(
     let client = build_http_client()?;
 
     // 通过 API Key / Secret Key 换取 access_token
-    let token_response: BaiduTokenResponse = client
+    let token_body = client
         .get(BAIDU_TOKEN_ENDPOINT)
         .query(&[
             ("grant_type", "client_credentials"),
@@ -89,8 +89,10 @@ pub(super) async fn detect_with_baidu(
         .send()
         .await
         .map_err(|e| format!("[ocr_detect_online] Baidu token request failed: {}", e))?
-        .json()
+        .text()
         .await
+        .map_err(|e| format!("[ocr_detect_online] Baidu read token response failed: {}", e))?;
+    let token_response: BaiduTokenResponse = serde_json::from_str(&token_body)
         .map_err(|e| format!("[ocr_detect_online] Baidu parse token response failed: {}", e))?;
 
     let Some(access_token) = token_response.access_token else {

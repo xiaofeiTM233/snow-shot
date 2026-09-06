@@ -8,6 +8,7 @@ pub mod ocr;
 pub mod plugin;
 pub mod screenshot;
 pub mod scroll_screenshot;
+pub mod translation;
 pub mod video_record;
 pub mod webview;
 
@@ -538,10 +539,8 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             core::write_image_pixels_to_clipboard_with_shared_buffer,
             http_services::upload_to_s3,
-            http_services::translate_text_youdao,
-            http_services::translate_text_tencent,
-            http_services::translate_image_youdao,
-            http_services::translate_image_tencent,
+            ocr::translate_image,
+            translation::translate_text,
             hot_load_page::hot_load_page_init,
             hot_load_page::hot_load_page_add_page,
             global_state::set_capture_state,

@@ -4,6 +4,7 @@ use tauri::command;
 use tokio::sync::Mutex;
 
 use snow_shot_app_services::ocr_service::OcrService;
+use snow_shot_tauri_commands_http_service::online::MachineTranslatedImageLine;
 use snow_shot_tauri_commands_ocr::OcrDetectResult;
 
 #[command]
@@ -57,7 +58,14 @@ pub async fn ocr_detect_with_shared_buffer(
 
 #[command]
 pub async fn ocr_detect_online(request: tauri::ipc::Request<'_>) -> Result<OcrDetectResult, String> {
-    snow_shot_tauri_commands_ocr::online::ocr_detect_online(request).await
+    snow_shot_tauri_commands_http_service::online::ocr_detect_online(request).await
+}
+
+#[command]
+pub async fn translate_image(
+    request: tauri::ipc::Request<'_>,
+) -> Result<Vec<MachineTranslatedImageLine>, String> {
+    snow_shot_tauri_commands_http_service::online::translate_image(request).await
 }
 
 #[command]

@@ -1,81 +1,29 @@
-//! 有道智云翻译：批量文本翻译 + 图片翻译
-
-use std::time::{SystemTime, UNIX_EPOCH};
+//! 有道智云翻译适配器：批量文本翻译 + 图片翻译
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::MachineTranslatedImageLine;
+use super::OnlineTranslationConfig;
 use super::build_http_client;
 use super::clamp_to_u32;
 use super::now_unix_secs;
-
-const YOUDAO_TEXT_TRANSLATE_ENDPOINT: &str = "https://openapi.youdao.com/v2/api";
-const YOUDAO_IMAGE_TRANSLATE_ENDPOINT: &str = "https://openapi.youdao.com/ocrtransapi";
-/// 单次请求所有 q 拼接后的最大字符数（平台限制 5000，留出余量）
-const YOUDAO_TEXT_BATCH_MAX_CHARS: usize = 4000;
-/// 图片 Base64 编码后最大 5M
-const YOUDAO_IMAGE_MAX_BASE64_LENGTH: usize = 5_000_000;
-
-#[derive(Debug, Clone, Deserialize)]
-pub(super) struct YoudaoImageTranslateConfig {
-    /// 有道 应用ID（appKey）
-    #[serde(default)]
-    pub app_key: String,
-    /// 有道 应用密钥
-    #[serde(default)]
-    pub app_secret: String,
-    /// 源语言，取值跟随有道文档（zh-CHS、en 等），支持 auto
-    #[serde(default)]
-    pub from: String,
-    /// 目标语言
-    #[serde(default)]
-    pub to: String,
-}
-
-/// 有道签名 v3 的 input：长度大于 20 时取前 10 个字符 + 长度 + 后 10 个字符（按字符而非字节，避免多字节字符截断到 UTF-8 边界外）
-fn youdao_sign_input(text: &str) -> String {
-    let char_count = text.chars().count();
-    if char_count > 20 {
-        let first: String = text.chars().take(10).collect();
-        let last: String = text.chars().skip(char_count - 10).collect();
-        format!("{}{}{}", first, char_count, last)
-    } else {
-        text.to_string()
-    }
-}
-
-/// errorCode 兼容字符串与数值两种形态，归一化为字符串（缺失返回空串）
-fn youdao_error_code(value: &Option<serde_json::Value>) -> String {
-    match value {
-        Some(serde_json::Value::String(code)) => code.clone(),
-        Some(serde_json::Value::Number(number)) => number.to_string(),
-        _ => String::new(),
-    }
-}
-
-/// 应用代码转有道语言代码（应用语言代码与有道一致，仅处理兼容写法）
-fn map_youdao_language(code: &str) -> String {
-    if code.is_empty() {
-        "auto".to_string()
-    } else {
-        code.to_string()
-    }
-}
+use super::youdao::{
+    YOUDAO_IMAGE_MAX_BASE64_LENGTH, YOUDAO_IMAGE_TRANSLATE_ENDPOINT,
+    YOUDAO_TEXT_BATCH_MAX_CHARS, YOUDAO_TEXT_TRANSLATE_ENDPOINT, map_youdao_language,
+    youdao_error_code, youdao_sign,
+};
 
 /// 有道批量文本翻译：多个文本按总字符数分批，重复 q 字段提交
-pub async fn translate_text_youdao(
-    app_key: String,
-    app_secret: String,
+pub(super) async fn translate_text(
+    config: &OnlineTranslationConfig,
     texts: Vec<String>,
-    from: String,
-    to: String,
 ) -> Result<Vec<String>, String> {
     let context = "[translate_text_youdao]";
-    let app_key = app_key.trim();
-    let app_secret = app_secret.trim();
+    let app_key = config.app_key.trim();
+    let app_secret = config.app_secret.trim();
     if app_key.is_empty() || app_secret.is_empty() {
         return Err(format!("{} Youdao appKey or appSecret is empty", context));
     }
@@ -124,11 +72,11 @@ pub async fn translate_text_youdao(
     }
 
     let client = build_http_client()?;
-    let from = map_youdao_language(&from);
-    let to = if to.is_empty() {
+    let from = map_youdao_language(&config.from);
+    let to = if config.to.is_empty() {
         "zh-CHS".to_string()
     } else {
-        to
+        config.to.clone()
     };
 
     let mut results: Vec<String> = Vec::new();
@@ -142,11 +90,7 @@ pub async fn translate_text_youdao(
         let salt = format!("{:x}{}", now.subsec_nanos(), std::process::id());
 
         // 签名规则：sha256(appKey + input + salt + curtime + appSecret)
-        let sign_input = youdao_sign_input(&joined);
-        let sign = hex::encode(Sha256::digest(format!(
-            "{}{}{}{}{}",
-            app_key, sign_input, salt, curtime, app_secret
-        )));
+        let sign = youdao_sign(app_key, &joined, &salt, &curtime, app_secret);
 
         let mut form: Vec<(&str, String)> = vec![
             ("from", from.clone()),
@@ -218,7 +162,7 @@ pub async fn translate_text_youdao(
 
 /// 有道图片翻译：整图提交，按逐行明细（回退区域级）返回原文、译文与文本框
 pub(super) async fn translate_image(
-    config: YoudaoImageTranslateConfig,
+    config: &OnlineTranslationConfig,
     image_data: &[u8],
 ) -> Result<Vec<MachineTranslatedImageLine>, String> {
     let context = "[translate_image_youdao]";
@@ -245,11 +189,7 @@ pub(super) async fn translate_image(
     );
 
     // 签名规则与文本翻译一致，input 基于图片的 Base64 字符串
-    let sign_input = youdao_sign_input(&img_base64);
-    let sign = hex::encode(Sha256::digest(format!(
-        "{}{}{}{}{}",
-        app_key, sign_input, salt, curtime, app_secret
-    )));
+    let sign = youdao_sign(app_key, &img_base64, &salt, &curtime, app_secret);
 
     let from = map_youdao_language(&config.from);
     let to = if config.to.is_empty() {

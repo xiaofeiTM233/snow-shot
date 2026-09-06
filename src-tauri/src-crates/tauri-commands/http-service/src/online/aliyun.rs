@@ -10,7 +10,7 @@ use super::clamp_to_u32;
 use super::hmac_sha256;
 use super::prepare_image_bytes;
 use super::utc_datetime_from_unix;
-use crate::OcrDetectResult;
+use snow_shot_tauri_commands_ocr::OcrDetectResult;
 
 const ALIYUN_OCR_ENDPOINT: &str = "https://ocr-api.cn-hangzhou.aliyuncs.com/";
 const ALIYUN_OCR_HOST: &str = "ocr-api.cn-hangzhou.aliyuncs.com";

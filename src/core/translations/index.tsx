@@ -24,8 +24,8 @@ import {
 	translateTextMicrosoft,
 } from "@/services/tools/translation";
 import {
-	translateTextTencent,
-	translateTextYoudao,
+	translateText,
+	toOnlineTranslationConfig,
 } from "@/commands/translation";
 import {
 	type AppSettingsData,
@@ -412,47 +412,14 @@ export const useTranslationRequest = (options?: {
 					};
 				}
 
-				if (apiConfig.api_type === TranslationApiType.Youdao) {
-					setStartTranslateLoading(true);
-
-					let result: string[] | undefined;
-					try {
-						result = await translateTextYoudao(
-							apiConfig,
-							params.sourceContent,
-							params.sourceLanguage,
-							params.targetLanguage,
-						);
-					} catch (error) {
-						appError("[customTranslation] translateTextYoudao error", error);
-					}
-
-					setStartTranslateLoading(false);
-
-					if (!result) {
-						return {
-							success: false,
-						};
-					}
-
-					// 个别条目翻译失败时保持原文
-					const youdaoTranslatedResults = result.map((content, index) => ({
-						content: content || params.sourceContent[index] || "",
-					}));
-
-					options?.onComplete?.(youdaoTranslatedResults, params.requestId);
-					setTranslatedContent(
-						youdaoTranslatedResults.map((item) => item.content).join("\n"),
-					);
-
-					return {
-						success: true,
-						result: youdaoTranslatedResults,
-					};
-				}
-
-				if (apiConfig.api_type === TranslationApiType.Tencent) {
-					if (params.sourceLanguage === "auto") {
+				if (
+					apiConfig.api_type === TranslationApiType.Youdao ||
+					apiConfig.api_type === TranslationApiType.Tencent
+				) {
+					if (
+						apiConfig.api_type === TranslationApiType.Tencent &&
+						params.sourceLanguage === "auto"
+					) {
 						message.error(
 							intl.formatMessage({
 								id: "tools.translation.tencentAutoSourceNotSupported",
@@ -467,14 +434,14 @@ export const useTranslationRequest = (options?: {
 
 					let result: string[] | undefined;
 					try {
-						result = await translateTextTencent(
-							apiConfig,
+						result = await translateText(
+							toOnlineTranslationConfig(apiConfig),
 							params.sourceContent,
 							params.sourceLanguage,
 							params.targetLanguage,
 						);
 					} catch (error) {
-						appError("[customTranslation] translateTextTencent error", error);
+						appError("[customTranslation] translateText error", error);
 					}
 
 					setStartTranslateLoading(false);
@@ -486,18 +453,18 @@ export const useTranslationRequest = (options?: {
 					}
 
 					// 个别条目翻译失败时保持原文
-					const tencentTranslatedResults = result.map((content, index) => ({
+					const translatedResults = result.map((content, index) => ({
 						content: content || params.sourceContent[index] || "",
 					}));
 
-					options?.onComplete?.(tencentTranslatedResults, params.requestId);
+					options?.onComplete?.(translatedResults, params.requestId);
 					setTranslatedContent(
-						tencentTranslatedResults.map((item) => item.content).join("\n"),
+						translatedResults.map((item) => item.content).join("\n"),
 					);
 
 					return {
 						success: true,
-						result: tencentTranslatedResults,
+						result: translatedResults,
 					};
 				}
 			}

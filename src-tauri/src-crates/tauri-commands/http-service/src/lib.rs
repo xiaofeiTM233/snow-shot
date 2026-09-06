@@ -1,6 +1,6 @@
 use snow_shot_http_services::{S3Config, S3Service};
 
-pub mod translation;
+pub mod online;
 
 pub async fn upload_to_s3(
     endpoint: String,
