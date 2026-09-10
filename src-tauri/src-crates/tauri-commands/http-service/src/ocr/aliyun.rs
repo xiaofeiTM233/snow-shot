@@ -1,8 +1,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use snow_shot_app_services::ocr_service::{OcrDetectResult, Point, TextBlock};
 
 use super::prepare_image_bytes;
 use super::OnlineOcrConfig;
@@ -10,7 +10,6 @@ use crate::common::build_http_client;
 use crate::common::clamp_to_u32;
 use crate::common::hmac_sha256;
 use crate::common::utc_datetime_from_unix;
-use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const ALIYUN_OCR_ENDPOINT: &str = "https://ocr-api.cn-hangzhou.aliyuncs.com/";
 const ALIYUN_OCR_HOST: &str = "ocr-api.cn-hangzhou.aliyuncs.com";

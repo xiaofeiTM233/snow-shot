@@ -2,9 +2,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
-use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use snow_shot_app_services::ocr_service::{OcrDetectResult, Point, TextBlock};
 
 use super::prepare_image_bytes;
 use super::rect_to_box_points;
@@ -13,7 +13,6 @@ use crate::common::build_http_client;
 use crate::common::clamp_to_u32;
 use crate::common::hmac_sha256;
 use crate::common::utc_date_from_unix;
-use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const VOLC_OCR_ENDPOINT: &str = "https://visual.volcengineapi.com/";
 const VOLC_OCR_HOST: &str = "visual.volcengineapi.com";

@@ -79,3 +79,61 @@ pub(crate) fn parse_number_list(value: &str) -> Vec<f64> {
         .filter_map(|item| item.trim().parse::<f64>().ok())
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_utc_date_from_unix() {
+        assert_eq!(utc_date_from_unix(0), "1970-01-01");
+        assert_eq!(utc_date_from_unix(1_000_000_000), "2001-09-09");
+        assert_eq!(utc_date_from_unix(86_400), "1970-01-02");
+    }
+
+    #[test]
+    fn test_utc_datetime_from_unix() {
+        assert_eq!(utc_datetime_from_unix(0), "1970-01-01T00:00:00Z");
+        assert_eq!(
+            utc_datetime_from_unix(1_000_000_000),
+            "2001-09-09T01:46:40Z"
+        );
+        assert_eq!(utc_datetime_from_unix(86_399), "1970-01-01T23:59:59Z");
+    }
+
+    #[test]
+    fn test_clamp_to_u32() {
+        assert_eq!(clamp_to_u32(f64::NAN), 0);
+        assert_eq!(clamp_to_u32(-1.5), 0);
+        assert_eq!(clamp_to_u32(0.0), 0);
+        assert_eq!(clamp_to_u32(3.4), 3);
+        assert_eq!(clamp_to_u32(3.6), 4);
+        assert_eq!(clamp_to_u32(u32::MAX as f64 * 2.0), u32::MAX);
+    }
+
+    #[test]
+    fn test_parse_number_list() {
+        assert_eq!(
+            parse_number_list("8,2,717,30"),
+            vec![8.0, 2.0, 717.0, 30.0]
+        );
+        // 带空白与非法项
+        assert_eq!(parse_number_list(" 1 , abc, 2.5"), vec![1.0, 2.5]);
+        assert!(parse_number_list("").is_empty());
+        assert!(parse_number_list("a,b,c").is_empty());
+    }
+
+    #[test]
+    fn test_normalize_error_code() {
+        assert_eq!(
+            normalize_error_code(&Some(serde_json::Value::String("202".into()))),
+            "202"
+        );
+        assert_eq!(
+            normalize_error_code(&Some(serde_json::Value::Number(202.into()))),
+            "202"
+        );
+        assert_eq!(normalize_error_code(&None), "");
+        assert_eq!(normalize_error_code(&Some(serde_json::Value::Null)), "");
+    }
+}

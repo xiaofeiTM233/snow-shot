@@ -9,10 +9,9 @@ use std::io::Cursor;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
-use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
-use snow_shot_app_services::ocr_service::OcrDetectResult;
+use snow_shot_app_services::ocr_service::{OcrDetectResult, Point, TextBlock};
 
 use crate::common::{clamp_to_u32, parse_number_list};
 
@@ -181,7 +180,7 @@ pub(crate) fn rect_to_box_points(x: f64, y: f64, width: f64, height: f64) -> Vec
 /// 解析有道系服务的 boundingBox 字符串为四个角点（左上/右上/右下/左下）：
 /// 8 个数值时依次为 左上(x,y)、右上(x,y)、右下(x,y)、左下(x,y)，
 /// 4 个数值时为 x,y,宽,高
-fn parse_bounding_box(bounding_box: &str) -> Option<Vec<Point>> {
+pub(crate) fn parse_bounding_box(bounding_box: &str) -> Option<Vec<Point>> {
     let values = parse_number_list(bounding_box);
     match values.len() {
         len if len >= 8 => Some(
@@ -230,4 +229,69 @@ fn ocr_line_to_text_block(line: &OcrLine) -> Option<TextBlock> {
         text: line.text.clone(),
         text_score: 1.0,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn point_coords(points: &[Point]) -> Vec<(u32, u32)> {
+        points.iter().map(|p| (p.x, p.y)).collect()
+    }
+
+    #[test]
+    fn test_parse_bounding_box_rect() {
+        // 4 值格式：x,y,宽,高
+        let points = parse_bounding_box("8,2,717,30").unwrap();
+        assert_eq!(
+            point_coords(&points),
+            vec![(8, 2), (725, 2), (725, 32), (8, 32)]
+        );
+    }
+
+    #[test]
+    fn test_parse_bounding_box_corners() {
+        // 8 值格式：左上(x,y)、右上(x,y)、右下(x,y)、左下(x,y)
+        let points = parse_bounding_box("1,2,3,4,5,6,7,8").unwrap();
+        assert_eq!(
+            point_coords(&points),
+            vec![(1, 2), (3, 4), (5, 6), (7, 8)]
+        );
+    }
+
+    #[test]
+    fn test_parse_bounding_box_invalid() {
+        assert!(parse_bounding_box("").is_none());
+        assert!(parse_bounding_box("abc").is_none());
+        assert!(parse_bounding_box("1,2,3").is_none());
+    }
+
+    #[test]
+    fn test_ocr_line_to_text_block_prefers_vertices() {
+        let line = OcrLine {
+            bounding_box: "0,0,10,10".to_string(),
+            vertices_bounding_box: "1,1,2,1,2,2,1,2".to_string(),
+            text: "hello".to_string(),
+        };
+
+        let block = ocr_line_to_text_block(&line).unwrap();
+        assert_eq!(block.text, "hello");
+        assert_eq!(
+            point_coords(&block.box_points),
+            vec![(1, 1), (2, 1), (2, 2), (1, 2)]
+        );
+
+        // vertices 缺省时退回 boundingBox
+        let line = OcrLine {
+            bounding_box: "0,0,10,10".to_string(),
+            vertices_bounding_box: String::new(),
+            text: "world".to_string(),
+        };
+
+        let block = ocr_line_to_text_block(&line).unwrap();
+        assert_eq!(
+            point_coords(&block.box_points),
+            vec![(0, 0), (10, 0), (10, 10), (0, 10)]
+        );
+    }
 }

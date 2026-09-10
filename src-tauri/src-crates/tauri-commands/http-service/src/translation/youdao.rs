@@ -2,15 +2,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
-use paddle_ocr_rs::ocr_result::TextBlock;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use snow_shot_app_services::ocr_service::{OcrDetectResult, TextBlock};
 
 use super::{TranslateTextResult, TranslationConfig, YOUDAO_LLM_SERVICE_TYPE};
-use crate::common::{build_http_client, normalize_error_code, parse_number_list};
-use crate::ocr::rect_to_box_points;
+use crate::common::{build_http_client, normalize_error_code};
+use crate::ocr::parse_bounding_box;
 use crate::ocr::{prepare_image_bytes, OnlineOcrConfig};
-use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const YOUDAO_TEXT_ENDPOINT: &str = "https://openapi.youdao.com/api";
 /// 批量文本翻译，支持一次传入多个 q
@@ -430,13 +429,11 @@ pub(crate) async fn translate_image_as_ocr(
         .res_regions
         .iter()
         .filter_map(|region| {
-            let values = parse_number_list(&region.bounding_box);
-            if values.len() < 4 {
-                return None;
-            }
+            // boundingBox 兼容两种格式：4 值 (x,y,宽,高) 与 8 值 (四个角点)
+            let box_points = parse_bounding_box(&region.bounding_box)?;
 
             Some(TextBlock {
-                box_points: rect_to_box_points(values[0], values[1], values[2], values[3]),
+                box_points,
                 box_score: 1.0,
                 angle_index: 0,
                 angle_score: 0.0,
@@ -450,4 +447,53 @@ pub(crate) async fn translate_image_as_ocr(
         text_blocks,
         scale_factor: 1.0,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_v3_sign_input_short_text() {
+        // 长度 <= 20 时签名 input 为原文（按字符数而非字节数计算）
+        assert_eq!(v3_sign_input("hello"), "hello");
+        assert_eq!(
+            v3_sign_input("你好世界你好世界你好世界你好世"),
+            "你好世界你好世界你好世界你好世"
+        );
+        assert_eq!(v3_sign_input("abcdefghijklmnopqrst"), "abcdefghijklmnopqrst");
+    }
+
+    #[test]
+    fn test_v3_sign_input_long_text() {
+        // 长度 > 20 时为 前10字符 + 字符长度 + 后10字符
+        assert_eq!(
+            v3_sign_input("abcdefghijklmnopqrstu"),
+            "abcdefghij21lmnopqrstu"
+        );
+        assert_eq!(
+            v3_sign_input("a1b2c3d4e5f6g7h8i9j0k1l2m"),
+            "a1b2c3d4e5258i9j0k1l2m"
+        );
+        // 多字节字符按字符数计算长度
+        assert_eq!(
+            v3_sign_input(&"你".repeat(25)),
+            format!("{}25{}", "你".repeat(10), "你".repeat(10))
+        );
+    }
+
+    #[test]
+    fn test_sign_v3() {
+        // golden 值与 Node.js crypto sha256 对照
+        assert_eq!(
+            sign_v3("testKey", "input", "salt", "1700000000", "testSecret"),
+            "950fb81cfc15a2c281e387a7dce59d4bbcc7220430ec148663a9c638f8280c2f"
+        );
+    }
+
+    #[test]
+    fn test_generate_salt() {
+        assert_eq!(generate_salt("payload").len(), 64);
+        assert_ne!(generate_salt("payload-a"), generate_salt("payload-b"));
+    }
 }

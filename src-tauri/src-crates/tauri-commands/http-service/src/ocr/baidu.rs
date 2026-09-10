@@ -1,14 +1,13 @@
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
-use paddle_ocr_rs::ocr_result::TextBlock;
 use serde::Deserialize;
+use snow_shot_app_services::ocr_service::{OcrDetectResult, TextBlock};
 
 use super::prepare_image_bytes;
 use super::rect_to_box_points;
 use super::OnlineOcrConfig;
 use crate::common::build_http_client;
 use crate::common::normalize_error_code;
-use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const BAIDU_TOKEN_ENDPOINT: &str = "https://aip.baidubce.com/oauth/2.0/token";
 const BAIDU_OCR_ENDPOINT: &str = "https://aip.baidubce.com/rest/2.0/ocr/v1";

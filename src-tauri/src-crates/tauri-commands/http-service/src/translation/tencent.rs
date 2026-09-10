@@ -2,15 +2,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
-use paddle_ocr_rs::ocr_result::TextBlock;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use snow_shot_app_services::ocr_service::{OcrDetectResult, TextBlock};
 
 use super::{TranslateTextResult, TranslationConfig};
 use crate::common::{build_http_client, hmac_sha256, utc_date_from_unix};
 use crate::ocr::rect_to_box_points;
 use crate::ocr::{prepare_image_bytes, OnlineOcrConfig};
-use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const TENCENT_TMT_ENDPOINT: &str = "https://tmt.tencentcloudapi.com";
 const TENCENT_TMT_HOST: &str = "tmt.tencentcloudapi.com";
@@ -288,4 +287,35 @@ pub(crate) async fn translate_image_as_ocr(
         text_blocks,
         scale_factor: 1.0,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_map_language_code() {
+        assert_eq!(map_language_code("zh-CHS", true), "zh");
+        assert_eq!(map_language_code("zh-CHS", false), "zh");
+        assert_eq!(map_language_code("zh-CHT", true), "zh-TW");
+        assert_eq!(map_language_code("en", true), "en");
+        assert_eq!(map_language_code("ja", false), "ja");
+        // 自动检测：文本翻译允许 auto，图片翻译目标语言不允许
+        assert_eq!(map_language_code("auto", true), "auto");
+        assert_eq!(map_language_code("auto", false), "zh");
+        assert_eq!(map_language_code("", true), "auto");
+        assert_eq!(map_language_code("", false), "zh");
+    }
+
+    #[test]
+    fn test_map_image_target_language() {
+        assert_eq!(map_image_target_language("zh-CHS"), "zh");
+        assert_eq!(map_image_target_language(""), "zh");
+        assert_eq!(map_image_target_language("auto"), "zh");
+        assert_eq!(map_image_target_language("zh-CHT"), "zh-TW");
+        // 土耳其语按官方文档传 tr-
+        assert_eq!(map_image_target_language("tr"), "tr-");
+        assert_eq!(map_image_target_language("en"), "en");
+        assert_eq!(map_image_target_language("pt"), "pt");
+    }
 }

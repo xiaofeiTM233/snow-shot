@@ -6874,7 +6874,6 @@ dependencies = [
  "hmac",
  "image",
  "log",
- "paddle-ocr-rs",
  "percent-encoding",
  "reqwest 0.12.24",
  "serde",
@@ -6892,7 +6891,6 @@ version = "0.1.0"
 dependencies = [
  "image",
  "log",
- "paddle-ocr-rs",
  "rayon",
  "snow-shot-app-services",
  "snow-shot-webview",

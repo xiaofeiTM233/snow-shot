@@ -31,6 +31,3 @@ percent-encoding = { workspace = true }
 
 # 图像处理
 image = { workspace = true }
-
-# OCR 结果类型
-paddle-ocr-rs = "0.6.0"
