@@ -5,11 +5,11 @@ use base64::Engine;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use super::build_http_client;
-use super::normalize_error_code;
 use super::ocr_line_to_text_block;
 use super::prepare_image_bytes;
 use super::OnlineOcrConfig;
+use crate::common::build_http_client;
+use crate::common::normalize_error_code;
 use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const YOUDAO_OCR_ENDPOINT: &str = "https://openapi.youdao.com/ocrapi";

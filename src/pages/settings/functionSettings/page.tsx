@@ -591,6 +591,35 @@ export const FunctionSettingsPage = () => {
 				}),
 				value: TranslationApiType.Custom,
 			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.translationSettings.apiConfig.apiType.youdao",
+				}),
+				value: TranslationApiType.Youdao,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.translationSettings.apiConfig.apiType.tencent",
+				}),
+				value: TranslationApiType.Tencent,
+			},
+		];
+	}, [intl]);
+
+	const youdaoTranslationServiceTypeOptions = useMemo(() => {
+		return [
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.translationSettings.apiConfig.youdaoService.text",
+				}),
+				value: "youdao:text",
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.translationSettings.apiConfig.youdaoService.llm",
+				}),
+				value: "youdao:llm",
+			},
 		];
 	}, [intl]);
 
@@ -1825,6 +1854,21 @@ export const FunctionSettingsPage = () => {
 									>
 										<Row gutter={token.marginLG} style={{ width: "100%" }}>
 											<Col span={12}>
+												<ProFormText
+													name="service_name"
+													label={
+														<IconLabel
+															label={
+																<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.serviceName" />
+															}
+															tooltipTitle={
+																<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.serviceName.tip" />
+															}
+														/>
+													}
+												/>
+											</Col>
+											<Col span={12}>
 												<ProFormSelect
 													name="api_type"
 													label={
@@ -1838,29 +1882,43 @@ export const FunctionSettingsPage = () => {
 													options={translationApiTypeOptions}
 												/>
 											</Col>
-											<Col span={12}>
-												<ProFormText
-													name="api_uri"
-													label={
-														<IconLabel
-															label={
-																<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiUri" />
-															}
-															tooltipTitle={
-																<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiUri.tip" />
-															}
-														/>
+											<ProFormDependency<{ api_type: TranslationApiType }>
+												name={["api_type"]}
+											>
+												{({ api_type }) => {
+													if (
+														api_type === TranslationApiType.DeepL ||
+														api_type === TranslationApiType.Custom
+													) {
+														return (
+															<Col span={12}>
+																<ProFormText
+																	name="api_uri"
+																	label={
+																		<IconLabel
+																			label={
+																				<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiUri" />
+																			}
+																			tooltipTitle={
+																				<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiUri.tip" />
+																			}
+																		/>
+																	}
+																	rules={[
+																		{
+																			required: true,
+																			message: intl.formatMessage({
+																				id: "settings.functionSettings.translationSettings.apiConfig.apiUri.required",
+																			}),
+																		},
+																	]}
+																/>
+															</Col>
+														);
 													}
-													rules={[
-														{
-															required: true,
-															message: intl.formatMessage({
-																id: "settings.functionSettings.translationSettings.apiConfig.apiUri.required",
-															}),
-														},
-													]}
-												/>
-											</Col>
+													return null;
+												}}
+											</ProFormDependency>
 											<ProFormDependency<{ api_type: TranslationApiType }>
 												name={["api_type"]}
 											>
@@ -1963,6 +2021,136 @@ export const FunctionSettingsPage = () => {
 																		fieldProps={{
 																			precision: 0,
 																		}}
+																	/>
+																</Col>
+															</>
+														);
+													}
+													return null;
+												}}
+											</ProFormDependency>
+
+											<ProFormDependency<{ api_type: TranslationApiType }>
+												name={["api_type"]}
+											>
+												{({ api_type }) => {
+													if (api_type === TranslationApiType.Youdao) {
+														return (
+															<>
+																<Col span={12}>
+																	<ProFormSelect
+																		name="service_type"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.youdaoServiceType" />
+																				}
+																			/>
+																		}
+																		allowClear={false}
+																		initialValue="youdao:text"
+																		options={youdaoTranslationServiceTypeOptions}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormText
+																		name="app_key"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.appKey" />
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: "settings.functionSettings.translationSettings.apiConfig.appKey.required",
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormText.Password
+																		name="app_secret"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.appSecret" />
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: "settings.functionSettings.translationSettings.apiConfig.appSecret.required",
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+															</>
+														);
+													}
+
+													if (api_type === TranslationApiType.Tencent) {
+														return (
+															<>
+																<Col span={12}>
+																	<ProFormText
+																		name="secret_id"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.secretId" />
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: "settings.functionSettings.translationSettings.apiConfig.secretId.required",
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormText.Password
+																		name="secret_key"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.secretKey" />
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: "settings.functionSettings.translationSettings.apiConfig.secretKey.required",
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormText
+																		name="region"
+																		initialValue="ap-guangzhou"
+																		placeholder="ap-guangzhou"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.region" />
+																				}
+																			/>
+																		}
 																	/>
 																</Col>
 															</>

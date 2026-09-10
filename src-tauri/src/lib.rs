@@ -8,6 +8,7 @@ pub mod ocr;
 pub mod plugin;
 pub mod screenshot;
 pub mod scroll_screenshot;
+pub mod translation;
 pub mod video_record;
 pub mod webview;
 
@@ -459,6 +460,7 @@ pub fn run() {
             ocr::ocr_init,
             ocr::ocr_release,
             ocr::list_ocr_model_files,
+            translation::translate_text_online,
             core::exit_app,
             core::start_free_drag,
             core::start_resize_window,

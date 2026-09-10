@@ -1,11 +1,18 @@
-import type { CustomApiConfig } from "@/types/appSettings";
+import { invoke } from "@tauri-apps/api/core";
+import type {
+	CustomApiConfig,
+	TencentTranslationApiConfig,
+	YoudaoTranslationApiConfig,
+} from "@/types/appSettings";
 import type {
 	DeepLTranslateResult,
 	TranslateData,
 	TranslateParams,
 	TranslationTypeOption,
 } from "@/types/servies/translation";
+import { TranslationDomain } from "@/types/servies/translation";
 import { withCache } from "@/utils/cache";
+import { appError } from "@/utils/log";
 import { ServiceResponse, serviceBaseFetch, serviceFetch } from ".";
 
 export type CustomTranslateResult = {
@@ -294,6 +301,37 @@ export const translateTextCustomWithLimits = async (
 	}
 
 	return { translations };
+};
+
+export type OnlineTranslateResult = {
+	/** 与入参文本顺序对应的翻译结果 */
+	results: string[];
+	/** 服务检测到的源语言 */
+	from?: string | null;
+};
+
+/**
+ * 厂商机器翻译 API（有道智云 / 腾讯云），由 Rust 侧完成签名与请求
+ */
+export const translateTextOnline = async (
+	config: YoudaoTranslationApiConfig | TencentTranslationApiConfig,
+	sourceContent: string[],
+	sourceLanguage: string,
+	targetLanguage: string,
+	domain?: TranslationDomain,
+): Promise<OnlineTranslateResult | undefined> => {
+	try {
+		return await invoke<OnlineTranslateResult>("translate_text_online", {
+			config,
+			texts: sourceContent,
+			from: sourceLanguage,
+			to: targetLanguage,
+			domain: domain ?? TranslationDomain.General,
+		});
+	} catch (error) {
+		appError("[translateTextOnline] error", error);
+		return undefined;
+	}
 };
 
 export const translateTextCustom = translateTextCustomOnce;

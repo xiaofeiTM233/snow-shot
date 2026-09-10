@@ -55,6 +55,8 @@ import {
 	type RunLogLevel,
 	type TrayIconClickAction,
 	type TrayIconDefaultIcon,
+	TranslationApiType,
+	type TranslationApiConfig,
 	type VideoMaxSize,
 } from "@/types/appSettings";
 import type {
@@ -922,24 +924,38 @@ const AppSettingsContextProviderCore: React.FC<{
 					translationApiConfigList: Array.isArray(
 						newSettings?.translationApiConfigList,
 					)
-						? newSettings.translationApiConfigList.map((item) => ({
-								api_uri: `${item.api_uri ?? ""}`,
-								api_key: `${item.api_key ?? ""}`,
-								api_type: item.api_type,
-								deepl_prefer_quality_optimized:
-									"deepl_prefer_quality_optimized" in item &&
-									typeof item.deepl_prefer_quality_optimized === "boolean"
-										? item.deepl_prefer_quality_optimized
-										: false,
-								max_requests_per_second:
-									typeof item.max_requests_per_second === "number"
-										? item.max_requests_per_second
-										: undefined,
-								max_paragraph_count:
-									typeof item.max_paragraph_count === "number"
-										? item.max_paragraph_count
-										: undefined,
-							}))
+						? newSettings.translationApiConfigList.map((rawItem) => {
+								// 不同类型的翻译 API 配置字段差异较大，统一按记录视图读取
+								const item = rawItem as unknown as Record<string, unknown>;
+
+								return {
+									api_type: item.api_type as TranslationApiType,
+									service_name: `${item.service_name ?? ""}`,
+									api_uri: `${item.api_uri ?? ""}`,
+									api_key: `${item.api_key ?? ""}`,
+									deepl_prefer_quality_optimized:
+										typeof item.deepl_prefer_quality_optimized === "boolean"
+											? item.deepl_prefer_quality_optimized
+											: false,
+									max_requests_per_second:
+										typeof item.max_requests_per_second === "number"
+											? item.max_requests_per_second
+											: undefined,
+									max_paragraph_count:
+										typeof item.max_paragraph_count === "number"
+											? item.max_paragraph_count
+											: undefined,
+									service_type:
+										typeof item.service_type === "string"
+											? item.service_type
+											: "youdao:text",
+									app_key: `${item.app_key ?? ""}`,
+									app_secret: `${item.app_secret ?? ""}`,
+									secret_id: `${item.secret_id ?? ""}`,
+									secret_key: `${item.secret_key ?? ""}`,
+									region: `${item.region ?? ""}`,
+								};
+							}) as TranslationApiConfig[]
 						: (prevSettings?.translationApiConfigList ??
 							defaultAppSettingsData[group].translationApiConfigList),
 					sourceLanguage:

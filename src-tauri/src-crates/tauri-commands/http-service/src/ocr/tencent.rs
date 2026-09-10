@@ -6,12 +6,12 @@ use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use super::build_http_client;
-use super::clamp_to_u32;
-use super::hmac_sha256;
 use super::prepare_image_bytes;
-use super::utc_date_from_unix;
 use super::OnlineOcrConfig;
+use crate::common::build_http_client;
+use crate::common::clamp_to_u32;
+use crate::common::hmac_sha256;
+use crate::common::utc_date_from_unix;
 use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const TENCENT_OCR_ENDPOINT: &str = "https://ocr.tencentcloudapi.com";

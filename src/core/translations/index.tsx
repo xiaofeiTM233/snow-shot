@@ -22,6 +22,8 @@ import {
 	translateTextDeepL,
 	translateTextGoogle,
 	translateTextMicrosoft,
+	translateTextOnline,
+	type OnlineTranslateResult,
 } from "@/services/tools/translation";
 import {
 	type AppSettingsData,
@@ -207,6 +209,14 @@ export const useTranslationRequest = (options?: {
 					return intl.formatMessage({ id: "tools.translation.type.deepl" });
 				case TranslationApiType.Custom:
 					return intl.formatMessage({ id: "tools.translation.type.custom" });
+				case TranslationApiType.Youdao:
+					return intl.formatMessage({
+						id: "tools.translation.type.youdaoApi",
+					});
+				case TranslationApiType.Tencent:
+					return intl.formatMessage({
+						id: "tools.translation.type.tencentApi",
+					});
 				default:
 					return apiConfigType;
 			}
@@ -245,13 +255,13 @@ export const useTranslationRequest = (options?: {
 				};
 			}) ?? []),
 			...(translationApiConfigList?.map((item): TranslationServiceConfig => {
-				return {
-					type: item.api_type,
-					name: getTranslationApiConfigTypeName(item.api_type),
-					translationApiConfig: item,
-					isOfficial: false,
-				};
-			}) ?? []),
+					return {
+						type: item.api_type,
+						name: item.service_name || getTranslationApiConfigTypeName(item.api_type),
+						translationApiConfig: item,
+						isOfficial: false,
+					};
+				}) ?? []),
 			...(officialTranslationTypes ?? []).map(
 				(item): TranslationServiceConfig => {
 					return {
@@ -401,6 +411,48 @@ export const useTranslationRequest = (options?: {
 					return {
 						success: true,
 						result: customTranslatedResults,
+					};
+				}
+
+				if (
+					apiConfig.api_type === TranslationApiType.Youdao ||
+					apiConfig.api_type === TranslationApiType.Tencent
+				) {
+					setStartTranslateLoading(true);
+
+					let result: OnlineTranslateResult | undefined;
+					try {
+						result = await translateTextOnline(
+							apiConfig,
+							params.sourceContent,
+							params.sourceLanguage,
+							params.targetLanguage,
+							params.translationDomain,
+						);
+					} catch (error) {
+						appError("[customTranslation] translateTextOnline error", error);
+					}
+
+					setStartTranslateLoading(false);
+
+					if (!result || result.results.length === 0) {
+						return {
+							success: false,
+						};
+					}
+
+					const onlineTranslatedResults = result.results.map((content) => ({
+						content,
+					}));
+
+					options?.onComplete?.(onlineTranslatedResults, params.requestId);
+					setTranslatedContent(
+						onlineTranslatedResults.map((item) => item.content).join("\n"),
+					);
+
+					return {
+						success: true,
+						result: onlineTranslatedResults,
 					};
 				}
 			}

@@ -4,10 +4,10 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use serde::Deserialize;
 
-use super::build_http_client;
-use super::normalize_error_code;
 use super::ocr_line_to_text_block;
 use super::OnlineOcrConfig;
+use crate::common::build_http_client;
+use crate::common::normalize_error_code;
 use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 #[derive(Deserialize)]

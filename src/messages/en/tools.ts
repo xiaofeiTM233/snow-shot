@@ -64,6 +64,8 @@ export const tools = {
 	"tools.translation.type.googleWeb": "Google Web Translate",
 	"tools.translation.type.google": "Google Translate",
 	"tools.translation.type.microsoft": "Microsoft Translate",
+	"tools.translation.type.youdaoApi": "Youdao Translate API",
+	"tools.translation.type.tencentApi": "Tencent Cloud Translate API",
 	"tools.translation.domain.general": "General",
 	"tools.translation.domain.computers": "Computers",
 	"tools.translation.domain.medicine": "Medicine",

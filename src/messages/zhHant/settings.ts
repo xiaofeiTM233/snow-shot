@@ -507,6 +507,34 @@ export const settings = {
 		"每次請求最大段落數",
 	"settings.functionSettings.translationSettings.apiConfig.maxParagraphCount.tip":
 		"每次傳送給翻譯服務的段落數量，如果段落數量過多，可能會導致介面的回應變慢",
+	"settings.functionSettings.translationSettings.apiConfig.serviceName": "服務名稱",
+	"settings.functionSettings.translationSettings.apiConfig.serviceName.tip":
+		"用於在翻譯服務列表中顯示",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.youdao":
+		"有道翻譯",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.tencent":
+		"騰訊雲翻譯",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoServiceType":
+		"有道服務",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoService.text":
+		"文本翻譯",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoService.llm":
+		"大模型翻譯",
+	"settings.functionSettings.translationSettings.apiConfig.appKey":
+		"應用 ID（appKey）",
+	"settings.functionSettings.translationSettings.apiConfig.appKey.required":
+		"請輸入應用 ID（appKey）",
+	"settings.functionSettings.translationSettings.apiConfig.appSecret":
+		"應用密鑰（appSecret）",
+	"settings.functionSettings.translationSettings.apiConfig.appSecret.required":
+		"請輸入應用密鑰（appSecret）",
+	"settings.functionSettings.translationSettings.apiConfig.secretId": "SecretId",
+	"settings.functionSettings.translationSettings.apiConfig.secretId.required":
+		"請輸入 SecretId",
+	"settings.functionSettings.translationSettings.apiConfig.secretKey": "SecretKey",
+	"settings.functionSettings.translationSettings.apiConfig.secretKey.required":
+		"請輸入 SecretKey",
+	"settings.functionSettings.translationSettings.apiConfig.region": "地域（Region）",
 	"settings.functionSettings.trayIconSettings": "系統匣",
 	"settings.functionSettings.trayIconSettings.iconClickAction": "左鍵點擊後",
 	"settings.functionSettings.trayIconSettings.iconClickAction.screenshot":
@@ -671,6 +699,8 @@ export const settings = {
 		"服務類型",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language":
 		"識別語言",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.targetLanguage":
+		"翻譯目標語言",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.youdao":
 		"網易有道",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.tencent":
@@ -685,6 +715,10 @@ export const settings = {
 		"自訂",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoOcr":
 		"通用文字識別",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoImageTranslation":
+		"圖片翻譯",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentImageTranslateLLM":
+		"端到端圖片翻譯",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralBasicOcr":
 		"通用印刷體識別",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralAccurateOcr":

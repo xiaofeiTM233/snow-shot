@@ -119,10 +119,14 @@ export type ChatApiConfig = {
 export enum TranslationApiType {
 	DeepL = "translation_api_deepl",
 	Custom = "translation_api_custom",
+	Youdao = "translation_api_youdao",
+	Tencent = "translation_api_tencent",
 }
 
 export type DeepLApiConfig = {
 	api_type: TranslationApiType.DeepL;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
 	api_uri: string;
 	api_key: string;
 	deepl_prefer_quality_optimized?: boolean;
@@ -130,6 +134,8 @@ export type DeepLApiConfig = {
 
 export type CustomApiConfig = {
 	api_type: TranslationApiType.Custom;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
 	api_uri: string;
 	api_key?: string;
 	/** 每秒最大请求数，默认为 5 */
@@ -138,7 +144,31 @@ export type CustomApiConfig = {
 	max_paragraph_count?: number;
 };
 
-export type TranslationApiConfig = DeepLApiConfig | CustomApiConfig;
+export type YoudaoTranslationApiConfig = {
+	api_type: TranslationApiType.Youdao;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
+	/** 有道服务类型：文本翻译 / 大模型翻译 */
+	service_type: "youdao:text" | "youdao:llm";
+	app_key: string;
+	app_secret: string;
+};
+
+export type TencentTranslationApiConfig = {
+	api_type: TranslationApiType.Tencent;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
+	secret_id: string;
+	secret_key: string;
+	/** 腾讯云 地域，默认 ap-guangzhou */
+	region?: string;
+};
+
+export type TranslationApiConfig =
+	| DeepLApiConfig
+	| CustomApiConfig
+	| YoudaoTranslationApiConfig
+	| TencentTranslationApiConfig;
 
 export enum AppSettingsGroup {
 	Common = "common",
@@ -298,10 +328,14 @@ export type CustomOcrModelConfig = {
 export enum OnlineOcrServiceType {
 	/** 有道 通用文字识别 */
 	YoudaoOcr = "youdao:ocr",
+	/** 有道 图片翻译 */
+	YoudaoImageTranslation = "youdao:imageTranslation",
 	/** 腾讯云 通用印刷体识别 */
 	TencentGeneralBasicOcr = "tencent:GeneralBasicOCR",
 	/** 腾讯云 通用文字识别（高精度版） */
 	TencentGeneralAccurateOcr = "tencent:GeneralAccurateOCR",
+	/** 腾讯云 端到端图片翻译 */
+	TencentImageTranslateLLM = "tencent:imageTranslateLLM",
 	/** 百度 通用文字识别（标准版） */
 	BaiduGeneralBasic = "baidu:GeneralBasic",
 	/** 百度 通用文字识别（高精度版） */
@@ -321,6 +355,8 @@ export type OnlineOcrModelConfig = {
 	service_type: OnlineOcrServiceType | string;
 	/** 识别语言，取值跟随对应平台文档 */
 	language: string;
+	/** 翻译目标语言，仅图片翻译类服务使用 */
+	target_language?: string;
 	/** 自定义 API 地址 */
 	api_uri?: string;
 	/** 百度 API Key */

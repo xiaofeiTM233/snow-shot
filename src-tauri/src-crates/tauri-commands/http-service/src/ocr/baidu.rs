@@ -3,11 +3,11 @@ use base64::Engine;
 use paddle_ocr_rs::ocr_result::TextBlock;
 use serde::Deserialize;
 
-use super::build_http_client;
-use super::normalize_error_code;
 use super::prepare_image_bytes;
 use super::rect_to_box_points;
 use super::OnlineOcrConfig;
+use crate::common::build_http_client;
+use crate::common::normalize_error_code;
 use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const BAIDU_TOKEN_ENDPOINT: &str = "https://aip.baidubce.com/oauth/2.0/token";
