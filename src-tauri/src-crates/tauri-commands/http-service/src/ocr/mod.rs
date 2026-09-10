@@ -7,15 +7,14 @@ mod youdao;
 
 use std::io::Cursor;
 
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 use hmac::{Hmac, Mac};
 use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-
-use super::OcrDetectResult;
+use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 pub(crate) const YOUDAO_SERVICE_TYPE_PREFIX: &str = "youdao:";
 pub(crate) const TENCENT_SERVICE_TYPE_PREFIX: &str = "tencent:";
@@ -148,8 +147,7 @@ fn prepare_image_bytes(
 
     for quality in [90u8, 80u8] {
         let mut jpeg_bytes = Vec::new();
-        let encoder =
-            image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_bytes, quality);
+        let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_bytes, quality);
         img.write_with_encoder(encoder)
             .map_err(|e| format!("[ocr_detect_online] Failed to encode image: {}", e))?;
         if BASE64_STANDARD.encode(&jpeg_bytes).len() < max_base64_length {
@@ -217,9 +215,9 @@ fn parse_bounding_box(bounding_box: &str) -> Option<Vec<Point>> {
                 })
                 .collect(),
         ),
-        len if len >= 4 => {
-            Some(rect_to_box_points(values[0], values[1], values[2], values[3]))
-        }
+        len if len >= 4 => Some(rect_to_box_points(
+            values[0], values[1], values[2], values[3],
+        )),
         _ => None,
     }
 }

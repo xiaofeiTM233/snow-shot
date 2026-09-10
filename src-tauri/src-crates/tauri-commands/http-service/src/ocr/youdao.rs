@@ -1,16 +1,16 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use super::OnlineOcrConfig;
 use super::build_http_client;
 use super::normalize_error_code;
 use super::ocr_line_to_text_block;
 use super::prepare_image_bytes;
-use crate::OcrDetectResult;
+use super::OnlineOcrConfig;
+use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const YOUDAO_OCR_ENDPOINT: &str = "https://openapi.youdao.com/ocrapi";
 const YOUDAO_MAX_IMAGE_SIDE: u32 = 2048;

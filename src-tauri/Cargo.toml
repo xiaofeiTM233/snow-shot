@@ -166,6 +166,7 @@ debug = false
 [profile.dev.package.snow-shot-tauri-commands-ocr]
 [profile.dev.package.snow-shot-tauri-commands-screenshot]
 [profile.dev.package.snow-shot-tauri-commands-scroll-screenshot]
+[profile.dev.package.snow-shot-tauri-commands-http-service]
 [profile.dev.package.snow-shot-webview]
 opt-level = 2
 debug = true

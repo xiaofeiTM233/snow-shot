@@ -1,19 +1,19 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use super::OnlineOcrConfig;
 use super::build_http_client;
 use super::clamp_to_u32;
 use super::hmac_sha256;
 use super::prepare_image_bytes;
 use super::rect_to_box_points;
 use super::utc_date_from_unix;
-use crate::OcrDetectResult;
+use super::OnlineOcrConfig;
+use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const VOLC_OCR_ENDPOINT: &str = "https://visual.volcengineapi.com/";
 const VOLC_OCR_HOST: &str = "visual.volcengineapi.com";
@@ -148,10 +148,7 @@ pub(super) async fn detect_with_volc(
     let client = build_http_client()?;
     let response = client
         .post(VOLC_OCR_ENDPOINT)
-        .query(&[
-            ("Action", VOLC_OCR_ACTION),
-            ("Version", VOLC_OCR_VERSION),
-        ])
+        .query(&[("Action", VOLC_OCR_ACTION), ("Version", VOLC_OCR_VERSION)])
         .header("Content-Type", "application/x-www-form-urlencoded")
         .header("X-Date", &x_date)
         .header("X-Content-Sha256", &body_hash)

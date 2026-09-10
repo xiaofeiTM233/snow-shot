@@ -3,7 +3,14 @@ use std::path::{Path, PathBuf};
 use num_cpus;
 use ort::session::builder::SessionBuilder;
 use paddle_ocr_rs::ocr_lite::OcrLite;
+use paddle_ocr_rs::ocr_result::TextBlock;
 use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub struct OcrDetectResult {
+    pub text_blocks: Vec<TextBlock>,
+    pub scale_factor: f32,
+}
 
 pub struct OcrService {
     hot_start: bool,

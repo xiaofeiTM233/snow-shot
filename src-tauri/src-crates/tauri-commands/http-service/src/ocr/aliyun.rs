@@ -4,13 +4,13 @@ use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use super::OnlineOcrConfig;
 use super::build_http_client;
 use super::clamp_to_u32;
 use super::hmac_sha256;
 use super::prepare_image_bytes;
 use super::utc_datetime_from_unix;
-use crate::OcrDetectResult;
+use super::OnlineOcrConfig;
+use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const ALIYUN_OCR_ENDPOINT: &str = "https://ocr-api.cn-hangzhou.aliyuncs.com/";
 const ALIYUN_OCR_HOST: &str = "ocr-api.cn-hangzhou.aliyuncs.com";
@@ -59,7 +59,9 @@ pub(super) async fn detect_with_aliyun(
     let secret_id = config.secret_id.trim();
     let secret_key = config.secret_key.trim();
     if secret_id.is_empty() || secret_key.is_empty() {
-        return Err("[ocr_detect_online] Aliyun AccessKeyId or AccessKeySecret is empty".to_string());
+        return Err(
+            "[ocr_detect_online] Aliyun AccessKeyId or AccessKeySecret is empty".to_string(),
+        );
     }
 
     let action = config
@@ -100,7 +102,10 @@ pub(super) async fn detect_with_aliyun(
         "ACS3-HMAC-SHA256\n{}",
         hex::encode(Sha256::digest(canonical_request.as_bytes()))
     );
-    let signature = hex::encode(hmac_sha256(secret_key.as_bytes(), string_to_sign.as_bytes())?);
+    let signature = hex::encode(hmac_sha256(
+        secret_key.as_bytes(),
+        string_to_sign.as_bytes(),
+    )?);
     let authorization = format!(
         "ACS3-HMAC-SHA256 Credential={},SignedHeaders={},Signature={}",
         secret_id, signed_headers, signature

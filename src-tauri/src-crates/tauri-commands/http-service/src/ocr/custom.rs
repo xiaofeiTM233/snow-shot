@@ -1,14 +1,14 @@
 use std::io::Cursor;
 
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 use serde::Deserialize;
 
-use super::OnlineOcrConfig;
 use super::build_http_client;
 use super::normalize_error_code;
 use super::ocr_line_to_text_block;
-use crate::OcrDetectResult;
+use super::OnlineOcrConfig;
+use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 #[derive(Deserialize)]
 struct CustomOcrResponse {
@@ -37,7 +37,10 @@ pub(super) async fn detect_with_custom(
     image
         .write_to(&mut Cursor::new(&mut png_bytes), image::ImageFormat::Png)
         .map_err(|e| format!("[ocr_detect_online] Failed to encode image: {}", e))?;
-    let data_url = format!("data:image/png;base64,{}", BASE64_STANDARD.encode(&png_bytes));
+    let data_url = format!(
+        "data:image/png;base64,{}",
+        BASE64_STANDARD.encode(&png_bytes)
+    );
 
     let client = build_http_client()?;
     let response = client

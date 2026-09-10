@@ -1,14 +1,14 @@
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 use paddle_ocr_rs::ocr_result::TextBlock;
 use serde::Deserialize;
 
-use super::OnlineOcrConfig;
 use super::build_http_client;
 use super::normalize_error_code;
 use super::prepare_image_bytes;
 use super::rect_to_box_points;
-use crate::OcrDetectResult;
+use super::OnlineOcrConfig;
+use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const BAIDU_TOKEN_ENDPOINT: &str = "https://aip.baidubce.com/oauth/2.0/token";
 const BAIDU_OCR_ENDPOINT: &str = "https://aip.baidubce.com/rest/2.0/ocr/v1";
@@ -91,7 +91,12 @@ pub(super) async fn detect_with_baidu(
         .map_err(|e| format!("[ocr_detect_online] Baidu token request failed: {}", e))?
         .json()
         .await
-        .map_err(|e| format!("[ocr_detect_online] Baidu parse token response failed: {}", e))?;
+        .map_err(|e| {
+            format!(
+                "[ocr_detect_online] Baidu parse token response failed: {}",
+                e
+            )
+        })?;
 
     let Some(access_token) = token_response.access_token else {
         return Err(format!(
@@ -154,12 +159,7 @@ pub(super) async fn detect_with_baidu(
             .location
             .as_ref()
             .map(|location| {
-                rect_to_box_points(
-                    location.left,
-                    location.top,
-                    location.width,
-                    location.height,
-                )
+                rect_to_box_points(location.left, location.top, location.width, location.height)
             })
             .unwrap_or_default();
 

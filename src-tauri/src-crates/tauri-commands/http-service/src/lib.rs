@@ -1,3 +1,5 @@
+pub mod ocr;
+
 use snow_shot_http_services::{S3Config, S3Service};
 
 pub async fn upload_to_s3(

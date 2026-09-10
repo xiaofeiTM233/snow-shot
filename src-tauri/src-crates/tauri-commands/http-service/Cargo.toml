@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 # 项目内依赖
+snow-shot-app-services = { workspace = true }
 snow-shot-http-services = { workspace = true }
 
 # Tauri
@@ -18,3 +19,18 @@ log = { workspace = true }
 
 # 序列化
 serde = { workspace = true }
+serde_json = { workspace = true }
+
+# HTTP 服务
+reqwest = { workspace = true }
+base64 = { workspace = true }
+sha2 = { workspace = true }
+hmac = { workspace = true }
+hex = { workspace = true }
+percent-encoding = { workspace = true }
+
+# 图像处理
+image = { workspace = true }
+
+# OCR 结果类型
+paddle-ocr-rs = "0.6.0"
