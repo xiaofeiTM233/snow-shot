@@ -1,18 +1,18 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use super::OnlineOcrConfig;
 use super::build_http_client;
 use super::clamp_to_u32;
 use super::hmac_sha256;
 use super::prepare_image_bytes;
 use super::utc_date_from_unix;
-use crate::OcrDetectResult;
+use super::OnlineOcrConfig;
+use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const TENCENT_OCR_ENDPOINT: &str = "https://ocr.tencentcloudapi.com";
 const TENCENT_OCR_HOST: &str = "ocr.tencentcloudapi.com";
@@ -141,10 +141,7 @@ pub(super) async fn detect_with_tencent(
     let secret_date = hmac_sha256(format!("TC3{}", secret_key).as_bytes(), date.as_bytes())?;
     let secret_service = hmac_sha256(&secret_date, TENCENT_OCR_SERVICE.as_bytes())?;
     let secret_signing = hmac_sha256(&secret_service, b"tc3_request")?;
-    let signature = hex::encode(hmac_sha256(
-        &secret_signing,
-        string_to_sign.as_bytes(),
-    )?);
+    let signature = hex::encode(hmac_sha256(&secret_signing, string_to_sign.as_bytes())?);
 
     let authorization = format!(
         "TC3-HMAC-SHA256 Credential={}/{}/{}/tc3_request, SignedHeaders=content-type;host;x-tc-action, Signature={}",

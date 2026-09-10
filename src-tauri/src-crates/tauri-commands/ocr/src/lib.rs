@@ -1,11 +1,7 @@
-pub mod online;
-
 use log;
-use paddle_ocr_rs::ocr_result::TextBlock;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
-use serde::Deserialize;
-use serde::Serialize;
+use snow_shot_app_services::ocr_service::OcrDetectResult;
 use snow_shot_app_services::ocr_service::OcrService;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -34,12 +30,6 @@ pub async fn ocr_init(
         .await?;
 
     Ok(())
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct OcrDetectResult {
-    pub text_blocks: Vec<TextBlock>,
-    pub scale_factor: f32,
 }
 
 fn convert_rgba_to_rgb(image: &[u8]) -> Vec<u8> {

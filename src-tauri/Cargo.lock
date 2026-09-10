@@ -6869,8 +6869,18 @@ dependencies = [
 name = "snow-shot-tauri-commands-http-service"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
+ "hex",
+ "hmac",
+ "image",
  "log",
+ "paddle-ocr-rs",
+ "percent-encoding",
+ "reqwest 0.12.24",
  "serde",
+ "serde_json",
+ "sha2",
+ "snow-shot-app-services",
  "snow-shot-http-services",
  "tauri",
  "tokio",
@@ -6880,18 +6890,10 @@ dependencies = [
 name = "snow-shot-tauri-commands-ocr"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
- "hex",
- "hmac",
  "image",
  "log",
  "paddle-ocr-rs",
- "percent-encoding",
  "rayon",
- "reqwest 0.12.24",
- "serde",
- "serde_json",
- "sha2",
  "snow-shot-app-services",
  "snow-shot-webview",
  "tauri",
