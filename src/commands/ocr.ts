@@ -40,6 +40,17 @@ export const ocrDetectOnline = async (
 	});
 };
 
+export const tableOcrOnline = async (
+	data: ArrayBuffer | Uint8Array,
+	config: OnlineOcrModelConfig,
+): Promise<string> => {
+	return await invoke<string>("table_ocr_online", data, {
+		headers: {
+			"x-ocr-config": encodeURIComponent(JSON.stringify(config)),
+		},
+	});
+};
+
 export const ocrInit = async (
 	orcPluginPath: string,
 	detModel: string | null,

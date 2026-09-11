@@ -455,6 +455,7 @@ pub fn run() {
             file::create_local_config_dir,
             ocr::ocr_detect,
             ocr::ocr_detect_online,
+            ocr::table_ocr_online,
             #[cfg(target_os = "windows")]
             ocr::ocr_detect_with_shared_buffer,
             ocr::ocr_init,

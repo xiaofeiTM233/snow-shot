@@ -45,6 +45,41 @@ const ONLINE_OCR_SERVICE_TYPE_LIST: OnlineOcrServiceTypeItem[] = [
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduImageTranslation`,
 	},
 	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduGeneralAccurate,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneralAccurate`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduGeneral,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneral`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduWebImageLocation,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduWebImageLocation`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduGeneralAccurateBasic,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneralAccurateBasic`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduGeneralBasic,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneralBasic`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduWebImage,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduWebImage`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduHandwriting,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduHandwriting`,
+	},
+	{
 		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.tencent`,
 		value: OnlineOcrServiceType.TencentGeneralBasicOcr,
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.tencentGeneralBasicOcr`,
@@ -68,6 +103,11 @@ const ONLINE_OCR_SERVICE_TYPE_LIST: OnlineOcrServiceTypeItem[] = [
 		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.aliyun`,
 		value: OnlineOcrServiceType.AliyunRecognizeGeneral,
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.aliyunRecognizeGeneral`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.aliyun`,
+		value: OnlineOcrServiceType.AliyunRecognizeHandwriting,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.aliyunRecognizeHandwriting`,
 	},
 	{
 		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.volcengine`,
@@ -232,7 +272,7 @@ const useOnlineOcrLanguageOptions = (serviceType: string | undefined) => {
 				languageList = TENCENT_GENERAL_ACCURATE_LANGUAGE_LIST;
 				break;
 			case OnlineOcrServiceType.BaiduGeneralBasic:
-			case OnlineOcrServiceType.BaiduGeneralAccurateBasic:
+			case OnlineOcrServiceType.BaiduGeneral:
 				languageList = BAIDU_LANGUAGE_LIST;
 				break;
 			default:

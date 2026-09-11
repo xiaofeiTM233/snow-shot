@@ -26,9 +26,11 @@ import {
 } from "@/pages/fixedContent/components/ocrResult";
 import { AppSettingsGroup, OcrDetectAfterAction } from "@/types/appSettings";
 import type { OcrDetectResult } from "@/types/commands/ocr";
+import { tableOcrOnline } from "@/commands/ocr";
 import type { ElementRect } from "@/types/commands/screenshot";
 import { DrawState } from "@/types/draw";
 import { writeTextToClipboard } from "@/utils/clipboard";
+import { appError } from "@/utils/log";
 import { executeTranslateOcrText } from "@/functions/tools";
 import { ScreenshotType } from "@/utils/types";
 import { zIndexs } from "@/utils/zIndex";
@@ -238,6 +240,104 @@ export const OcrBlocks: React.FC<{
 		onConvertImageToVisionModelFormat("markdown");
 	}, [onConvertImageToVisionModelFormat]);
 
+	const [tableRecognitionLoading, setTableRecognitionLoading] =
+		useState(false);
+	const hasBaiduTableOcrConfig = !!getAppSettings()[
+		AppSettingsGroup.FunctionOcr
+	].onlineOcrModelConfigList?.some((item) =>
+		item.service_type.startsWith("baidu:"),
+	);
+	const hasAliyunTableOcrConfig = !!getAppSettings()[
+		AppSettingsGroup.FunctionOcr
+	].onlineOcrModelConfigList?.some((item) =>
+		item.service_type.startsWith("aliyun:"),
+	);
+
+	const onTableRecognition = useCallback(
+		async (provider: "baidu" | "aliyun") => {
+			const config = getAppSettings()[
+				AppSettingsGroup.FunctionOcr
+			].onlineOcrModelConfigList?.find((item) =>
+				item.service_type.startsWith(`${provider}:`),
+			);
+			if (!config) {
+				message.error(
+					intl.formatMessage({ id: "draw.ocrResult.tableOcrConfigMissing" }),
+				);
+				return;
+			}
+
+			const selectRectParams =
+				selectLayerActionRef.current?.getSelectRectParams();
+			const imageLayerAction = imageLayerActionRef.current;
+			const drawLayerAction = drawLayerActionRef.current;
+			if (!selectRectParams || !imageLayerAction || !drawLayerAction) {
+				return;
+			}
+
+			if (
+				selectRectParams.rect.max_x - selectRectParams.rect.min_x < 10 ||
+				selectRectParams.rect.max_y - selectRectParams.rect.min_y < 10
+			) {
+				message.error(
+					intl.formatMessage({ id: "draw.ocrResult.imageTooSmall" }),
+				);
+				return;
+			}
+
+			const screenshotCanvas = await getCanvas(
+				selectRectParams,
+				imageLayerAction,
+				drawLayerAction,
+				true,
+				true,
+				INIT_CONTAINER_KEY,
+			);
+
+			if (!screenshotCanvas) {
+				return;
+			}
+
+			setTableRecognitionLoading(true);
+			try {
+				const blob = await new Promise<Blob | null>((resolve) =>
+					screenshotCanvas.toBlob(resolve, "image/png"),
+				);
+				if (!blob) {
+					throw new Error("canvas toBlob failed");
+				}
+				const data = new Uint8Array(await blob.arrayBuffer());
+				const html = await tableOcrOnline(data, config);
+				ocrResultActionRef.current?.setVisionModelHtmlResult({
+					text_blocks: [
+						{
+							text: html,
+							box_points: [],
+							text_score: 0,
+						},
+					],
+					scale_factor: 1,
+				});
+			} catch (error) {
+				appError("[onTableRecognition] error", error);
+				message.error(
+					intl.formatMessage({ id: "draw.ocrResult.tableOcrError" }),
+				);
+			} finally {
+				setTableRecognitionLoading(false);
+			}
+		},
+		[
+			selectLayerActionRef,
+			imageLayerActionRef,
+			drawLayerActionRef,
+			getAppSettings,
+			intl,
+			message,
+			ocrResultActionRef,
+		],
+	);
+
 	const onTranslateOcrToPage = useCallback(() => {
 		if (!ocrResult?.result) {
 			return;
@@ -258,6 +358,10 @@ export const OcrBlocks: React.FC<{
 					onTranslateOcrToPage={onTranslateOcrToPage}
 					onConvertImageToHtml={onConvertImageToHtml}
 					onConvertImageToMarkdown={onConvertImageToMarkdown}
+					onTableRecognition={onTableRecognition}
+					tableRecognitionLoading={tableRecognitionLoading}
+					hasBaiduTableOcrConfig={hasBaiduTableOcrConfig}
+					hasAliyunTableOcrConfig={hasAliyunTableOcrConfig}
 					currentOcrResult={currentOcrResult}
 					ocrResult={ocrResult}
 					translatedOcrResult={translatedOcrResult}

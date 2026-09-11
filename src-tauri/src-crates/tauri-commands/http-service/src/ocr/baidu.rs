@@ -54,27 +54,7 @@ struct BaiduLocation {
     height: f64,
 }
 
-pub(super) async fn detect_with_baidu(
-    config: &OnlineOcrConfig,
-    image: &image::DynamicImage,
-    detect_angle: bool,
-) -> Result<OcrDetectResult, String> {
-    // 凭据去除首尾空白，避免复制粘贴引入空格导致鉴权失败
-    let api_key = config.api_key.trim();
-    let secret_key = config.secret_key.trim();
-    if api_key.is_empty() || secret_key.is_empty() {
-        return Err("[ocr_detect_online] Baidu API Key or Secret Key is empty".to_string());
-    }
-
-    let action = config
-        .service_type
-        .strip_prefix(super::BAIDU_SERVICE_TYPE_PREFIX)
-        .unwrap_or("GeneralBasic");
-    let path = match action {
-        "GeneralAccurateBasic" => "accurate_basic",
-        _ => "general_basic",
-    };
-
+pub(crate) async fn get_access_token(api_key: &str, secret_key: &str) -> Result<String, String> {
     let client = build_http_client()?;
 
     // 通过 API Key / Secret Key 换取 access_token
@@ -105,6 +85,41 @@ pub(super) async fn detect_with_baidu(
         ));
     };
 
+    Ok(access_token)
+}
+
+pub(super) async fn detect_with_baidu(
+    config: &OnlineOcrConfig,
+    image: &image::DynamicImage,
+    detect_angle: bool,
+) -> Result<OcrDetectResult, String> {
+    // 凭据去除首尾空白，避免复制粘贴引入空格导致鉴权失败
+    let api_key = config.api_key.trim();
+    let secret_key = config.secret_key.trim();
+    if api_key.is_empty() || secret_key.is_empty() {
+        return Err("[ocr_detect_online] Baidu API Key or Secret Key is empty".to_string());
+    }
+
+    let access_token = get_access_token(api_key, secret_key).await?;
+
+    let action = config
+        .service_type
+        .strip_prefix(super::BAIDU_SERVICE_TYPE_PREFIX)
+        .unwrap_or("GeneralBasic");
+    let path = match action {
+        "General" => "general",
+        "GeneralAccurateBasic" => "accurate_basic",
+        "GeneralAccurate" => "accurate",
+        "WebImage" => "webimage",
+        "WebImageLocation" => "webimage_location",
+        "Handwriting" => "handwriting",
+        _ => "general_basic",
+    };
+    // 仅标准版/标准含位置版支持 language_type 参数
+    let supports_language_type = matches!(path, "general_basic" | "general");
+
+    let client = build_http_client()?;
+
     let image_bytes = prepare_image_bytes(image, BAIDU_MAX_IMAGE_SIDE, BAIDU_MAX_BASE64_LENGTH)?;
     let img_base64 = BASE64_STANDARD.encode(&image_bytes);
 
@@ -115,17 +130,19 @@ pub(super) async fn detect_with_baidu(
         config.language.as_str()
     };
 
+    let mut form: Vec<(&str, &str)> = vec![("image", img_base64.as_str())];
+    if supports_language_type {
+        form.push(("language_type", language_type));
+    }
+    form.push((
+        "detect_direction",
+        if detect_angle { "true" } else { "false" },
+    ));
+
     let response = client
         .post(format!("{}/{}", BAIDU_OCR_ENDPOINT, path))
         .query(&[("access_token", access_token.as_str())])
-        .form(&[
-            ("image", img_base64.as_str()),
-            ("language_type", language_type),
-            (
-                "detect_direction",
-                if detect_angle { "true" } else { "false" },
-            ),
-        ])
+        .form(&form)
         .send()
         .await
         .map_err(|e| format!("[ocr_detect_online] Baidu request failed: {}", e))?;

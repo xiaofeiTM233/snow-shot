@@ -364,12 +364,24 @@ export enum OnlineOcrServiceType {
 	TencentGeneralBasicOcr = "tencent:GeneralBasicOCR",
 	/** 腾讯云 通用文字识别（高精度版） */
 	TencentGeneralAccurateOcr = "tencent:GeneralAccurateOCR",
+	/** 百度 通用文字识别（高精度含位置版） */
+	BaiduGeneralAccurate = "baidu:GeneralAccurate",
+	/** 百度 通用文字识别（标准含位置版） */
+	BaiduGeneral = "baidu:General",
+	/** 百度 网络图片文字识别（含位置版） */
+	BaiduWebImageLocation = "baidu:WebImageLocation",
 	/** 百度 通用文字识别（标准版） */
 	BaiduGeneralBasic = "baidu:GeneralBasic",
 	/** 百度 通用文字识别（高精度版） */
 	BaiduGeneralAccurateBasic = "baidu:GeneralAccurateBasic",
+	/** 百度 网络图片文字识别 */
+	BaiduWebImage = "baidu:WebImage",
+	/** 百度 手写文字识别 */
+	BaiduHandwriting = "baidu:Handwriting",
 	/** 阿里云 通用文字识别 */
 	AliyunRecognizeGeneral = "aliyun:RecognizeGeneral",
+	/** 阿里云 通用手写体识别 */
+	AliyunRecognizeHandwriting = "aliyun:RecognizeHandwriting",
 	/** 火山引擎 通用文字识别 */
 	VolcengineOcrNormal = "volcengine:OCRNormal",
 	/** 自定义 API */

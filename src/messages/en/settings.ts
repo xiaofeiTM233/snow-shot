@@ -777,18 +777,26 @@ export const settings = {
 		"Image Translation",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduImageTranslation":
 		"Image Translation",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneralAccurate":
+		"General OCR (Accurate with Location)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneral":
+		"General OCR (Standard with Location)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduWebImageLocation":
+		"Web Image OCR (with Location)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduWebImage":
+		"Web Image OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduHandwriting":
+		"Handwriting OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralBasicOcr":
 		"General Printed Text OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralAccurateOcr":
 		"General Accurate OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.custom":
 		"Custom",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneralBasic":
-		"General OCR",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneralAccurateBasic":
-		"General Accurate OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunRecognizeGeneral":
 		"General OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunRecognizeHandwriting":
+		"Handwriting OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.volcengineOcrNormal":
 		"General OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri": "API URI",

@@ -1,6 +1,7 @@
 mod aliyun;
 mod baidu;
 mod custom;
+pub mod table;
 mod tencent;
 mod volcengine;
 mod youdao;

@@ -236,6 +236,13 @@ export const draw = {
 		"Converting to vision model format",
 	"draw.ocrResult.convertImageToVisionModelFormatError":
 		"Vision model conversion failed",
+	"draw.ocrDetect.tableRecognition": "Table Recognition",
+	"draw.ocrDetect.tableRecognition.visionModel": "Vision Model",
+	"draw.ocrDetect.tableRecognition.baidu": "Baidu Table OCR",
+	"draw.ocrDetect.tableRecognition.aliyun": "Alibaba Cloud Table OCR",
+	"draw.ocrResult.tableOcrConfigMissing":
+		"No corresponding online OCR service configured, please add one in app settings first",
+	"draw.ocrResult.tableOcrError": "Table recognition failed",
 	"draw.ocrDetect.visionModelHtml": "Convert to HTML",
 	"draw.ocrDetect.openTranslation": "Open in Translation",
 	"draw.openTranslationTool": "Open in Translation",

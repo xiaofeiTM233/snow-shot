@@ -98,6 +98,7 @@ export type OcrResultActionType = {
 	switchOcrResult: (ocrResultType: OcrResultType) => void;
 	convertImageToHtml: (canvas: HTMLCanvasElement) => Promise<void>;
 	convertImageToMarkdown: (canvas: HTMLCanvasElement) => Promise<void>;
+	setVisionModelHtmlResult: (result: OcrDetectResult) => void;
 };
 
 export const covertOcrResultToText = (ocrResult: OcrDetectResult) => {
@@ -1386,6 +1387,10 @@ export const OcrResult: React.FC<{
 			convertImageToMarkdown: async (canvas: HTMLCanvasElement) => {
 				return await convertImageToVisionModelFormat(canvas, "markdown");
 			},
+			setVisionModelHtmlResult: (result: OcrDetectResult) => {
+				setVisionModelHtmlResult({ result, ignoreScale: false });
+				updateOcrTextElements(result, false, OcrResultType.VisionModelHtml);
+			},
 		}),
 		[
 			getSelectedText,
@@ -1405,6 +1410,7 @@ export const OcrResult: React.FC<{
 			convertImageToVisionModelFormat,
 			visionModelHtmlResultRef,
 			visionModelMarkdownResultRef,
+			setVisionModelHtmlResult,
 		],
 	);
 

@@ -1,4 +1,5 @@
-import { Button } from "antd";
+import { Button, Dropdown } from "antd";
+import { TableOutlined } from "@ant-design/icons";
 import { useCallback, useState } from "react";
 import { useIntl } from "react-intl";
 import { DrawStatePublisher } from "@/components/drawCore/extra";
@@ -34,6 +35,10 @@ const OcrTool: React.FC<{
 	onTranslateOcrToPage: () => void;
 	onConvertImageToHtml: () => void;
 	onConvertImageToMarkdown: () => void;
+	onTableRecognition: (provider: "baidu" | "aliyun") => void;
+	tableRecognitionLoading: boolean;
+	hasBaiduTableOcrConfig: boolean;
+	hasAliyunTableOcrConfig: boolean;
 	currentOcrResult:
 		| (AppOcrResult & { ocrResultType: OcrResultType })
 		| undefined;
@@ -50,6 +55,10 @@ const OcrTool: React.FC<{
 	onTranslateOcrToPage,
 	onConvertImageToHtml,
 	onConvertImageToMarkdown,
+	onTableRecognition,
+	tableRecognitionLoading,
+	hasBaiduTableOcrConfig,
+	hasAliyunTableOcrConfig,
 	currentOcrResult,
 	ocrResult,
 	translatedOcrResult,
@@ -127,6 +136,50 @@ const OcrTool: React.FC<{
 				/>,
 				...(isReadyStatus?.(PLUGIN_ID_AI_CHAT)
 					? [
+							<Dropdown
+								menu={{
+									items: [
+										{
+											key: "visionModel",
+											label: intl.formatMessage({
+												id: "draw.ocrDetect.tableRecognition.visionModel",
+											}),
+											onClick: onConvertImageToHtml,
+										},
+										{ type: "divider" },
+										{
+											key: "baidu",
+											label: intl.formatMessage({
+												id: "draw.ocrDetect.tableRecognition.baidu",
+											}),
+											disabled: !hasBaiduTableOcrConfig,
+											onClick: () => {
+												onTableRecognition("baidu");
+											},
+										},
+										{
+											key: "aliyun",
+											label: intl.formatMessage({
+												id: "draw.ocrDetect.tableRecognition.aliyun",
+											}),
+											disabled: !hasAliyunTableOcrConfig,
+											onClick: () => {
+												onTableRecognition("aliyun");
+											},
+										},
+									],
+								}}
+								key="tableRecognition"
+							>
+								<Button
+									loading={tableRecognitionLoading}
+									type="text"
+									icon={<TableOutlined />}
+									title={intl.formatMessage({
+										id: "draw.ocrDetect.tableRecognition",
+									})}
+								/>
+							</Dropdown>,
 							<Button
 								loading={visionModelHtmlLoading}
 								onClick={() => {

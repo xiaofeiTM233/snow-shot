@@ -61,6 +61,11 @@ pub async fn ocr_detect_online(request: tauri::ipc::Request<'_>) -> Result<OcrDe
 }
 
 #[command]
+pub async fn table_ocr_online(request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    snow_shot_tauri_commands_http_service::ocr::table::table_ocr_online(request).await
+}
+
+#[command]
 pub async fn ocr_release(ocr_instance: tauri::State<'_, Mutex<OcrService>>) -> Result<(), String> {
     snow_shot_tauri_commands_ocr::ocr_release(ocr_instance).await
 }

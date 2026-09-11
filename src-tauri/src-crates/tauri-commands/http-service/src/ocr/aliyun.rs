@@ -16,6 +16,15 @@ const ALIYUN_OCR_HOST: &str = "ocr-api.cn-hangzhou.aliyuncs.com";
 const ALIYUN_OCR_VERSION: &str = "2021-07-07";
 const ALIYUN_MAX_BASE64_LENGTH: usize = 9_500_000;
 
+/// 供表格识别等其他 OCR 接口复用的接入点信息
+pub(crate) fn host() -> &'static str {
+    ALIYUN_OCR_HOST
+}
+
+pub(crate) fn endpoint() -> &'static str {
+    ALIYUN_OCR_ENDPOINT
+}
+
 #[derive(Deserialize)]
 struct AliyunOcrResponse {
     /// Data 为内嵌 JSON 的字符串

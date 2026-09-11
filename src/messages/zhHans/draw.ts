@@ -222,6 +222,13 @@ export const draw = {
 	"draw.ocrResult.imageTooSmall": "所选区域过小，无法进行视觉理解",
 	"draw.ocrResult.convertImageToVisionModelFormatLoading": "视觉理解模型转换中",
 	"draw.ocrResult.convertImageToVisionModelFormatError": "视觉理解模型转换失败",
+	"draw.ocrDetect.tableRecognition": "表格识别",
+	"draw.ocrDetect.tableRecognition.visionModel": "视觉模型解析",
+	"draw.ocrDetect.tableRecognition.baidu": "百度表格识别",
+	"draw.ocrDetect.tableRecognition.aliyun": "阿里云表格识别",
+	"draw.ocrResult.tableOcrConfigMissing":
+		"未配置对应的在线 OCR 服务，请先在应用设置中添加",
+	"draw.ocrResult.tableOcrError": "表格识别失败",
 	"draw.ocrDetect.visionModelHtml": "转换为 HTML",
 	"draw.ocrDetect.openTranslation": "转到翻译页",
 	"draw.openTranslationTool": "转到翻译页",

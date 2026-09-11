@@ -740,6 +740,16 @@ export const settings = {
 		"圖片翻譯",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduImageTranslation":
 		"圖片翻譯",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneralAccurate":
+		"通用文字識別（高精度含位置版）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneral":
+		"通用文字識別（標準含位置版）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduWebImageLocation":
+		"網絡圖片文字識別（含位置版）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduWebImage":
+		"網絡圖片文字識別",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduHandwriting":
+		"手寫文字識別",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralBasicOcr":
 		"通用印刷體識別",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralAccurateOcr":
@@ -752,6 +762,8 @@ export const settings = {
 		"通用文字識別（高精度版）",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunRecognizeGeneral":
 		"通用文字識別",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunRecognizeHandwriting":
+		"通用手寫體識別",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.volcengineOcrNormal":
 		"通用文字識別",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri": "API 位址",
