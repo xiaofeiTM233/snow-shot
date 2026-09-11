@@ -30,6 +30,21 @@ const ONLINE_OCR_SERVICE_TYPE_LIST: OnlineOcrServiceTypeItem[] = [
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.youdaoImageTranslation`,
 	},
 	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.aliyun`,
+		value: OnlineOcrServiceType.AliyunImageTranslation,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.aliyunImageTranslation`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.volcengine`,
+		value: OnlineOcrServiceType.VolcengineImageTranslation,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.volcengineImageTranslation`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduImageTranslation,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduImageTranslation`,
+	},
+	{
 		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.tencent`,
 		value: OnlineOcrServiceType.TencentGeneralBasicOcr,
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.tencentGeneralBasicOcr`,
@@ -241,6 +256,9 @@ const useOnlineOcrTargetLanguageOptions = (
 		let languageList: OnlineOcrLanguageItem[];
 		switch (serviceType) {
 			case OnlineOcrServiceType.YoudaoImageTranslation:
+			case OnlineOcrServiceType.AliyunImageTranslation:
+			case OnlineOcrServiceType.VolcengineImageTranslation:
+			case OnlineOcrServiceType.BaiduImageTranslation:
 				languageList = YOUDAO_LANGUAGE_LIST;
 				break;
 			default:
@@ -563,7 +581,8 @@ export const OnlineOcrConfig = () => {
 
 						if (
 							service_type === OnlineOcrServiceType.BaiduGeneralBasic ||
-							service_type === OnlineOcrServiceType.BaiduGeneralAccurateBasic
+							service_type === OnlineOcrServiceType.BaiduGeneralAccurateBasic ||
+							service_type === OnlineOcrServiceType.BaiduImageTranslation
 						) {
 							return (
 								<>
@@ -615,7 +634,10 @@ export const OnlineOcrConfig = () => {
 							);
 						}
 
-						if (service_type === OnlineOcrServiceType.AliyunRecognizeGeneral) {
+						if (
+							service_type === OnlineOcrServiceType.AliyunRecognizeGeneral ||
+							service_type === OnlineOcrServiceType.AliyunImageTranslation
+						) {
 							return (
 								<>
 									<Col span={12}>
@@ -666,7 +688,10 @@ export const OnlineOcrConfig = () => {
 							);
 						}
 
-						if (service_type === OnlineOcrServiceType.VolcengineOcrNormal) {
+						if (
+							service_type === OnlineOcrServiceType.VolcengineOcrNormal ||
+							service_type === OnlineOcrServiceType.VolcengineImageTranslation
+						) {
 							return (
 								<>
 									<Col span={12}>

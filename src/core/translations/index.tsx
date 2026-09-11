@@ -213,6 +213,18 @@ export const useTranslationRequest = (options?: {
 					return intl.formatMessage({
 						id: "tools.translation.type.youdaoApi",
 					});
+				case TranslationApiType.Aliyun:
+					return intl.formatMessage({
+						id: "tools.translation.type.aliyunApi",
+					});
+				case TranslationApiType.Volcengine:
+					return intl.formatMessage({
+						id: "tools.translation.type.volcengineApi",
+					});
+				case TranslationApiType.Baidu:
+					return intl.formatMessage({
+						id: "tools.translation.type.baiduApi",
+					});
 				default:
 					return apiConfigType;
 			}
@@ -410,7 +422,12 @@ export const useTranslationRequest = (options?: {
 					};
 				}
 
-				if (apiConfig.api_type === TranslationApiType.Youdao) {
+				if (
+					apiConfig.api_type === TranslationApiType.Youdao ||
+					apiConfig.api_type === TranslationApiType.Aliyun ||
+					apiConfig.api_type === TranslationApiType.Volcengine ||
+					apiConfig.api_type === TranslationApiType.Baidu
+				) {
 					setStartTranslateLoading(true);
 
 					let result: OnlineTranslateResult | undefined;

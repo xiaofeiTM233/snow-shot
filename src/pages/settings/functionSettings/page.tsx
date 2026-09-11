@@ -597,6 +597,41 @@ export const FunctionSettingsPage = () => {
 				}),
 				value: TranslationApiType.Youdao,
 			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.translationSettings.apiConfig.apiType.aliyun",
+				}),
+				value: TranslationApiType.Aliyun,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.translationSettings.apiConfig.apiType.volcengine",
+				}),
+				value: TranslationApiType.Volcengine,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.translationSettings.apiConfig.apiType.baidu",
+				}),
+				value: TranslationApiType.Baidu,
+			},
+		];
+	}, [intl]);
+
+	const aliyunTranslationServiceTypeOptions = useMemo(() => {
+		return [
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.translationSettings.apiConfig.aliyunService.general",
+				}),
+				value: "aliyun:general",
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.functionSettings.translationSettings.apiConfig.aliyunService.professional",
+				}),
+				value: "aliyun:professional",
+			},
 		];
 	}, [intl]);
 
@@ -2087,13 +2122,183 @@ export const FunctionSettingsPage = () => {
 																	/>
 																</Col>
 															</>
-															);
-														}
-														return null;
-													}}
-												</ProFormDependency>
-											</Row>
-										</ProFormList>
+																);
+															}
+
+															if (api_type === TranslationApiType.Aliyun) {
+																return (
+																	<>
+																		<Col span={12}>
+																			<ProFormSelect
+																				name="service_type"
+																				label={
+																					<IconLabel
+																						label={
+																							<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.aliyunServiceType" />
+																						}
+																					/>
+																				}
+																				allowClear={false}
+																				initialValue="aliyun:general"
+																				options={aliyunTranslationServiceTypeOptions}
+																			/>
+																		</Col>
+																		<Col span={12}>
+																			<ProFormText
+																				name="secret_id"
+																				label={
+																					<IconLabel
+																						label={
+																							<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.accessKeyId" />
+																						}
+																					/>
+																				}
+																				rules={[
+																					{
+																						required: true,
+																						message: intl.formatMessage({
+																							id: "settings.functionSettings.translationSettings.apiConfig.accessKeyId.required",
+																						}),
+																					},
+																				]}
+																			/>
+																		</Col>
+																		<Col span={12}>
+																			<ProFormText.Password
+																				name="secret_key"
+																				label={
+																					<IconLabel
+																						label={
+																							<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.accessKeySecret" />
+																						}
+																					/>
+																				}
+																				rules={[
+																					{
+																						required: true,
+																						message: intl.formatMessage({
+																							id: "settings.functionSettings.translationSettings.apiConfig.accessKeySecret.required",
+																						}),
+																					},
+																				]}
+																			/>
+																		</Col>
+																	</>
+																);
+															}
+
+															if (api_type === TranslationApiType.Volcengine) {
+																return (
+																	<>
+																		<Col span={12}>
+																			<ProFormText
+																				name="secret_id"
+																				label={
+																					<IconLabel
+																						label={
+																							<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.accessKeyId" />
+																						}
+																					/>
+																				}
+																				rules={[
+																					{
+																						required: true,
+																						message: intl.formatMessage({
+																							id: "settings.functionSettings.translationSettings.apiConfig.accessKeyId.required",
+																						}),
+																					},
+																				]}
+																			/>
+																		</Col>
+																		<Col span={12}>
+																			<ProFormText.Password
+																				name="secret_key"
+																				label={
+																					<IconLabel
+																						label={
+																							<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.accessKeySecret" />
+																						}
+																					/>
+																				}
+																				rules={[
+																					{
+																						required: true,
+																						message: intl.formatMessage({
+																							id: "settings.functionSettings.translationSettings.apiConfig.accessKeySecret.required",
+																						}),
+																					},
+																				]}
+																			/>
+																		</Col>
+																		<Col span={12}>
+																			<ProFormText
+																				name="region"
+																				initialValue="cn-north-1"
+																				placeholder="cn-north-1"
+																				label={
+																					<IconLabel
+																						label={
+																							<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.region" />
+																						}
+																					/>
+																				}
+																			/>
+																		</Col>
+																	</>
+																);
+															}
+
+															if (api_type === TranslationApiType.Baidu) {
+																return (
+																	<>
+																		<Col span={12}>
+																			<ProFormText
+																				name="api_key"
+																				label={
+																					<IconLabel
+																						label={
+																							<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiKey" />
+																						}
+																					/>
+																				}
+																				rules={[
+																					{
+																						required: true,
+																						message: intl.formatMessage({
+																							id: "settings.functionSettings.translationSettings.apiConfig.apiKey.required",
+																						}),
+																					},
+																				]}
+																			/>
+																		</Col>
+																		<Col span={12}>
+																			<ProFormText.Password
+																				name="secret_key"
+																				label={
+																					<IconLabel
+																						label={
+																							<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.secretKey" />
+																						}
+																					/>
+																				}
+																				rules={[
+																					{
+																						required: true,
+																						message: intl.formatMessage({
+																							id: "settings.functionSettings.translationSettings.apiConfig.secretKey.required",
+																						}),
+																					},
+																				]}
+																			/>
+																		</Col>
+																	</>
+																);
+															}
+															return null;
+														}}
+													</ProFormDependency>
+												</Row>
+											</ProFormList>
 								</Col>
 							</Row>
 

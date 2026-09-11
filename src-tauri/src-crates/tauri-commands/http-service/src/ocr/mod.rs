@@ -90,6 +90,12 @@ pub async fn ocr_detect_online(
     // 图片翻译类服务需要在前缀判断之前处理，避免被同名厂商的 OCR 服务拦截
     if config.service_type == crate::translation::YOUDAO_IMAGE_TRANSLATION_SERVICE_TYPE {
         crate::translation::youdao::translate_image_as_ocr(&config, &image).await
+    } else if config.service_type == crate::translation::ALIYUN_IMAGE_TRANSLATION_SERVICE_TYPE {
+        crate::translation::aliyun::translate_image_as_ocr(&config, &image).await
+    } else if config.service_type == crate::translation::VOLC_IMAGE_TRANSLATION_SERVICE_TYPE {
+        crate::translation::volcengine::translate_image_as_ocr(&config, &image).await
+    } else if config.service_type == crate::translation::BAIDU_IMAGE_TRANSLATION_SERVICE_TYPE {
+        crate::translation::baidu::translate_image_as_ocr(&config, &image).await
     } else if config.service_type.starts_with(YOUDAO_SERVICE_TYPE_PREFIX) {
         youdao::detect_with_youdao(&config, &image, detect_angle).await
     } else if config.service_type.starts_with(TENCENT_SERVICE_TYPE_PREFIX) {

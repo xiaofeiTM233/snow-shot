@@ -526,6 +526,32 @@ export const settings = {
 		"应用密钥（appSecret）",
 	"settings.functionSettings.translationSettings.apiConfig.appSecret.required":
 		"请输入应用密钥（appSecret）",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.aliyun":
+		"阿里云翻译",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.volcengine":
+		"火山引擎翻译",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.baidu":
+		"百度翻译",
+	"settings.functionSettings.translationSettings.apiConfig.aliyunServiceType":
+		"阿里服务",
+	"settings.functionSettings.translationSettings.apiConfig.aliyunService.general":
+		"通用版",
+	"settings.functionSettings.translationSettings.apiConfig.aliyunService.professional":
+		"专业版",
+	"settings.functionSettings.translationSettings.apiConfig.accessKeyId":
+		"AccessKeyId",
+	"settings.functionSettings.translationSettings.apiConfig.accessKeyId.required":
+		"请输入 AccessKeyId",
+	"settings.functionSettings.translationSettings.apiConfig.accessKeySecret":
+		"AccessKeySecret",
+	"settings.functionSettings.translationSettings.apiConfig.accessKeySecret.required":
+		"请输入 AccessKeySecret",
+	"settings.functionSettings.translationSettings.apiConfig.secretKey":
+		"Secret Key",
+	"settings.functionSettings.translationSettings.apiConfig.secretKey.required":
+		"请输入 Secret Key",
+	"settings.functionSettings.translationSettings.apiConfig.region":
+		"地域（Region）",
 	"settings.functionSettings.trayIconSettings": "托盘",
 	"settings.functionSettings.trayIconSettings.iconClickAction": "左键点击后",
 	"settings.functionSettings.trayIconSettings.iconClickAction.screenshot":
@@ -707,6 +733,12 @@ export const settings = {
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoOcr":
 		"通用文字识别",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoImageTranslation":
+		"图片翻译",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunImageTranslation":
+		"图片翻译",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.volcengineImageTranslation":
+		"图片翻译",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduImageTranslation":
 		"图片翻译",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralBasicOcr":
 		"通用印刷体识别",

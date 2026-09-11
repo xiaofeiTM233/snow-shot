@@ -22,7 +22,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 
 # HTTP 服务
-reqwest = { workspace = true, features = ["json"] }
+reqwest = { workspace = true, features = ["json", "multipart"] }
 base64 = { workspace = true }
 sha2 = { workspace = true }
 hmac = { workspace = true }

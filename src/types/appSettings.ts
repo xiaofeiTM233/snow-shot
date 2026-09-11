@@ -120,6 +120,9 @@ export enum TranslationApiType {
 	DeepL = "translation_api_deepl",
 	Custom = "translation_api_custom",
 	Youdao = "translation_api_youdao",
+	Aliyun = "translation_api_aliyun",
+	Volcengine = "translation_api_volcengine",
+	Baidu = "translation_api_baidu",
 }
 
 export type DeepLApiConfig = {
@@ -153,7 +156,43 @@ export type YoudaoTranslationApiConfig = {
 	app_secret: string;
 };
 
-export type TranslationApiConfig = DeepLApiConfig | CustomApiConfig | YoudaoTranslationApiConfig;
+export type AliyunTranslationApiConfig = {
+	api_type: TranslationApiType.Aliyun;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
+	/** 阿里云服务类型：通用版 / 专业版 */
+	service_type: "aliyun:general" | "aliyun:professional";
+	secret_id: string;
+	secret_key: string;
+};
+
+export type VolcengineTranslationApiConfig = {
+	api_type: TranslationApiType.Volcengine;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
+	secret_id: string;
+	secret_key: string;
+	/** 火山引擎 地域，默认 cn-north-1 */
+	region?: string;
+};
+
+export type BaiduTranslationApiConfig = {
+	api_type: TranslationApiType.Baidu;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
+	/** 百度智能云 API Key（AK） */
+	api_key: string;
+	/** 百度智能云 Secret Key（SK） */
+	secret_key: string;
+};
+
+export type TranslationApiConfig =
+	| DeepLApiConfig
+	| CustomApiConfig
+	| YoudaoTranslationApiConfig
+	| AliyunTranslationApiConfig
+	| VolcengineTranslationApiConfig
+	| BaiduTranslationApiConfig;
 
 export enum AppSettingsGroup {
 	Common = "common",
@@ -315,6 +354,12 @@ export enum OnlineOcrServiceType {
 	YoudaoOcr = "youdao:ocr",
 	/** 有道 图片翻译 */
 	YoudaoImageTranslation = "youdao:imageTranslation",
+	/** 阿里云 图片翻译 */
+	AliyunImageTranslation = "aliyun:imageTranslation",
+	/** 火山引擎 图片翻译 */
+	VolcengineImageTranslation = "volcengine:imageTranslation",
+	/** 百度 图片翻译 */
+	BaiduImageTranslation = "baidu:imageTranslation",
 	/** 腾讯云 通用印刷体识别 */
 	TencentGeneralBasicOcr = "tencent:GeneralBasicOCR",
 	/** 腾讯云 通用文字识别（高精度版） */

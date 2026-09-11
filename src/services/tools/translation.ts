@@ -1,7 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+	BaiduTranslationApiConfig,
 	CustomApiConfig,
+	VolcengineTranslationApiConfig,
 	YoudaoTranslationApiConfig,
+	AliyunTranslationApiConfig,
 } from "@/types/appSettings";
 import type {
 	DeepLTranslateResult,
@@ -310,10 +313,14 @@ export type OnlineTranslateResult = {
 };
 
 /**
- * 厂商机器翻译 API（有道智云），由 Rust 侧完成签名与请求
+ * 厂商机器翻译 API（有道 / 阿里云 / 火山引擎 / 百度智能云），由 Rust 侧完成签名与请求
  */
 export const translateTextOnline = async (
-	config: YoudaoTranslationApiConfig,
+	config:
+		| YoudaoTranslationApiConfig
+		| AliyunTranslationApiConfig
+		| VolcengineTranslationApiConfig
+		| BaiduTranslationApiConfig,
 	sourceContent: string[],
 	sourceLanguage: string,
 	targetLanguage: string,

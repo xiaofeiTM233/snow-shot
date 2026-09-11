@@ -21,6 +21,11 @@ pub(crate) fn hmac_sha256(key: &[u8], data: &[u8]) -> Result<Vec<u8>, String> {
     Ok(mac.finalize().into_bytes().to_vec())
 }
 
+pub(crate) fn sha256_hex(data: &[u8]) -> String {
+    use sha2::Digest;
+    hex::encode(Sha256::digest(data))
+}
+
 /// 由 Unix 时间戳计算 UTC 日期（yyyy-MM-dd），用于 TC3 / V4 签名
 pub(crate) fn utc_date_from_unix(timestamp: u64) -> String {
     let days = (timestamp / 86_400) as i64;
