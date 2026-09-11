@@ -62,7 +62,6 @@ export const tools = {
 	"tools.translation.type.google": "谷歌翻譯",
 	"tools.translation.type.microsoft": "微軟翻譯",
 	"tools.translation.type.youdaoApi": "有道翻譯 API",
-	"tools.translation.type.tencentApi": "騰訊雲翻譯 API",
 	"tools.translation.domain.general": "通用領域",
 	"tools.translation.domain.computers": "電腦領域",
 	"tools.translation.domain.medicine": "醫學領域",

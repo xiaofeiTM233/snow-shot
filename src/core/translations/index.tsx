@@ -213,10 +213,6 @@ export const useTranslationRequest = (options?: {
 					return intl.formatMessage({
 						id: "tools.translation.type.youdaoApi",
 					});
-				case TranslationApiType.Tencent:
-					return intl.formatMessage({
-						id: "tools.translation.type.tencentApi",
-					});
 				default:
 					return apiConfigType;
 			}
@@ -414,10 +410,7 @@ export const useTranslationRequest = (options?: {
 					};
 				}
 
-				if (
-					apiConfig.api_type === TranslationApiType.Youdao ||
-					apiConfig.api_type === TranslationApiType.Tencent
-				) {
+				if (apiConfig.api_type === TranslationApiType.Youdao) {
 					setStartTranslateLoading(true);
 
 					let result: OnlineTranslateResult | undefined;

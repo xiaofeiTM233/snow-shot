@@ -40,11 +40,6 @@ const ONLINE_OCR_SERVICE_TYPE_LIST: OnlineOcrServiceTypeItem[] = [
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.tencentGeneralAccurateOcr`,
 	},
 	{
-		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.tencent`,
-		value: OnlineOcrServiceType.TencentImageTranslateLLM,
-		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.tencentImageTranslateLLM`,
-	},
-	{
 		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
 		value: OnlineOcrServiceType.BaiduGeneralBasic,
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneralBasic`,
@@ -143,27 +138,6 @@ const TENCENT_GENERAL_ACCURATE_LANGUAGE_LIST: OnlineOcrLanguageItem[] = [
 		value: "mul",
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.language.multipleLanguages`,
 	},
-];
-
-/// 腾讯云端到端图片翻译支持的目标语言
-const TENCENT_IMAGE_TRANSLATE_TARGET_LANGUAGE_LIST: OnlineOcrLanguageItem[] = [
-	{ value: "zh-CHS", labelId: "tools.translation.language.simplifiedChinese" },
-	{ value: "zh-CHT", labelId: "tools.translation.language.traditionalChinese" },
-	{ value: "en", labelId: "tools.translation.language.english" },
-	{ value: "ja", labelId: "tools.translation.language.japanese" },
-	{ value: "ko", labelId: "tools.translation.language.korean" },
-	{ value: "th", labelId: "tools.translation.language.thai" },
-	{ value: "vi", labelId: "tools.translation.language.vietnamese" },
-	{ value: "ru", labelId: "tools.translation.language.russian" },
-	{ value: "de", labelId: "tools.translation.language.german" },
-	{ value: "fr", labelId: "tools.translation.language.french" },
-	{ value: "ar", labelId: "tools.translation.language.arabic" },
-	{ value: "es", labelId: "tools.translation.language.spanish" },
-	{ value: "it", labelId: "tools.translation.language.italian" },
-	{ value: "id", labelId: "tools.translation.language.indonesian" },
-	{ value: "ms", labelId: "tools.translation.language.malay" },
-	{ value: "pt", labelId: "tools.translation.language.portuguese" },
-	{ value: "tr", labelId: "tools.translation.language.turkish" },
 ];
 
 const BAIDU_LANGUAGE_LIST: OnlineOcrLanguageItem[] = [
@@ -269,9 +243,6 @@ const useOnlineOcrTargetLanguageOptions = (
 			case OnlineOcrServiceType.YoudaoImageTranslation:
 				languageList = YOUDAO_LANGUAGE_LIST;
 				break;
-			case OnlineOcrServiceType.TencentImageTranslateLLM:
-				languageList = TENCENT_IMAGE_TRANSLATE_TARGET_LANGUAGE_LIST;
-				break;
 			default:
 				return [];
 		}
@@ -347,8 +318,7 @@ const OnlineOcrLanguageField: React.FC<{ serviceType?: string }> = ({
 const isTencentServiceType = (serviceType?: string) => {
 	return (
 		serviceType === OnlineOcrServiceType.TencentGeneralBasicOcr ||
-		serviceType === OnlineOcrServiceType.TencentGeneralAccurateOcr ||
-		serviceType === OnlineOcrServiceType.TencentImageTranslateLLM
+		serviceType === OnlineOcrServiceType.TencentGeneralAccurateOcr
 	);
 };
 

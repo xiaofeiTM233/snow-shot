@@ -597,12 +597,6 @@ export const FunctionSettingsPage = () => {
 				}),
 				value: TranslationApiType.Youdao,
 			},
-			{
-				label: intl.formatMessage({
-					id: "settings.functionSettings.translationSettings.apiConfig.apiType.tencent",
-				}),
-				value: TranslationApiType.Tencent,
-			},
 		];
 	}, [intl]);
 
@@ -2093,74 +2087,13 @@ export const FunctionSettingsPage = () => {
 																	/>
 																</Col>
 															</>
-														);
-													}
-
-													if (api_type === TranslationApiType.Tencent) {
-														return (
-															<>
-																<Col span={12}>
-																	<ProFormText
-																		name="secret_id"
-																		label={
-																			<IconLabel
-																				label={
-																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.secretId" />
-																				}
-																			/>
-																		}
-																		rules={[
-																			{
-																				required: true,
-																				message: intl.formatMessage({
-																					id: "settings.functionSettings.translationSettings.apiConfig.secretId.required",
-																				}),
-																			},
-																		]}
-																	/>
-																</Col>
-																<Col span={12}>
-																	<ProFormText.Password
-																		name="secret_key"
-																		label={
-																			<IconLabel
-																				label={
-																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.secretKey" />
-																				}
-																			/>
-																		}
-																		rules={[
-																			{
-																				required: true,
-																				message: intl.formatMessage({
-																					id: "settings.functionSettings.translationSettings.apiConfig.secretKey.required",
-																				}),
-																			},
-																		]}
-																	/>
-																</Col>
-																<Col span={12}>
-																	<ProFormText
-																		name="region"
-																		initialValue="ap-guangzhou"
-																		placeholder="ap-guangzhou"
-																		label={
-																			<IconLabel
-																				label={
-																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.region" />
-																				}
-																			/>
-																		}
-																	/>
-																</Col>
-															</>
-														);
-													}
-													return null;
-												}}
-											</ProFormDependency>
-										</Row>
-									</ProFormList>
+															);
+														}
+														return null;
+													}}
+												</ProFormDependency>
+											</Row>
+										</ProFormList>
 								</Col>
 							</Row>
 

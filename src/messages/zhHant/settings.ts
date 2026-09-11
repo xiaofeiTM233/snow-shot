@@ -512,8 +512,6 @@ export const settings = {
 		"用於在翻譯服務列表中顯示",
 	"settings.functionSettings.translationSettings.apiConfig.apiType.youdao":
 		"有道翻譯",
-	"settings.functionSettings.translationSettings.apiConfig.apiType.tencent":
-		"騰訊雲翻譯",
 	"settings.functionSettings.translationSettings.apiConfig.youdaoServiceType":
 		"有道服務",
 	"settings.functionSettings.translationSettings.apiConfig.youdaoService.text":
@@ -528,13 +526,6 @@ export const settings = {
 		"應用密鑰（appSecret）",
 	"settings.functionSettings.translationSettings.apiConfig.appSecret.required":
 		"請輸入應用密鑰（appSecret）",
-	"settings.functionSettings.translationSettings.apiConfig.secretId": "SecretId",
-	"settings.functionSettings.translationSettings.apiConfig.secretId.required":
-		"請輸入 SecretId",
-	"settings.functionSettings.translationSettings.apiConfig.secretKey": "SecretKey",
-	"settings.functionSettings.translationSettings.apiConfig.secretKey.required":
-		"請輸入 SecretKey",
-	"settings.functionSettings.translationSettings.apiConfig.region": "地域（Region）",
 	"settings.functionSettings.trayIconSettings": "系統匣",
 	"settings.functionSettings.trayIconSettings.iconClickAction": "左鍵點擊後",
 	"settings.functionSettings.trayIconSettings.iconClickAction.screenshot":
@@ -717,8 +708,6 @@ export const settings = {
 		"通用文字識別",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoImageTranslation":
 		"圖片翻譯",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentImageTranslateLLM":
-		"端到端圖片翻譯",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralBasicOcr":
 		"通用印刷體識別",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralAccurateOcr":

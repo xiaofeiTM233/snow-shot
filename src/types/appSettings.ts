@@ -120,7 +120,6 @@ export enum TranslationApiType {
 	DeepL = "translation_api_deepl",
 	Custom = "translation_api_custom",
 	Youdao = "translation_api_youdao",
-	Tencent = "translation_api_tencent",
 }
 
 export type DeepLApiConfig = {
@@ -154,21 +153,7 @@ export type YoudaoTranslationApiConfig = {
 	app_secret: string;
 };
 
-export type TencentTranslationApiConfig = {
-	api_type: TranslationApiType.Tencent;
-	/** 服务名称，用于在翻译服务列表中显示 */
-	service_name?: string;
-	secret_id: string;
-	secret_key: string;
-	/** 腾讯云 地域，默认 ap-guangzhou */
-	region?: string;
-};
-
-export type TranslationApiConfig =
-	| DeepLApiConfig
-	| CustomApiConfig
-	| YoudaoTranslationApiConfig
-	| TencentTranslationApiConfig;
+export type TranslationApiConfig = DeepLApiConfig | CustomApiConfig | YoudaoTranslationApiConfig;
 
 export enum AppSettingsGroup {
 	Common = "common",
@@ -334,8 +319,6 @@ export enum OnlineOcrServiceType {
 	TencentGeneralBasicOcr = "tencent:GeneralBasicOCR",
 	/** 腾讯云 通用文字识别（高精度版） */
 	TencentGeneralAccurateOcr = "tencent:GeneralAccurateOCR",
-	/** 腾讯云 端到端图片翻译 */
-	TencentImageTranslateLLM = "tencent:imageTranslateLLM",
 	/** 百度 通用文字识别（标准版） */
 	BaiduGeneralBasic = "baidu:GeneralBasic",
 	/** 百度 通用文字识别（高精度版） */

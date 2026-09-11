@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
 	CustomApiConfig,
-	TencentTranslationApiConfig,
 	YoudaoTranslationApiConfig,
 } from "@/types/appSettings";
 import type {
@@ -311,10 +310,10 @@ export type OnlineTranslateResult = {
 };
 
 /**
- * 厂商机器翻译 API（有道智云 / 腾讯云），由 Rust 侧完成签名与请求
+ * 厂商机器翻译 API（有道智云），由 Rust 侧完成签名与请求
  */
 export const translateTextOnline = async (
-	config: YoudaoTranslationApiConfig | TencentTranslationApiConfig,
+	config: YoudaoTranslationApiConfig,
 	sourceContent: string[],
 	sourceLanguage: string,
 	targetLanguage: string,

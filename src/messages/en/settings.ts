@@ -541,8 +541,6 @@ export const settings = {
 		"Displayed in the translation service list",
 	"settings.functionSettings.translationSettings.apiConfig.apiType.youdao":
 		"Youdao Translate",
-	"settings.functionSettings.translationSettings.apiConfig.apiType.tencent":
-		"Tencent Cloud Translate",
 	"settings.functionSettings.translationSettings.apiConfig.youdaoServiceType":
 		"Youdao Service",
 	"settings.functionSettings.translationSettings.apiConfig.youdaoService.text":
@@ -557,14 +555,6 @@ export const settings = {
 		"App Secret (appSecret)",
 	"settings.functionSettings.translationSettings.apiConfig.appSecret.required":
 		"Please enter the app secret (appSecret)",
-	"settings.functionSettings.translationSettings.apiConfig.secretId": "SecretId",
-	"settings.functionSettings.translationSettings.apiConfig.secretId.required":
-		"Please enter the SecretId",
-	"settings.functionSettings.translationSettings.apiConfig.secretKey": "SecretKey",
-	"settings.functionSettings.translationSettings.apiConfig.secretKey.required":
-		"Please enter the SecretKey",
-	"settings.functionSettings.translationSettings.apiConfig.region":
-		"Region",
 	"settings.functionSettings.trayIconSettings": "Tray Icon",
 	"settings.functionSettings.trayIconSettings.iconClickAction":
 		"Left Click Action",
@@ -755,8 +745,6 @@ export const settings = {
 		"General OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoImageTranslation":
 		"Image Translation",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentImageTranslateLLM":
-		"End-to-End Image Translation",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralBasicOcr":
 		"General Printed Text OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralAccurateOcr":

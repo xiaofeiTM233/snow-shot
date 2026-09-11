@@ -951,9 +951,6 @@ const AppSettingsContextProviderCore: React.FC<{
 											: "youdao:text",
 									app_key: `${item.app_key ?? ""}`,
 									app_secret: `${item.app_secret ?? ""}`,
-									secret_id: `${item.secret_id ?? ""}`,
-									secret_key: `${item.secret_key ?? ""}`,
-									region: `${item.region ?? ""}`,
 								};
 							}) as TranslationApiConfig[]
 						: (prevSettings?.translationApiConfigList ??
