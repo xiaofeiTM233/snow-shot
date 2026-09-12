@@ -118,7 +118,7 @@ export const renderInitCanvasAction = async (
 		if (appOptions.preference === "webgpu") {
 			renderLog(
 				"warn",
-				`[renderInitCanvasAction] WebGPU init failed or timed out, fallback to WebGL: ${String(error)}`,
+				`[ImageLayer][renderInitCanvasAction] WebGPU init failed or timed out, fallback to WebGL: ${String(error)}`,
 			);
 			// 丢弃挂起/失败的 WebGPU Application：超时后原 init 若最终 resolve
 			// 会与新 Application 产生状态混乱，必须整体替换
@@ -134,7 +134,7 @@ export const renderInitCanvasAction = async (
 			});
 			renderLog(
 				"warn",
-				`[renderInitCanvasAction] WebGL fallback init done (WebGPU mode is NOT active), rendererType: ${String(canvasApp.renderer.type)}`,
+				`[ImageLayer][renderInitCanvasAction] WebGL fallback init done (WebGPU mode is NOT active), rendererType: ${String(canvasApp.renderer.type)}`,
 			);
 		} else {
 			throw error;
@@ -170,23 +170,23 @@ export const renderInitCanvasAction = async (
 			event.preventDefault();
 			renderLog(
 				"error",
-				"[renderInitCanvasAction] WebGL CONTEXT_LOST — screenshot rendering will break until restored",
+				"[ImageLayer][renderInitCanvasAction] WebGL CONTEXT_LOST — screenshot rendering will break until restored",
 			);
 		});
 		captureCanvas.addEventListener("webglcontextrestored", () => {
 			renderLog(
 				"warn",
-				"[renderInitCanvasAction] WebGL context restored, rebuilding renderer (PIXI partial restore is unreliable)",
+				"[ImageLayer][renderInitCanvasAction] WebGL context restored, rebuilding renderer (PIXI partial restore is unreliable)",
 			);
 			if (!contextRestoreRefs) {
 				renderLog(
 					"warn",
-					"[renderInitCanvasAction] no contextRestoreRefs provided, cannot rebuild after restore",
+					"[ImageLayer][renderInitCanvasAction] no contextRestoreRefs provided, cannot rebuild after restore",
 				);
 				return;
 			}
 			if (contextRestoreRebuilding) {
-				renderLog("warn", "[renderInitCanvasAction] context restore rebuild already in progress, skip");
+				renderLog("warn", "[ImageLayer][renderInitCanvasAction] context restore rebuild already in progress, skip");
 				return;
 			}
 			contextRestoreRebuilding = true;
@@ -196,15 +196,15 @@ export const renderInitCanvasAction = async (
 			// 需要逐步落盘定位
 			(async () => {
 				try {
-					renderLog("info", "[rebuild] step 1/5: disposing old renderer");
+					renderLog("info", "[ImageLayer][rebuild] step 1/5: disposing old renderer");
 					renderDisposeCanvasAction(canvasAppRef);
-					renderLog("info", "[rebuild] step 2/5: re-initializing renderer");
+					renderLog("info", "[ImageLayer][rebuild] step 2/5: re-initializing renderer");
 					await renderInitCanvasAction(
 						canvasAppRef,
 						appOptions,
 						contextRestoreRefs,
 					);
-					renderLog("info", "[rebuild] step 3/5: renderer re-initialized");
+					renderLog("info", "[ImageLayer][rebuild] step 3/5: renderer re-initialized");
 					const cachedBuffer =
 						contextRestoreRefs.imageSharedBufferRef.current;
 					if (cachedBuffer) {
@@ -221,23 +221,23 @@ export const renderInitCanvasAction = async (
 						);
 						renderLog(
 							"info",
-							"[rebuild] step 4/5: screenshot re-rendered from cached buffer",
+							"[ImageLayer][rebuild] step 4/5: screenshot re-rendered from cached buffer",
 						);
 					} else {
 						renderLog(
 							"warn",
-							"[rebuild] step 4/5 skipped: no cached screenshot buffer after rebuild",
+							"[ImageLayer][rebuild] step 4/5 skipped: no cached screenshot buffer after rebuild",
 						);
 					}
 					canvasAppRef.current?.render();
 					renderLog(
 						"info",
-						"[rebuild] step 5/5: renderer rebuilt after context restore, rendering recovered",
+						"[ImageLayer][rebuild] step 5/5: renderer rebuilt after context restore, rendering recovered",
 					);
 				} catch (error) {
 					renderLog(
 						"error",
-						`[renderInitCanvasAction] context restore rebuild failed: ${String(error)}`,
+						`[ImageLayer][renderInitCanvasAction] context restore rebuild failed: ${String(error)}`,
 					);
 				} finally {
 					contextRestoreRebuilding = false;
@@ -251,7 +251,7 @@ export const renderInitCanvasAction = async (
 	// 或 WebGPU 渲染器初始化"成功"但渲染异常——黑屏排查需要确知实际后端）
 	renderLog(
 		"info",
-		`[renderInitCanvasAction] init, rendererType: ${String(
+		`[ImageLayer][renderInitCanvasAction] init, rendererType: ${String(
 			canvasApp.renderer.type,
 		)}, renderer: ${canvasApp.renderer.width}x${canvasApp.renderer.height}, canvas: ${canvasApp.canvas.width}x${canvasApp.canvas.height}`,
 	);
@@ -297,7 +297,7 @@ export const renderResizeCanvasAction = (
 	// 诊断日志：定位"冻结画面被放大"，确认 resize 后画布实际尺寸
 	renderLog(
 		"info",
-		`[renderResizeCanvasAction] resize ${width}x${height}, renderer: ${canvasApp.renderer.width}x${canvasApp.renderer.height}, canvas: ${canvasApp.canvas.width}x${canvasApp.canvas.height}`,
+		`[ImageLayer][renderResizeCanvasAction] resize ${width}x${height}, renderer: ${canvasApp.renderer.width}x${canvasApp.renderer.height}, canvas: ${canvasApp.canvas.width}x${canvasApp.canvas.height}`,
 	);
 };
 
@@ -358,7 +358,7 @@ export const renderGetImageBitmapAction = async (
 	// 诊断日志：导出前检查渲染容器内容，定位保存/复制黑屏
 	renderLog(
 		"info",
-		`[renderGetImageBitmapAction] export, imageContainer: ${!!imageContainer}, childrenCount: ${
+		`[ImageLayer][renderGetImageBitmapAction] export, imageContainer: ${!!imageContainer}, childrenCount: ${
 			imageContainer?.children.length ?? -1
 		}, hasTexture: ${
 			!!(imageContainer?.children[0] as PIXI.Sprite | undefined)?.texture
@@ -418,7 +418,7 @@ export const renderGetImageBitmapAction = async (
 			const isBlack = blackRatio > 0.99;
 			renderLog(
 				isBlack ? "error" : "info",
-				`[renderGetImageBitmapAction] result sampled: blackRatio=${blackRatio.toFixed(3)}, darkRatio=${(
+				`[ImageLayer][renderGetImageBitmapAction] result sampled: blackRatio=${blackRatio.toFixed(3)}, darkRatio=${(
 					dark / total
 				).toFixed(3)}, transparentRatio=${(transparent / total).toFixed(3)}${
 					isBlack ? " — RESULT IMAGE IS BLACK" : ""
@@ -428,7 +428,7 @@ export const renderGetImageBitmapAction = async (
 	} catch (error) {
 		renderLog(
 			"warn",
-			`[renderGetImageBitmapAction] result sampling failed: ${String(error)}`,
+			`[ImageLayer][renderGetImageBitmapAction] result sampling failed: ${String(error)}`,
 		);
 	}
 
@@ -634,7 +634,7 @@ export const renderAddImageToContainerAction = async (
 	if (!container) {
 		renderLog(
 			"warn",
-			`[renderAddImageToContainerAction] container not found, skip rendering: ${containerKey}`,
+			`[ImageLayer][renderAddImageToContainerAction] container not found, skip rendering: ${containerKey}`,
 		);
 		return;
 	}
@@ -652,7 +652,7 @@ export const renderAddImageToContainerAction = async (
 				texture = sharedBufferImageTextureRef.current;
 				renderLog(
 					"info",
-					`[renderAddImageToContainerAction] shared_buffer_image_texture branch, cached texture: ${
+					`[ImageLayer][renderAddImageToContainerAction] shared_buffer_image_texture branch, cached texture: ${
 						!!texture
 					}, cached imageSharedBuffer: ${!!imageSharedBufferRef.current}`,
 				);
@@ -668,7 +668,7 @@ export const renderAddImageToContainerAction = async (
 			);
 			renderLog(
 				"info",
-				`[renderAddImageToContainerAction] raw sharedBuffer branch, size: ${imageSrc.width}x${imageSrc.height}, bufferLength: ${
+				`[ImageLayer][renderAddImageToContainerAction] raw sharedBuffer branch, size: ${imageSrc.width}x${imageSrc.height}, bufferLength: ${
 					imageSrc.sharedBuffer?.length ?? -1
 				}`,
 			);
@@ -704,14 +704,14 @@ export const renderAddImageToContainerAction = async (
 	if (!texture) {
 		renderLog(
 			"warn",
-			`[renderAddImageToContainerAction] texture is undefined after add, result will be blank/black, container: ${containerKey}`,
+			`[ImageLayer][renderAddImageToContainerAction] texture is undefined after add, result will be blank/black, container: ${containerKey}`,
 		);
 	} else {
 		// 诊断日志：定位"冻结画面被放大"，确认贴图尺寸
 		// （渲染器尺寸由 renderInitCanvasAction / renderResizeCanvasAction 的诊断日志输出）
 		renderLog(
 			"info",
-			`[renderAddImageToContainerAction] sprite texture: ${texture.width}x${texture.height}`,
+			`[ImageLayer][renderAddImageToContainerAction] sprite texture: ${texture.width}x${texture.height}`,
 		);
 	}
 
@@ -756,7 +756,7 @@ export const renderEnsureImageRenderedAction = async (
 
 	renderLog(
 		"warn",
-		`[renderEnsureImageRenderedAction] INIT container is EMPTY (childrenCount: 0), fallback buffer: ${!!fallbackImageBuffer}, re-rendering`,
+		`[ImageLayer][renderEnsureImageRenderedAction] INIT container is EMPTY (childrenCount: 0), fallback buffer: ${!!fallbackImageBuffer}, re-rendering`,
 	);
 	if (!fallbackImageBuffer) {
 		return 0;
@@ -778,7 +778,7 @@ export const renderEnsureImageRenderedAction = async (
 	const updatedCount = updated?.children.length ?? 0;
 	renderLog(
 		updatedCount > 0 ? "info" : "error",
-		`[renderEnsureImageRenderedAction] re-render done, childrenCount: ${updatedCount}`,
+		`[ImageLayer][renderEnsureImageRenderedAction] re-render done, childrenCount: ${updatedCount}`,
 	);
 	return updatedCount;
 };

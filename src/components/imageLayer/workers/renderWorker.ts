@@ -567,7 +567,7 @@ self.onmessage = async (event: MessageEvent<BaseLayerRenderData>) => {
 	} catch (error) {
 		renderLog(
 			"error",
-			`[renderWorker] handle ${event.data.type} failed: ${String(error)}`,
+			`[ImageLayer][renderWorker] handle ${event.data.type} failed: ${String(error)}`,
 		);
 		// 回传空结果：让主线程的等待 resolve，避免永久挂起
 		self.postMessage({

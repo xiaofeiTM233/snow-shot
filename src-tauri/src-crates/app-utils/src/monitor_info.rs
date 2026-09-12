@@ -40,7 +40,7 @@ pub enum ColorFormat {
 pub(crate) fn log_image_state(tag: &str, image: &image::DynamicImage) {
     let (width, height) = image.dimensions();
     if width == 0 || height == 0 {
-        log::warn!("[image_state] {} empty image {}x{}", tag, width, height);
+        log::debug!("[image_state] {} empty image {}x{}", tag, width, height);
         return;
     }
 
@@ -82,7 +82,7 @@ pub(crate) fn log_image_state(tag: &str, image: &image::DynamicImage) {
     } else {
         -1.0
     };
-    log::info!(
+    log::debug!(
         "[image_state] {} size={}x{} has_alpha={} alpha_zero_ratio={:.3} alpha_below10_ratio={:.3} black_rgb_ratio={:.3} dark_rgb_ratio={:.3}",
         tag,
         width,
