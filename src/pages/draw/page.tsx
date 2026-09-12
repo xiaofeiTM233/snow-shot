@@ -86,7 +86,7 @@ import {
 	getImagePathFromSettings,
 	showImageDialog,
 } from "@/utils/file";
-import { appError, appWarn, appInfo } from "@/utils/log";
+import { appDebug, appError, appWarn, appInfo } from "@/utils/log";
 import { MousePosition } from "@/utils/mousePosition";
 import { ScreenshotType } from "@/utils/types";
 import { setWindowRect, showWindow as showCurrentWindow } from "@/utils/window";
@@ -259,7 +259,7 @@ const DrawPageCore: React.FC<{
 			imageBuffer: ImageBuffer | ImageSharedBufferData | undefined,
 			captureBoundingBoxInfo: CaptureBoundingBoxInfo,
 		) => {
-			appInfo("[DIAG] onCaptureLoad: start");
+			appDebug("[DIAG] onCaptureLoad: start");
 			await Promise.all([
 				imageLayerActionRef.current?.onCaptureLoad(
 					imageSrc,
@@ -281,7 +281,7 @@ const DrawPageCore: React.FC<{
 					appWarn("[DrawPageCore] Capture history id is not found");
 				}
 			}
-			appInfo("[DIAG] onCaptureLoad: done");
+			appDebug("[DIAG] onCaptureLoad: done");
 		},
 		[getScreenshotType, setCaptureEvent],
 	);
@@ -349,7 +349,7 @@ const DrawPageCore: React.FC<{
 			imageBuffer: ImageBuffer | ImageSharedBufferData | undefined,
 			captureBoundingBoxInfo: CaptureBoundingBoxInfo,
 		) => {
-			appInfo("[DIAG] readyCapture: start");
+			appDebug("[DIAG] readyCapture: start");
 			setCaptureLoading(true);
 
 			if (imageBlobUrlRef.current) {
@@ -418,7 +418,7 @@ const DrawPageCore: React.FC<{
 				appError("[DrawPageCore] ensureImageRendered failed", error);
 			}
 
-			appInfo("[DIAG] readyCapture: done");
+			appDebug("[DIAG] readyCapture: done");
 		},
 		[onCaptureLoad, setCaptureLoading, setCaptureEvent],
 	);
@@ -442,7 +442,7 @@ const DrawPageCore: React.FC<{
 			}
 
 			// 诊断日志：定位"冻结画面被放大"，输出窗口与页面几何信息
-			appInfo("[DIAG] showWindow geometry", {
+			appDebug("[DIAG] showWindow geometry", {
 				rect: { min_x, min_y, max_x, max_y },
 				devicePixelRatio: window.devicePixelRatio,
 				documentSize: `${(max_x - min_x) / window.devicePixelRatio}x${
@@ -493,14 +493,14 @@ const DrawPageCore: React.FC<{
 			}
 
 			drawPageStateRef.current = DrawPageState.Release;
-			appInfo("[DIAG] releasePage: releasing draw window");
+			appDebug("[DIAG] releasePage: releasing draw window");
 			try {
 				await Promise.all([
 					createDrawWindow(),
 					// 隔一段时间释放，防止释放中途用户唤起
 					closeWindowAfterDelay(1000 * 3),
 				]);
-				appInfo("[DIAG] releasePage: done");
+				appDebug("[DIAG] releasePage: done");
 			} catch (error) {
 				appError("[DrawPageCore] releasePage error", error);
 				// 如果创建窗口失败，重置状态以便下次截图可以正常执行
@@ -531,7 +531,7 @@ const DrawPageCore: React.FC<{
 
 	const finishCapture = useCallback<DrawContextType["finishCapture"]>(
 		async (clearScrollScreenshot: boolean = true) => {
-			appInfo("[DIAG] finishCapture: start", {
+			appDebug("[DIAG] finishCapture: start", {
 				capturing: capturingRef.current,
 				drawPageState: drawPageStateRef.current,
 			});
@@ -554,13 +554,13 @@ const DrawPageCore: React.FC<{
 			}
 
 			window.getSelection()?.removeAllRanges();
-			appInfo("[DIAG] finishCapture: awaiting onCaptureFinish");
+			appDebug("[DIAG] finishCapture: awaiting onCaptureFinish");
 			await Promise.all([
 				imageLayerActionRef.current?.onCaptureFinish(),
 				selectLayerActionRef.current?.onCaptureFinish(),
 				drawLayerActionRef.current?.onCaptureFinish(),
 			]);
-			appInfo("[DIAG] finishCapture: onCaptureFinish done");
+			appDebug("[DIAG] finishCapture: onCaptureFinish done");
 
 			setCaptureEvent({
 				event: CaptureEvent.onCaptureFinish,
@@ -579,7 +579,7 @@ const DrawPageCore: React.FC<{
 			setTimeout(() => {
 				hideWindow();
 			}, 17);
-			appInfo("[DIAG] finishCapture: end");
+			appDebug("[DIAG] finishCapture: end");
 		},
 		[
 			hideWindow,
@@ -594,7 +594,7 @@ const DrawPageCore: React.FC<{
 	);
 
 	const initCaptureBoundingBoxInfoAndShowWindow = useCallback(async () => {
-		appInfo("[DIAG] initCaptureBoundingBoxInfoAndShowWindow: start");
+		appDebug("[DIAG] initCaptureBoundingBoxInfoAndShowWindow: start");
 		// 恢复窗口
 		appWindowRef.current.setIgnoreCursorEvents(false);
 		if (layerContainerRef.current) {
@@ -640,7 +640,7 @@ const DrawPageCore: React.FC<{
 				captureBoundingBoxInfoRef.current.height,
 			),
 		]);
-		appInfo("[DIAG] initCaptureBoundingBoxInfoAndShowWindow: done");
+		appDebug("[DIAG] initCaptureBoundingBoxInfoAndShowWindow: done");
 	}, [getAppSettings, getScreenshotType, message, showWindow]);
 
 	const captureAllMonitorsAction = useCallback(
@@ -722,7 +722,7 @@ const DrawPageCore: React.FC<{
 			excuteScreenshotType: ScreenshotType,
 			params: { windowId?: string; captureHistoryId?: string },
 		) => {
-			appInfo("[DIAG] excuteScreenshot: start", {
+			appDebug("[DIAG] excuteScreenshot: start", {
 				excuteScreenshotType,
 				capturing: capturingRef.current,
 				drawPageState: drawPageStateRef.current,
@@ -736,7 +736,7 @@ const DrawPageCore: React.FC<{
 				drawPageStateRef.current === DrawPageState.WaitRelease ||
 				drawPageStateRef.current === DrawPageState.Release
 			) {
-				appInfo("[DIAG] excuteScreenshot: ignored (already capturing or releasing)");
+				appDebug("[DIAG] excuteScreenshot: ignored (already capturing or releasing)");
 				return;
 			}
 
@@ -766,21 +766,21 @@ const DrawPageCore: React.FC<{
 				event: CaptureEvent.onExecuteScreenshot,
 			});
 
-			appInfo("[DIAG] excuteScreenshot: awaiting captureAllMonitors");
+			appDebug("[DIAG] excuteScreenshot: awaiting captureAllMonitors");
 			let imageBuffer: ImageBuffer | ImageSharedBufferData | undefined;
 			try {
 				imageBuffer = await captureAllMonitorsPromise;
-				appInfo("[DIAG] excuteScreenshot: captureAllMonitors done", {
+				appDebug("[DIAG] excuteScreenshot: captureAllMonitors done", {
 					hasImageBuffer: !!imageBuffer,
 				});
 			} catch {
-				appInfo("[DIAG] excuteScreenshot: captureAllMonitors failed");
+				appDebug("[DIAG] excuteScreenshot: captureAllMonitors failed");
 				imageBuffer = undefined;
 			}
 			try {
-				appInfo("[DIAG] excuteScreenshot: awaiting initCaptureBoundingBoxInfo");
+				appDebug("[DIAG] excuteScreenshot: awaiting initCaptureBoundingBoxInfo");
 				await initCaptureBoundingBoxInfoPromise;
-				appInfo("[DIAG] excuteScreenshot: initCaptureBoundingBoxInfo done");
+				appDebug("[DIAG] excuteScreenshot: initCaptureBoundingBoxInfo done");
 			} catch (error) {
 				appError(
 					"[DrawPageCore] initCaptureBoundingBoxInfoAndShowWindow error",
@@ -795,7 +795,7 @@ const DrawPageCore: React.FC<{
 				excuteScreenshotType !== ScreenshotType.SwitchCaptureHistory &&
 				excuteScreenshotType !== ScreenshotType.VideoRecord
 			) {
-				appInfo("[DIAG] excuteScreenshot: no imageBuffer, finishing capture");
+				appDebug("[DIAG] excuteScreenshot: no imageBuffer, finishing capture");
 				sendErrorMessage(intl.formatMessage({ id: "draw.captureError" }));
 
 				finishCapture();
@@ -806,7 +806,7 @@ const DrawPageCore: React.FC<{
 
 			// 防止用户提前退出报错
 			if (getCaptureEvent()?.event !== CaptureEvent.onExecuteScreenshot) {
-				appInfo("[DIAG] excuteScreenshot: captureEvent changed, aborting");
+				appDebug("[DIAG] excuteScreenshot: captureEvent changed, aborting");
 				capturingRef.current = false;
 				setCaptureStateAction(false);
 				return;
@@ -824,10 +824,10 @@ const DrawPageCore: React.FC<{
 
 				try {
 					await layerOnExecuteScreenshotPromise;
-					appInfo("[DIAG] excuteScreenshot: VideoRecord layer init done");
+					appDebug("[DIAG] excuteScreenshot: VideoRecord layer init done");
 				} catch (error) {
 					// 选区层初始化失败不阻断录屏流程，仅丢失窗口自动选择辅助功能
-					appError(
+					appDebug(
 						"[DIAG] excuteScreenshot: VideoRecord layer init failed",
 						error,
 					);
@@ -854,7 +854,7 @@ const DrawPageCore: React.FC<{
 						event: CaptureEvent.onCaptureLoad,
 						params: [undefined, undefined, captureBoundingBoxInfo],
 					});
-					appInfo("[DIAG] excuteScreenshot: VideoRecord ready");
+					appDebug("[DIAG] excuteScreenshot: VideoRecord ready");
 				} else {
 					appWarn(
 						"[DrawPageCore] VideoRecord captureBoundingBoxInfo is not ready",
@@ -866,7 +866,7 @@ const DrawPageCore: React.FC<{
 			}
 
 			try {
-				appInfo("[DIAG] excuteScreenshot: entering readyCapture");
+				appDebug("[DIAG] excuteScreenshot: entering readyCapture");
 				// 因为窗口是空的，所以窗口显示和图片显示先后顺序倒无所谓
 				await Promise.all([
 					captureBoundingBoxInfoRef.current
@@ -882,9 +882,9 @@ const DrawPageCore: React.FC<{
 							})(),
 					layerOnExecuteScreenshotPromise,
 				]);
-				appInfo("[DIAG] excuteScreenshot: readyCapture done");
+				appDebug("[DIAG] excuteScreenshot: readyCapture done");
 			} catch (error) {
-				appError("[DIAG] excuteScreenshot: readyCapture error", error);
+				appDebug("[DIAG] excuteScreenshot: readyCapture error", error);
 				// 无论如何先把 capturing 状态复位，避免一次异常导致后续所有截图静默失效
 				capturingRef.current = false;
 				setCaptureStateAction(false);
@@ -1677,7 +1677,7 @@ const DrawPageCore: React.FC<{
 	useEffect(() => {
 		// 监听截图命令
 		const listenerId = addListener("execute-screenshot", (args) => {
-			appInfo("[DIAG] draw: execute-screenshot listener fired", {
+			appDebug("[DIAG] draw: execute-screenshot listener fired", {
 				label: appWindowRef.current?.label,
 				capturing: capturingRef.current,
 				drawPageState: drawPageStateRef.current,
@@ -1728,7 +1728,7 @@ const DrawPageCore: React.FC<{
 			// 还不存在，resize 会被静默丢弃，截图会被画进默认尺寸的画布再拉伸铺满窗口
 			// （表现为冻结画面被放大）。等画布初始化完成（Active）后再执行
 			if (drawPageStateRef.current === DrawPageState.Init) {
-				appInfo("[DIAG] draw: canvas init not ready, defer execute-screenshot");
+				appDebug("[DIAG] draw: canvas init not ready, defer execute-screenshot");
 				if (initWaitExecuteScreenshotTimerRef.current) {
 					clearInterval(initWaitExecuteScreenshotTimerRef.current);
 				}

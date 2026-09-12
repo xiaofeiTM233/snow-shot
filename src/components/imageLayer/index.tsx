@@ -24,7 +24,7 @@ import type { ElementRect, ImageBuffer } from "@/types/commands/screenshot";
 import type { CaptureHistoryItem } from "@/utils/appStore";
 import { getCaptureHistoryImageAbsPath } from "@/utils/captureHistory";
 import { supportOffscreenCanvas } from "@/utils/environment";
-import { appError, appInfo, appWarn } from "@/utils/log";
+import { appDebug, appError, appWarn } from "@/utils/log";
 import {
 	addImageToContainerAction,
 	applyProcessImageConfigToCanvasAction,
@@ -300,14 +300,8 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 				) => {
 					const data = event.data;
 					if (data && data.type === "forwardLog" && data.payload?.message) {
-						const msg = `[worker-render] ${data.payload.message}`;
-						if (data.payload.level === "warn") {
-							appWarn(msg);
-						} else if (data.payload.level === "error") {
-							appError(msg);
-						} else {
-							appInfo(msg);
-						}
+						const msg = `[ImageLayer][worker-render] ${data.payload.message}`;
+						appDebug(msg);
 					}
 				},
 			);
@@ -492,8 +486,8 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 	const resizeCanvas = useCallback(
 		async (width: number, height: number) => {
 			// 诊断日志：定位"冻结画面被放大"，确认画布请求尺寸与页面环境
-			appInfo(
-				`[DIAG] resizeCanvas: ${width}x${height}, devicePixelRatio: ${window.devicePixelRatio}, innerSize: ${window.innerWidth}x${window.innerHeight}`,
+			appDebug(
+				`[ImageLayer][DIAG] resizeCanvas: ${width}x${height}, devicePixelRatio: ${window.devicePixelRatio}, innerSize: ${window.innerWidth}x${window.innerHeight}`,
 			);
 			// 上一次因画布上存在内容而推迟的重建，在下一次调整画布尺寸前应用
 			const pendingRenderConfig = pendingRenderConfigRef.current;
@@ -887,16 +881,16 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 			}
 			// 诊断日志：记录 onCaptureReady 收到的数据形态，定位黑屏是哪种路径
 			if (isSharedBuffer) {
-				appInfo(
-					`[onCaptureReady] sharedBuffer path, size: ${imageBuffer.width}x${imageBuffer.height}, bufferLen: ${
+				appDebug(
+					`[ImageLayer][onCaptureReady] sharedBuffer path, size: ${imageBuffer.width}x${imageBuffer.height}, bufferLen: ${
 						imageBuffer.sharedBuffer?.length ?? -1
 					}, bufferByteLength: ${
 						imageBuffer.sharedBuffer?.buffer?.byteLength ?? -1
 					}`,
 				);
 			} else {
-				appInfo(
-					`[onCaptureReady] non-sharedBuffer path, imageSrc: ${typeof imageSrc}, ${
+				appDebug(
+					`[ImageLayer][onCaptureReady] non-sharedBuffer path, imageSrc: ${typeof imageSrc}, ${
 						imageSrc ? imageSrc.slice(0, 40) : ""
 					}, imageBufferType: ${
 						imageBuffer && "type" in imageBuffer

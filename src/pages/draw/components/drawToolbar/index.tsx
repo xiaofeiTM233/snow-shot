@@ -70,7 +70,7 @@ import { DrawToolbarKeyEventKey } from "@/types/components/drawToolbar";
 import { DrawState } from "@/types/draw";
 import { ToolbarId, ToolbarToolKey } from "@/types/toolbarTool";
 import { getExcalidrawCanvas } from "@/utils/excalidraw";
-import { appError, appInfo, appWarn } from "@/utils/log";
+import { appDebug, appWarn } from "@/utils/log";
 import { getPlatform } from "@/utils/platform";
 import { ScreenshotType } from "@/utils/types";
 import { zIndexs } from "@/utils/zIndex";
@@ -268,11 +268,11 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 	const { isReadyStatus, isReady } = usePluginServiceContext();
 
 	const executeVideoRecord = useCallback(() => {
-		appInfo("[DIAG] executeVideoRecord: start");
+		appDebug("[DIAG] executeVideoRecord: start");
 		const captureBoundingBoxInfo = captureBoundingBoxInfoRef.current;
 		const selectRect = selectLayerActionRef.current?.getSelectRect();
 		if (!captureBoundingBoxInfo || !selectRect) {
-			appInfo("[DIAG] executeVideoRecord: no boundingBoxInfo or selectRect", {
+			appDebug("[DIAG] executeVideoRecord: no boundingBoxInfo or selectRect", {
 				hasBoundingBoxInfo: !!captureBoundingBoxInfo,
 				hasSelectRect: !!selectRect,
 			});
@@ -280,7 +280,7 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 		}
 
 		const monitorRect = captureBoundingBoxInfo.transformWindowRect(selectRect);
-		appInfo("[DIAG] executeVideoRecord: monitorRect", {
+		appDebug("[DIAG] executeVideoRecord: monitorRect", {
 			min_x: monitorRect.min_x,
 			min_y: monitorRect.min_y,
 			max_x: monitorRect.max_x,
@@ -291,7 +291,7 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 			getPlatform() === "macos" &&
 			captureBoundingBoxInfo.getActiveMonitorRectList(monitorRect).length > 1
 		) {
-			appInfo("[DIAG] executeVideoRecord: multiMonitor, aborting");
+			appDebug("[DIAG] executeVideoRecord: multiMonitor, aborting");
 			message.warning(
 				intl.formatMessage({
 					id: "draw.extraTool.videoRecord.multiMonitor",
@@ -300,7 +300,7 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 			return;
 		}
 
-		appInfo("[DIAG] executeVideoRecord: creating videoRecord window");
+		appDebug("[DIAG] executeVideoRecord: creating videoRecord window");
 		createVideoRecordWindow(
 			monitorRect.min_x,
 			monitorRect.min_y,
@@ -308,14 +308,14 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 			monitorRect.max_y,
 		)
 			.then(() => {
-				appInfo(
+				appDebug(
 					"[DIAG] executeVideoRecord: window created, calling finishCapture",
 				);
 				// 等待录屏窗口创建完成后，再关闭 draw 窗口，避免竞态
 				finishCapture();
 			})
 			.catch((error) => {
-				appError(
+				appDebug(
 					"[DIAG] executeVideoRecord: createVideoRecordWindow failed",
 					error,
 				);
@@ -744,7 +744,7 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 
 			if (canHandleScreenshotTypeRef.current) {
 				const screenshotType = getScreenshotType()?.type;
-				appInfo("[DIAG] onEnableChange: handling screenshotType", {
+				appDebug("[DIAG] onEnableChange: handling screenshotType", {
 					screenshotType,
 					enable,
 				});
@@ -762,7 +762,7 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 						onCopyToClipboard();
 						break;
 					case ScreenshotType.VideoRecord:
-						appInfo("[DIAG] onEnableChange: triggering VideoRecord");
+						appDebug("[DIAG] onEnableChange: triggering VideoRecord");
 						onToolClick(DrawState.VideoRecord);
 						break;
 					case ScreenshotType.TopWindow:

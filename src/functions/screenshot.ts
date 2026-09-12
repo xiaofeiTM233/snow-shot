@@ -7,7 +7,7 @@ import { type AppSettingsData, AppSettingsGroup } from "@/types/appSettings";
 import { getCorrectHdrColorAlgorithm, getCaptureMethod } from "@/utils/appSettings";
 import { playCameraShutterSound } from "@/utils/audio";
 import { getImagePathFromSettings } from "@/utils/file";
-import { appError, appInfo } from "@/utils/log";
+import { appDebug, appError } from "@/utils/log";
 import { ScreenshotType } from "@/utils/types";
 
 export const executeScreenshot = async (
@@ -15,7 +15,7 @@ export const executeScreenshot = async (
 	windowLabel?: string,
 	captureHistoryId?: string,
 ) => {
-	appInfo("[DIAG] executeScreenshot: emit start", {
+	appDebug("[DIAG] executeScreenshot: emit start", {
 		type,
 		windowLabel,
 		captureHistoryId,
@@ -26,9 +26,9 @@ export const executeScreenshot = async (
 			windowLabel,
 			captureHistoryId,
 		});
-		appInfo("[DIAG] executeScreenshot: emit success");
+		appDebug("[DIAG] executeScreenshot: emit success");
 	} catch (error) {
-		appError("[DIAG] executeScreenshot: emit failed", error);
+		appDebug("[DIAG] executeScreenshot: emit failed", error);
 	}
 };
 
