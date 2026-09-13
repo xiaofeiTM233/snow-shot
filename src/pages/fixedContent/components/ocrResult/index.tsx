@@ -40,7 +40,11 @@ import {
 import { CUSTOM_MODEL_PREFIX, MarkdownContent } from "@/pages/tools/chat/page";
 import { appFetch, getUrl } from "@/services/tools";
 import { getChatModelsWithCache } from "@/services/tools/chat";
-import { AppSettingsGroup, type ChatApiConfig } from "@/types/appSettings";
+import {
+	AppSettingsGroup,
+	type ChatApiConfig,
+	OcrTextAutoWrapMode,
+} from "@/types/appSettings";
 import type { OcrDetectResult } from "@/types/commands/ocr";
 import type { ElementRect } from "@/types/commands/screenshot";
 import { writeHtmlToClipboard, writeTextToClipboard } from "@/utils/clipboard";
@@ -55,6 +59,18 @@ import {
 
 // 定义角度阈值常量（以度为单位）
 const ROTATION_THRESHOLD = 3; // 小于3度的旋转被视为误差，不进行旋转
+
+// OCR 文本的基础字号（px），仅用于测量文本的自然尺寸，最终显示字号由排版结果决定
+const OCR_BASE_FONT_SIZE = 12;
+// 自动换行时二分查找最大可用字号的次数（次数越多越精确，代价是更多次强制布局）
+const OCR_FONT_SIZE_SEARCH_COUNT = 5;
+// 换行门槛：单行的等效字号不低于「堆叠方向可用长度 × 该比例」时不换行。
+// 也就是说，只要字号缩到框的一半之前就能单行塞下，就保持单行，不为了填满高度去拆行
+const OCR_WRAP_FONT_SIZE_RATIO = 0.5;
+// 换行后每行至少要放得下这么多个字，否则换行没有意义，直接保持单行
+const OCR_MIN_CHARS_PER_LINE = 3;
+// 保守模式下，至少要能排满这么多行才换行，否则保持单行
+const OCR_MIN_LINE_COUNT_CONSERVATIVE = 3;
 
 export type AppOcrResult = {
 	result: OcrDetectResult;
@@ -273,6 +289,9 @@ export const OcrResult: React.FC<{
 				return;
 			}
 
+			const ocrTextAutoWrapMode =
+				getAppSettings()[AppSettingsGroup.FunctionOcr].ocrTextAutoWrapMode;
+
 			setCurrentOcrResult({
 				result: ocrResult,
 				ignoreScale: ignoreScale,
@@ -409,7 +428,7 @@ export const OcrResult: React.FC<{
 						textElement.style.fontSize = "16px";
 						textElement.style.wordBreak = "break-all";
 					} else {
-						textElement.style.fontSize = "12px";
+						textElement.style.fontSize = `${OCR_BASE_FONT_SIZE}px`;
 						textElement.style.whiteSpace = "nowrap";
 						textWrapElement.style.textAlign = "center";
 					}
@@ -431,17 +450,124 @@ export const OcrResult: React.FC<{
 								textHeight -= 1;
 							}
 
-							const scale = Math.min(height / textHeight, width / textWidth);
-							textElement.style.transform = `scale(${scale})`;
-							const leftWidth = Math.max(0, width - textWidth * scale); // 文本的宽度可能小于 OCR 识别的宽度
-							let letterSpaceWidth = 0;
-							if (textElement.innerText.length > 1) {
-								// letterSpace 对于每个字符都生效，行首也要加一个间距，所以 +1
-								const letterSpaceCount = textElement.innerText.length + 1;
-								letterSpaceWidth = leftWidth / letterSpaceCount / scale;
+							let scale = Math.min(height / textHeight, width / textWidth);
+							let isMultiLine = false;
+
+							if (
+								!ignoreScale &&
+								ocrTextAutoWrapMode !== OcrTextAutoWrapMode.Disabled &&
+								textWidth > 0 &&
+								textHeight > 0
+							) {
+								// 行方向的可用长度（横排为宽、竖排为高）
+								const lineLength = isVertical ? height : width;
+								// 换行堆叠方向的可用长度（横排为高、竖排为宽）
+								const blockLength = isVertical ? width : height;
+								const naturalLineLength = isVertical ? textHeight : textWidth;
+								const naturalBlockLength = isVertical ? textWidth : textHeight;
+								// 行高相对字号的比例，取实测值保证与最终排版一致
+								const lineRatio = naturalBlockLength / OCR_BASE_FONT_SIZE;
+
+								// 不换行时的最优等效字号
+								const singleLineFontSize = OCR_BASE_FONT_SIZE * scale;
+								// 上界一：只排一行且刚好占满堆叠方向时的字号
+								const maxFontSize = blockLength / lineRatio;
+								// 上界二：换行后每行至少还能放得下这么多字时的字号。
+								// 字号越大每行字数越少、行数越多，需要避免把文本拆成只有两三个字的碎行；
+								// 行数 ≈ 文本行方向长度 / 行方向可用长度，反解出字号上界
+								const charCount = Math.max(1, block.text.length);
+								const maxLineCount = Math.max(
+									1,
+									Math.floor(charCount / OCR_MIN_CHARS_PER_LINE),
+								);
+								const maxFontSizeByLineCount =
+									(maxLineCount * OCR_BASE_FONT_SIZE * lineLength) /
+									naturalLineLength;
+								const upperFontSize = Math.min(
+									maxFontSize,
+									maxFontSizeByLineCount,
+								);
+
+								// 填满 OCR 框时的理论行数，用于判断值不值得换行
+								const optimalLineCount = Math.sqrt(
+									(blockLength * naturalLineLength) /
+										(lineLength * naturalBlockLength),
+								);
+								// 保守模式要求至少能排满这么多行才换行，自动模式不做行数下限要求
+								const minLineCount =
+									ocrTextAutoWrapMode === OcrTextAutoWrapMode.Conservative
+										? OCR_MIN_LINE_COUNT_CONSERVATIVE
+										: 1;
+
+								if (
+									singleLineFontSize <
+										blockLength * OCR_WRAP_FONT_SIZE_RATIO &&
+									optimalLineCount >= minLineCount &&
+									upperFontSize > singleLineFontSize
+								) {
+									// 单行会被宽度压到框的一半以下，改为自动换行。
+									// 字号越大，换行后的总高度单调不减，因此可以二分出能塞进 OCR 框的最大字号，
+									// 使最终字号尽量接近源文字的实际字号
+									textElement.style.whiteSpace = "normal";
+									textElement.style.overflowWrap = "anywhere";
+									textElement.style.minWidth = "0";
+									textElement.style.lineHeight = `${lineRatio}`;
+									if (isVertical) {
+										textElement.style.maxHeight = `${lineLength}px`;
+									} else {
+										textElement.style.maxWidth = `${lineLength}px`;
+									}
+
+									// singleLineFontSize 一定能单行放下，作为可行下界
+									let low = singleLineFontSize;
+									let high = upperFontSize;
+									for (let i = 0; i < OCR_FONT_SIZE_SEARCH_COUNT; i++) {
+										const mid = (low + high) / 2;
+										textElement.style.fontSize = `${mid}px`;
+										const measuredBlockLength = isVertical
+											? textElement.clientWidth
+											: textElement.clientHeight;
+										if (measuredBlockLength <= blockLength) {
+											low = mid;
+										} else {
+											high = mid;
+										}
+									}
+									textElement.style.fontSize = `${low}px`;
+
+									// 换行后尺寸发生变化，需要重新测量
+									textWidth = textElement.clientWidth;
+									textHeight = textElement.clientHeight;
+									if (isVertical) {
+										textWidth -= 1;
+									} else {
+										textHeight -= 1;
+									}
+									scale = Math.min(height / textHeight, width / textWidth);
+
+									// 一行约占 lineRatio 倍字号的高度，超过 1.5 倍说明确实换成了多行
+									isMultiLine =
+										(isVertical ? textWidth : textHeight) >
+										low * lineRatio * 1.5;
+								}
 							}
-							textElement.style.letterSpacing = `${letterSpaceWidth}px`;
-							textElement.style.textIndent = `${letterSpaceWidth}px`;
+
+							textElement.style.transform = `scale(${scale})`;
+							if (isMultiLine) {
+								// 多行时字间距会同时作用在每一行上，容易把行撑破，不做拉伸
+								textElement.style.letterSpacing = "0";
+								textElement.style.textIndent = "0";
+							} else {
+								const leftWidth = Math.max(0, width - textWidth * scale); // 文本的宽度可能小于 OCR 识别的宽度
+								let letterSpaceWidth = 0;
+								if (textElement.innerText.length > 1) {
+									// letterSpace 对于每个字符都生效，行首也要加一个间距，所以 +1
+									const letterSpaceCount = textElement.innerText.length + 1;
+									letterSpaceWidth = leftWidth / letterSpaceCount / scale;
+								}
+								textElement.style.letterSpacing = `${letterSpaceWidth}px`;
+								textElement.style.textIndent = `${letterSpaceWidth}px`;
+							}
 							textBackgroundElement.style.transform =
 								textWrapElement.style.transform = `translate(${centerX - width * 0.5}px, ${centerY - height * 0.5}px) rotate(${rotationDeg}deg)`;
 
@@ -457,7 +583,12 @@ export const OcrResult: React.FC<{
 				containerElementRef.current.style.opacity = "1";
 			}
 		},
-		[token.colorBgContainer, token.colorText, setCurrentOcrResult],
+		[
+			token.colorBgContainer,
+			token.colorText,
+			setCurrentOcrResult,
+			getAppSettings,
+		],
 	);
 	const setScale = useCallback((scale: number) => {
 		if (

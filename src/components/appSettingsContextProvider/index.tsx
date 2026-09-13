@@ -903,6 +903,11 @@ const AppSettingsContextProviderCore: React.FC<{
 							? newSettings.markdownVisionModelSystemPrompt
 							: (prevSettings?.markdownVisionModelSystemPrompt ??
 								defaultAppSettingsData[group].markdownVisionModelSystemPrompt),
+					ocrTextAutoWrapMode:
+						typeof newSettings?.ocrTextAutoWrapMode === "string"
+							? newSettings.ocrTextAutoWrapMode
+							: (prevSettings?.ocrTextAutoWrapMode ??
+								defaultAppSettingsData[group].ocrTextAutoWrapMode),
 					customOcrModelConfigList: Array.isArray(
 						newSettings?.customOcrModelConfigList,
 					)

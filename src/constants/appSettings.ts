@@ -20,6 +20,7 @@ import {
 	LogRetentionDuration,
 	OcrDetectAfterAction,
 	OcrModel,
+	OcrTextAutoWrapMode,
 	RenderBackend,
 	RunLogLevel,
 	TrayIconClickAction,
@@ -176,6 +177,7 @@ export const defaultAppSettingsData: AppSettingsData = {
 		ocrModel: OcrModel.RapidOcrV4,
 		customOcrModelConfigList: [],
 		onlineOcrModelConfigList: [],
+		ocrTextAutoWrapMode: OcrTextAutoWrapMode.Auto,
 		htmlVisionModelSystemPrompt: `You are a professional image-to-HTML conversion engine. Your sole objective is to accurately convert images into clean, semantic HTML code.
 
 ## Conversion Rules (must follow)

@@ -395,6 +395,15 @@ export enum OcrModel {
 	RapidOcrV4 = "RapidOcrV4",
 }
 
+export enum OcrTextAutoWrapMode {
+	/** 不自动换行，文字始终压缩在单行内 */
+	Disabled = "disabled",
+	/** 保守换行，最多 3 行，适合窄文本框 */
+	Conservative = "conservative",
+	/** 自动换行，最多 10 行，优先让字号接近原始文字 */
+	Auto = "auto",
+}
+
 export type CustomOcrModelConfig = {
 	/** 模型名称 */
 	model_name: string;
@@ -683,6 +692,8 @@ export type AppSettingsData = {
 		htmlVisionModelSystemPrompt: string;
 		/** 图片转为 Markdown 的 System 提示词 */
 		markdownVisionModelSystemPrompt: string;
+		/** OCR 文本自动换行模式 */
+		ocrTextAutoWrapMode: OcrTextAutoWrapMode;
 	};
 	[AppSettingsGroup.FunctionTranslation]: {
 		/** 优化 AI 翻译的排版 */

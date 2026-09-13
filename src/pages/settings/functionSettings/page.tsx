@@ -79,6 +79,7 @@ import {
 	KeyDisplayDirection,
 	OcrDetectAfterAction,
 	OcrModel,
+	OcrTextAutoWrapMode,
 	type OnlineOcrModelConfig,
 	TranslationServiceType,
 	TrayIconClickAction,
@@ -154,11 +155,7 @@ type OcrModelSelectFieldProps = {
 };
 
 const OcrModelSelectField = memo<OcrModelSelectFieldProps>(
-	({
-		ocrModelOptions,
-		customOcrModelConfigList,
-		onlineOcrModelConfigList,
-	}) => {
+	({ ocrModelOptions, customOcrModelConfigList, onlineOcrModelConfigList }) => {
 		const intl = useIntl();
 
 		const allOptions = useMemo(() => {
@@ -1652,12 +1649,8 @@ export const FunctionSettingsPage = () => {
 										}) => (
 											<OcrModelSelectField
 												ocrModelOptions={ocrModelOptions}
-												customOcrModelConfigList={
-													customOcrModelConfigList
-												}
-												onlineOcrModelConfigList={
-													onlineOcrModelConfigList
-												}
+												customOcrModelConfigList={customOcrModelConfigList}
+												onlineOcrModelConfigList={onlineOcrModelConfigList}
 											/>
 										)}
 									</ProFormDependency>
@@ -1683,6 +1676,46 @@ export const FunctionSettingsPage = () => {
 										/>
 									</Col>
 								)}
+							</Row>
+
+							<Row gutter={token.marginLG}>
+								<Col span={12}>
+									<ProFormSelect
+										name="ocrTextAutoWrapMode"
+										label={
+											<IconLabel
+												label={
+													<FormattedMessage id="settings.functionSettings.ocrSettings.ocrTextAutoWrapMode" />
+												}
+												tooltipTitle={
+													<FormattedMessage id="settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.tip" />
+												}
+											/>
+										}
+										layout="vertical"
+										options={[
+											{
+												label: (
+													<FormattedMessage id="settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.disabled" />
+												),
+												value: OcrTextAutoWrapMode.Disabled,
+											},
+											{
+												label: (
+													<FormattedMessage id="settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.conservative" />
+												),
+												value: OcrTextAutoWrapMode.Conservative,
+											},
+											{
+												label: (
+													<FormattedMessage id="settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.auto" />
+												),
+												value: OcrTextAutoWrapMode.Auto,
+											},
+										]}
+										allowClear={false}
+									/>
+								</Col>
 							</Row>
 
 							<Row gutter={token.marginLG}>

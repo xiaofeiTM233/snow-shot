@@ -742,6 +742,14 @@ export const settings = {
 	"settings.systemSettings.coreSettings.hotLoadPageCount.tip":
 		"Hot load pages for fast loading of pinned clipboard content to screen, video recording, fullscreen canvas, etc., but also increases memory usage",
 	"settings.functionSettings.ocrSettings": "OCR Settings",
+	"settings.functionSettings.ocrSettings.ocrTextAutoWrapMode": "Auto Text Wrap",
+	"settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.tip":
+		"Wrap text automatically when it would otherwise be squeezed into one line, keeping the font size close to the original text",
+	"settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.disabled":
+		"Disabled",
+	"settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.conservative":
+		"Conservative",
+	"settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.auto": "Auto",
 	"settings.functionSettings.ocrSettings.htmlVisionModel": "Vision Model",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.tip":
 		"Vision model for converting images to HTML",

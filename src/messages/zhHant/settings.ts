@@ -707,6 +707,14 @@ export const settings = {
 	"settings.systemSettings.coreSettings.hotLoadPageCount.tip":
 		"透過熱載入頁面，實現貼圖、錄影、全螢幕畫布等功能的快速載入，但同時提高了記憶體的佔用",
 	"settings.functionSettings.ocrSettings": "文字辨識",
+	"settings.functionSettings.ocrSettings.ocrTextAutoWrapMode": "文字自動換行",
+	"settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.tip":
+		"文字過多導致字號被壓縮時自動換行，使顯示字號接近原始文字的字號",
+	"settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.disabled":
+		"不換行",
+	"settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.conservative":
+		"保守",
+	"settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.auto": "自動",
 	"settings.functionSettings.ocrSettings.htmlVisionModel": "視覺理解模型",
 	"settings.functionSettings.ocrSettings.htmlVisionModel.tip":
 		"將圖片轉為 HTML 的視覺理解模型",
