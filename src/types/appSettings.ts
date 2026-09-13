@@ -119,10 +119,66 @@ export type ChatApiConfig = {
 export enum TranslationApiType {
 	DeepL = "translation_api_deepl",
 	Custom = "translation_api_custom",
+	Youdao = "translation_api_youdao",
+	Aliyun = "translation_api_aliyun",
+	Volcengine = "translation_api_volcengine",
+	Baidu = "translation_api_baidu",
 }
+
+/** 在线翻译服务类型，值同时编码厂商与服务 */
+export enum TranslationServiceType {
+	DeepL = "deepl",
+	Custom = "custom",
+	YoudaoText = "youdao:text",
+	YoudaoLLM = "youdao:llm",
+	AliyunGeneral = "aliyun:general",
+	AliyunProfessional = "aliyun:professional",
+	VolcengineText = "volcengine:translate",
+	BaiduText = "baidu:translate",
+}
+
+export const isTranslationServiceType = (
+	value: unknown,
+): value is TranslationServiceType => {
+	return (
+		typeof value === "string" &&
+		Object.values(TranslationServiceType).includes(
+			value as TranslationServiceType,
+		)
+	);
+};
+
+export const TRANSLATION_API_TYPE_BY_SERVICE_TYPE: Record<
+	TranslationServiceType,
+	TranslationApiType
+> = {
+	[TranslationServiceType.DeepL]: TranslationApiType.DeepL,
+	[TranslationServiceType.Custom]: TranslationApiType.Custom,
+	[TranslationServiceType.YoudaoText]: TranslationApiType.Youdao,
+	[TranslationServiceType.YoudaoLLM]: TranslationApiType.Youdao,
+	[TranslationServiceType.AliyunGeneral]: TranslationApiType.Aliyun,
+	[TranslationServiceType.AliyunProfessional]: TranslationApiType.Aliyun,
+	[TranslationServiceType.VolcengineText]: TranslationApiType.Volcengine,
+	[TranslationServiceType.BaiduText]: TranslationApiType.Baidu,
+};
+
+export const TRANSLATION_DEFAULT_SERVICE_TYPE_BY_API_TYPE: Record<
+	TranslationApiType,
+	TranslationServiceType
+> = {
+	[TranslationApiType.DeepL]: TranslationServiceType.DeepL,
+	[TranslationApiType.Custom]: TranslationServiceType.Custom,
+	[TranslationApiType.Youdao]: TranslationServiceType.YoudaoText,
+	[TranslationApiType.Aliyun]: TranslationServiceType.AliyunGeneral,
+	[TranslationApiType.Volcengine]: TranslationServiceType.VolcengineText,
+	[TranslationApiType.Baidu]: TranslationServiceType.BaiduText,
+};
 
 export type DeepLApiConfig = {
 	api_type: TranslationApiType.DeepL;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
+	service_type: TranslationServiceType.DeepL;
 	api_uri: string;
 	api_key: string;
 	deepl_prefer_quality_optimized?: boolean;
@@ -130,6 +186,9 @@ export type DeepLApiConfig = {
 
 export type CustomApiConfig = {
 	api_type: TranslationApiType.Custom;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
+	service_type: TranslationServiceType.Custom;
 	api_uri: string;
 	api_key?: string;
 	/** 每秒最大请求数，默认为 5 */
@@ -138,7 +197,57 @@ export type CustomApiConfig = {
 	max_paragraph_count?: number;
 };
 
-export type TranslationApiConfig = DeepLApiConfig | CustomApiConfig;
+export type YoudaoTranslationApiConfig = {
+	api_type: TranslationApiType.Youdao;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
+	/** 有道服务类型：文本翻译 / 大模型翻译 */
+	service_type: TranslationServiceType.YoudaoText | TranslationServiceType.YoudaoLLM;
+	app_key: string;
+	app_secret: string;
+};
+
+export type AliyunTranslationApiConfig = {
+	api_type: TranslationApiType.Aliyun;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
+	/** 阿里云服务类型：通用版 / 专业版 */
+	service_type:
+		| TranslationServiceType.AliyunGeneral
+		| TranslationServiceType.AliyunProfessional;
+	secret_id: string;
+	secret_key: string;
+};
+
+export type VolcengineTranslationApiConfig = {
+	api_type: TranslationApiType.Volcengine;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
+	service_type: TranslationServiceType.VolcengineText;
+	secret_id: string;
+	secret_key: string;
+	/** 火山引擎 地域，默认 cn-north-1 */
+	region?: string;
+};
+
+export type BaiduTranslationApiConfig = {
+	api_type: TranslationApiType.Baidu;
+	/** 服务名称，用于在翻译服务列表中显示 */
+	service_name?: string;
+	service_type: TranslationServiceType.BaiduText;
+	/** 百度智能云 API Key（AK） */
+	api_key: string;
+	/** 百度智能云 Secret Key（SK） */
+	secret_key: string;
+};
+
+export type TranslationApiConfig =
+	| DeepLApiConfig
+	| CustomApiConfig
+	| YoudaoTranslationApiConfig
+	| AliyunTranslationApiConfig
+	| VolcengineTranslationApiConfig
+	| BaiduTranslationApiConfig;
 
 export enum AppSettingsGroup {
 	Common = "common",
@@ -298,16 +407,36 @@ export type CustomOcrModelConfig = {
 export enum OnlineOcrServiceType {
 	/** 有道 通用文字识别 */
 	YoudaoOcr = "youdao:ocr",
+	/** 有道 图片翻译 */
+	YoudaoImageTranslation = "youdao:imageTranslation",
+	/** 阿里云 图片翻译 */
+	AliyunImageTranslation = "aliyun:imageTranslation",
+	/** 火山引擎 图片翻译 */
+	VolcengineImageTranslation = "volcengine:imageTranslation",
+	/** 百度 图片翻译 */
+	BaiduImageTranslation = "baidu:imageTranslation",
 	/** 腾讯云 通用印刷体识别 */
 	TencentGeneralBasicOcr = "tencent:GeneralBasicOCR",
 	/** 腾讯云 通用文字识别（高精度版） */
 	TencentGeneralAccurateOcr = "tencent:GeneralAccurateOCR",
+	/** 百度 通用文字识别（高精度含位置版） */
+	BaiduGeneralAccurate = "baidu:GeneralAccurate",
+	/** 百度 通用文字识别（标准含位置版） */
+	BaiduGeneral = "baidu:General",
+	/** 百度 网络图片文字识别（含位置版） */
+	BaiduWebImageLocation = "baidu:WebImageLocation",
 	/** 百度 通用文字识别（标准版） */
 	BaiduGeneralBasic = "baidu:GeneralBasic",
 	/** 百度 通用文字识别（高精度版） */
 	BaiduGeneralAccurateBasic = "baidu:GeneralAccurateBasic",
+	/** 百度 网络图片文字识别 */
+	BaiduWebImage = "baidu:WebImage",
+	/** 百度 手写文字识别 */
+	BaiduHandwriting = "baidu:Handwriting",
 	/** 阿里云 通用文字识别 */
 	AliyunRecognizeGeneral = "aliyun:RecognizeGeneral",
+	/** 阿里云 通用手写体识别 */
+	AliyunRecognizeHandwriting = "aliyun:RecognizeHandwriting",
 	/** 火山引擎 通用文字识别 */
 	VolcengineOcrNormal = "volcengine:OCRNormal",
 	/** 自定义 API */
@@ -321,6 +450,8 @@ export type OnlineOcrModelConfig = {
 	service_type: OnlineOcrServiceType | string;
 	/** 识别语言，取值跟随对应平台文档 */
 	language: string;
+	/** 翻译目标语言，仅图片翻译类服务使用 */
+	target_language?: string;
 	/** 自定义 API 地址 */
 	api_uri?: string;
 	/** 百度 API Key */
@@ -595,6 +726,10 @@ export type AppSettingsData = {
 		saveFileDirectory: string;
 		/** 保存文件格式 */
 		saveFileFormat: ImageFormat;
+		/** 保存文件时显示参数弹窗 */
+		saveFileDialog: boolean;
+		/** 保存文件参数弹窗默认缩放百分比 */
+		saveFileResizePercent: number;
 		/** OCR 后自动执行 */
 		ocrAfterAction: OcrDetectAfterAction;
 		/** OCR 复制时复制文本 */

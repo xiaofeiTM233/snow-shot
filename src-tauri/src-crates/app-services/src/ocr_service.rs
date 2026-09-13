@@ -3,8 +3,10 @@ use std::path::{Path, PathBuf};
 use num_cpus;
 use ort::session::builder::SessionBuilder;
 use paddle_ocr_rs::ocr_lite::OcrLite;
-use paddle_ocr_rs::ocr_result::TextBlock;
 use serde::{Deserialize, Serialize};
+
+/// OCR 结果类型，供本地 / 在线 OCR 及翻译模块共用
+pub use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 
 #[derive(Serialize, Deserialize)]
 pub struct OcrDetectResult {

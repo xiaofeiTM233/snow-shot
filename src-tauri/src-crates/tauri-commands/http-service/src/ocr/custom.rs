@@ -4,10 +4,11 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use serde::Deserialize;
 
-use super::build_http_client;
-use super::normalize_error_code;
 use super::ocr_line_to_text_block;
 use super::OnlineOcrConfig;
+use crate::common::build_http_client;
+use crate::common::normalize_error_code;
+use crate::common::post_and_log;
 use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 #[derive(Deserialize)]
@@ -43,19 +44,20 @@ pub(super) async fn detect_with_custom(
     );
 
     let client = build_http_client()?;
-    let response = client
-        .post(api_uri)
-        .header("Content-Type", "application/json")
-        .body(serde_json::json!({ "q": data_url }).to_string())
-        .send()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Custom request failed: {}", e))?;
-
-    let status = response.status();
-    let body = response
-        .text()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Custom read response failed: {}", e))?;
+    let request_body = serde_json::json!({ "q": data_url }).to_string();
+    let request_body_for_log = format!("(json, {} bytes)", request_body.len());
+    let (status, body) = post_and_log(
+        &client,
+        "[custom_ocr]",
+        api_uri,
+        &request_body_for_log,
+        |request| {
+            request
+                .header("Content-Type", "application/json")
+                .body(request_body)
+        },
+    )
+    .await?;
 
     let ocr_response: CustomOcrResponse = serde_json::from_str(&body).map_err(|e| {
         format!(

@@ -9,12 +9,11 @@ use std::io::Cursor;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
-use hmac::{Hmac, Mac};
-use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
-use snow_shot_app_services::ocr_service::OcrDetectResult;
+use snow_shot_app_services::ocr_service::{OcrDetectResult, Point, TextBlock};
+
+use crate::common::{clamp_to_u32, parse_number_list};
 
 pub(crate) const YOUDAO_SERVICE_TYPE_PREFIX: &str = "youdao:";
 pub(crate) const TENCENT_SERVICE_TYPE_PREFIX: &str = "tencent:";
@@ -23,8 +22,6 @@ pub(crate) const ALIYUN_SERVICE_TYPE_PREFIX: &str = "aliyun:";
 pub(crate) const VOLC_SERVICE_TYPE_PREFIX: &str = "volcengine:";
 pub(crate) const CUSTOM_SERVICE_TYPE_PREFIX: &str = "custom:";
 
-type HmacSha256 = Hmac<Sha256>;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OnlineOcrConfig {
     /// 服务类型，格式为 `provider:service`，例如 `youdao:ocr`、`tencent:GeneralBasicOCR`
@@ -32,6 +29,9 @@ pub struct OnlineOcrConfig {
     /// 识别语言，取值跟随对应平台文档
     #[serde(default)]
     pub language: String,
+    /// 翻译目标语言，仅图片翻译类服务使用
+    #[serde(default)]
+    pub target_language: String,
     /// 自定义 API 地址
     #[serde(default)]
     pub api_uri: String,
@@ -87,7 +87,23 @@ pub async fn ocr_detect_online(
     let image = image::load(Cursor::new(image_data), image::ImageFormat::Png)
         .map_err(|_| "[ocr_detect_online] Invalid image".to_string())?;
 
-    if config.service_type.starts_with(YOUDAO_SERVICE_TYPE_PREFIX) {
+    log::info!(
+        "[ocr_detect_online] request, service: {}, image: {} bytes",
+        config.service_type,
+        image_data.len()
+    );
+
+    // 图片翻译类服务需要在前缀判断之前处理，避免被同名厂商的 OCR 服务拦截
+    let result = if config.service_type == crate::translation::YOUDAO_IMAGE_TRANSLATION_SERVICE_TYPE
+    {
+        crate::translation::youdao::translate_image_as_ocr(&config, &image).await
+    } else if config.service_type == crate::translation::ALIYUN_IMAGE_TRANSLATION_SERVICE_TYPE {
+        crate::translation::aliyun::translate_image_as_ocr(&config, &image).await
+    } else if config.service_type == crate::translation::VOLC_IMAGE_TRANSLATION_SERVICE_TYPE {
+        crate::translation::volcengine::translate_image_as_ocr(&config, &image).await
+    } else if config.service_type == crate::translation::BAIDU_IMAGE_TRANSLATION_SERVICE_TYPE {
+        crate::translation::baidu::translate_image_as_ocr(&config, &image).await
+    } else if config.service_type.starts_with(YOUDAO_SERVICE_TYPE_PREFIX) {
         youdao::detect_with_youdao(&config, &image, detect_angle).await
     } else if config.service_type.starts_with(TENCENT_SERVICE_TYPE_PREFIX) {
         tencent::detect_with_tencent(&config, &image).await
@@ -104,23 +120,25 @@ pub async fn ocr_detect_online(
             "[ocr_detect_online] Unknown service type: {}",
             config.service_type
         ))
+    };
+
+    match &result {
+        Ok(result) => log::info!(
+            "[ocr_detect_online] result, service: {}, text blocks: {}",
+            config.service_type,
+            result.text_blocks.len()
+        ),
+        Err(error) => log::warn!("[ocr_detect_online] failed: {}", error),
     }
+
+    result
 }
 
-fn build_http_client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .timeout(std::time::Duration::from_secs(60))
-        .build()
-        .map_err(|e| format!("[ocr_detect_online] Failed to build http client: {}", e))
-}
-
-/// 压缩图片以满足在线平台的限制：超过最大边长时等比缩放，体积仍超限时降级为 JPEG
-fn prepare_image_bytes(
+/// 按最大边长限制等比缩放图片，拒绝无有效尺寸的输入
+fn prepare_resized_image(
     image: &image::DynamicImage,
     max_side: u32,
-    max_base64_length: usize,
-) -> Result<Vec<u8>, String> {
+) -> Result<image::DynamicImage, String> {
     // 拒绝无有效尺寸的图片，避免后续缩放与编码产生异常结果
     if image.width() == 0 || image.height() == 0 {
         return Err("[ocr_detect_online] Invalid image size".to_string());
@@ -136,6 +154,17 @@ fn prepare_image_bytes(
             image::imageops::FilterType::Lanczos3,
         );
     }
+
+    Ok(img)
+}
+
+/// 压缩图片以满足在线平台的限制：超过最大边长时等比缩放，体积仍超限时降级为 JPEG
+pub(crate) fn prepare_image_bytes(
+    image: &image::DynamicImage,
+    max_side: u32,
+    max_base64_length: usize,
+) -> Result<Vec<u8>, String> {
+    let img = prepare_resized_image(image, max_side)?;
 
     let mut png_bytes = Vec::new();
     img.write_to(&mut Cursor::new(&mut png_bytes), image::ImageFormat::Png)
@@ -158,20 +187,8 @@ fn prepare_image_bytes(
     Err("[ocr_detect_online] Image is too large to send".to_string())
 }
 
-/// 将坐标收敛到 u32 范围；超出 u32::MAX 的浮点值直接取上限，
-/// 避免 round() 后的 float->int 转换受精度影响
-fn clamp_to_u32(value: f64) -> u32 {
-    if value.is_nan() || value <= 0.0 {
-        0
-    } else if value >= u32::MAX as f64 {
-        u32::MAX
-    } else {
-        value.round() as u32
-    }
-}
-
 /// 将矩形 (x, y, 宽, 高) 转为四个角点（左上/右上/右下/左下）
-fn rect_to_box_points(x: f64, y: f64, width: f64, height: f64) -> Vec<Point> {
+pub(crate) fn rect_to_box_points(x: f64, y: f64, width: f64, height: f64) -> Vec<Point> {
     vec![
         Point {
             x: clamp_to_u32(x),
@@ -192,18 +209,10 @@ fn rect_to_box_points(x: f64, y: f64, width: f64, height: f64) -> Vec<Point> {
     ]
 }
 
-/// 解析逗号分隔的数值串，例如 "8,2,717,30"
-fn parse_number_list(value: &str) -> Vec<f64> {
-    value
-        .split(',')
-        .filter_map(|item| item.trim().parse::<f64>().ok())
-        .collect()
-}
-
 /// 解析有道系服务的 boundingBox 字符串为四个角点（左上/右上/右下/左下）：
 /// 8 个数值时依次为 左上(x,y)、右上(x,y)、右下(x,y)、左下(x,y)，
 /// 4 个数值时为 x,y,宽,高
-fn parse_bounding_box(bounding_box: &str) -> Option<Vec<Point>> {
+pub(crate) fn parse_bounding_box(bounding_box: &str) -> Option<Vec<Point>> {
     let values = parse_number_list(bounding_box);
     match values.len() {
         len if len >= 8 => Some(
@@ -254,48 +263,67 @@ fn ocr_line_to_text_block(line: &OcrLine) -> Option<TextBlock> {
     })
 }
 
-/// 将 errorCode 归一化为字符串（缺失或 null 返回空串），兼容字符串与数值两种形态
-fn normalize_error_code(error_code: &Option<serde_json::Value>) -> String {
-    match error_code {
-        Some(serde_json::Value::String(value)) => value.clone(),
-        Some(serde_json::Value::Null) | None => String::new(),
-        Some(other) => other.to_string(),
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn point_coords(points: &[Point]) -> Vec<(u32, u32)> {
+        points.iter().map(|p| (p.x, p.y)).collect()
     }
-}
 
-fn hmac_sha256(key: &[u8], data: &[u8]) -> Result<Vec<u8>, String> {
-    let mut mac = HmacSha256::new_from_slice(key)
-        .map_err(|e| format!("[ocr_detect_online] Failed to create hmac: {}", e))?;
-    mac.update(data);
-    Ok(mac.finalize().into_bytes().to_vec())
-}
+    #[test]
+    fn test_parse_bounding_box_rect() {
+        // 4 值格式：x,y,宽,高
+        let points = parse_bounding_box("8,2,717,30").unwrap();
+        assert_eq!(
+            point_coords(&points),
+            vec![(8, 2), (725, 2), (725, 32), (8, 32)]
+        );
+    }
 
-/// 由 Unix 时间戳计算 UTC 日期（yyyy-MM-dd），用于 TC3 / V4 签名
-fn utc_date_from_unix(timestamp: u64) -> String {
-    let days = (timestamp / 86_400) as i64;
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if m <= 2 { y + 1 } else { y };
+    #[test]
+    fn test_parse_bounding_box_corners() {
+        // 8 值格式：左上(x,y)、右上(x,y)、右下(x,y)、左下(x,y)
+        let points = parse_bounding_box("1,2,3,4,5,6,7,8").unwrap();
+        assert_eq!(
+            point_coords(&points),
+            vec![(1, 2), (3, 4), (5, 6), (7, 8)]
+        );
+    }
 
-    format!("{:04}-{:02}-{:02}", y, m, d)
-}
+    #[test]
+    fn test_parse_bounding_box_invalid() {
+        assert!(parse_bounding_box("").is_none());
+        assert!(parse_bounding_box("abc").is_none());
+        assert!(parse_bounding_box("1,2,3").is_none());
+    }
 
-/// 由 Unix 时间戳计算 UTC 日期时间（yyyy-MM-ddTHH:mm:ssZ），用于阿里云 V3 签名
-fn utc_datetime_from_unix(timestamp: u64) -> String {
-    let date = utc_date_from_unix(timestamp);
-    let secs_of_day = timestamp % 86_400;
-    format!(
-        "{}T{:02}:{:02}:{:02}Z",
-        date,
-        secs_of_day / 3600,
-        (secs_of_day % 3600) / 60,
-        secs_of_day % 60
-    )
+    #[test]
+    fn test_ocr_line_to_text_block_prefers_vertices() {
+        let line = OcrLine {
+            bounding_box: "0,0,10,10".to_string(),
+            vertices_bounding_box: "1,1,2,1,2,2,1,2".to_string(),
+            text: "hello".to_string(),
+        };
+
+        let block = ocr_line_to_text_block(&line).unwrap();
+        assert_eq!(block.text, "hello");
+        assert_eq!(
+            point_coords(&block.box_points),
+            vec![(1, 1), (2, 1), (2, 2), (1, 2)]
+        );
+
+        // vertices 缺省时退回 boundingBox
+        let line = OcrLine {
+            bounding_box: "0,0,10,10".to_string(),
+            vertices_bounding_box: String::new(),
+            text: "world".to_string(),
+        };
+
+        let block = ocr_line_to_text_block(&line).unwrap();
+        assert_eq!(
+            point_coords(&block.box_points),
+            vec![(0, 0), (10, 0), (10, 10), (0, 10)]
+        );
+    }
 }

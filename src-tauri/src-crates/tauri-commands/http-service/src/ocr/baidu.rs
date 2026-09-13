@@ -1,14 +1,14 @@
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
-use paddle_ocr_rs::ocr_result::TextBlock;
 use serde::Deserialize;
+use snow_shot_app_services::ocr_service::{OcrDetectResult, TextBlock};
 
-use super::build_http_client;
-use super::normalize_error_code;
 use super::prepare_image_bytes;
 use super::rect_to_box_points;
 use super::OnlineOcrConfig;
-use snow_shot_app_services::ocr_service::OcrDetectResult;
+use crate::common::build_http_client;
+use crate::common::normalize_error_code;
+use crate::common::post_and_log;
 
 const BAIDU_TOKEN_ENDPOINT: &str = "https://aip.baidubce.com/oauth/2.0/token";
 const BAIDU_OCR_ENDPOINT: &str = "https://aip.baidubce.com/rest/2.0/ocr/v1";
@@ -55,6 +55,41 @@ struct BaiduLocation {
     height: f64,
 }
 
+pub(crate) async fn get_access_token(api_key: &str, secret_key: &str) -> Result<String, String> {
+    let client = build_http_client()?;
+
+    // 通过 API Key / Secret Key 换取 access_token
+    // 凭据在 query 参数中，为避免密钥与令牌泄漏到日志，仅记录请求与结果状态
+    log::info!("[baidu_ocr] token request");
+    let token_response: BaiduTokenResponse = client
+        .get(BAIDU_TOKEN_ENDPOINT)
+        .query(&[
+            ("grant_type", "client_credentials"),
+            ("client_id", api_key),
+            ("client_secret", secret_key),
+        ])
+        .send()
+        .await
+        .map_err(|e| format!("[baidu_ocr] Baidu token request failed: {}", e))?
+        .json()
+        .await
+        .map_err(|e| format!("[baidu_ocr] Baidu parse token response failed: {}", e))?;
+    log::info!(
+        "[baidu_ocr] token response, has_token: {}",
+        token_response.access_token.is_some()
+    );
+
+    let Some(access_token) = token_response.access_token else {
+        return Err(format!(
+            "[ocr_detect_online] Baidu token error {}: {}",
+            token_response.error.unwrap_or_default(),
+            token_response.error_description.unwrap_or_default()
+        ));
+    };
+
+    Ok(access_token)
+}
+
 pub(super) async fn detect_with_baidu(
     config: &OnlineOcrConfig,
     image: &image::DynamicImage,
@@ -67,44 +102,25 @@ pub(super) async fn detect_with_baidu(
         return Err("[ocr_detect_online] Baidu API Key or Secret Key is empty".to_string());
     }
 
+    let access_token = get_access_token(api_key, secret_key).await?;
+
     let action = config
         .service_type
         .strip_prefix(super::BAIDU_SERVICE_TYPE_PREFIX)
         .unwrap_or("GeneralBasic");
     let path = match action {
+        "General" => "general",
         "GeneralAccurateBasic" => "accurate_basic",
+        "GeneralAccurate" => "accurate",
+        "WebImage" => "webimage",
+        "WebImageLocation" => "webimage_location",
+        "Handwriting" => "handwriting",
         _ => "general_basic",
     };
+    // 仅标准版/标准含位置版支持 language_type 参数
+    let supports_language_type = matches!(path, "general_basic" | "general");
 
     let client = build_http_client()?;
-
-    // 通过 API Key / Secret Key 换取 access_token
-    let token_response: BaiduTokenResponse = client
-        .get(BAIDU_TOKEN_ENDPOINT)
-        .query(&[
-            ("grant_type", "client_credentials"),
-            ("client_id", api_key),
-            ("client_secret", secret_key),
-        ])
-        .send()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Baidu token request failed: {}", e))?
-        .json()
-        .await
-        .map_err(|e| {
-            format!(
-                "[ocr_detect_online] Baidu parse token response failed: {}",
-                e
-            )
-        })?;
-
-    let Some(access_token) = token_response.access_token else {
-        return Err(format!(
-            "[ocr_detect_online] Baidu token error {}: {}",
-            token_response.error.unwrap_or_default(),
-            token_response.error_description.unwrap_or_default()
-        ));
-    };
 
     let image_bytes = prepare_image_bytes(image, BAIDU_MAX_IMAGE_SIDE, BAIDU_MAX_BASE64_LENGTH)?;
     let img_base64 = BASE64_STANDARD.encode(&image_bytes);
@@ -116,26 +132,27 @@ pub(super) async fn detect_with_baidu(
         config.language.as_str()
     };
 
-    let response = client
-        .post(format!("{}/{}", BAIDU_OCR_ENDPOINT, path))
-        .query(&[("access_token", access_token.as_str())])
-        .form(&[
-            ("image", img_base64.as_str()),
-            ("language_type", language_type),
-            (
-                "detect_direction",
-                if detect_angle { "true" } else { "false" },
-            ),
-        ])
-        .send()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Baidu request failed: {}", e))?;
+    let mut form: Vec<(&str, &str)> = vec![("image", img_base64.as_str())];
+    if supports_language_type {
+        form.push(("language_type", language_type));
+    }
+    form.push((
+        "detect_direction",
+        if detect_angle { "true" } else { "false" },
+    ));
 
-    let status = response.status();
-    let body = response
-        .text()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Baidu read response failed: {}", e))?;
+    let (status, body) = post_and_log(
+        &client,
+        &format!("[baidu_ocr:{path}]"),
+        &format!("{}/{}", BAIDU_OCR_ENDPOINT, path),
+        &format!("(form, image base64 {} chars)", img_base64.len()),
+        |request| {
+            request
+                .query(&[("access_token", access_token.as_str())])
+                .form(&form)
+        },
+    )
+    .await?;
 
     let ocr_response: BaiduOcrResponse = serde_json::from_str(&body).map_err(|e| {
         format!(

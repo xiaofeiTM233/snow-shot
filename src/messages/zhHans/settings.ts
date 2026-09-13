@@ -507,6 +507,51 @@ export const settings = {
 		"每次请求最大段落数",
 	"settings.functionSettings.translationSettings.apiConfig.maxParagraphCount.tip":
 		"每次发送给翻译服务的段落数量，如果段落数量过多，可能会导致接口的响应变慢",
+	"settings.functionSettings.translationSettings.apiConfig.serviceName": "服务名称",
+	"settings.functionSettings.translationSettings.apiConfig.serviceName.tip":
+		"用于在翻译服务列表中显示",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.youdao":
+		"有道翻译",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoServiceType":
+		"有道服务",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoService.text":
+		"文本翻译",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoService.llm":
+		"大模型翻译",
+	"settings.functionSettings.translationSettings.apiConfig.appKey":
+		"应用 ID（appKey）",
+	"settings.functionSettings.translationSettings.apiConfig.appKey.required":
+		"请输入应用 ID（appKey）",
+	"settings.functionSettings.translationSettings.apiConfig.appSecret":
+		"应用密钥（appSecret）",
+	"settings.functionSettings.translationSettings.apiConfig.appSecret.required":
+		"请输入应用密钥（appSecret）",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.aliyun":
+		"阿里云翻译",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.volcengine":
+		"火山引擎翻译",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.baidu":
+		"百度翻译",
+	"settings.functionSettings.translationSettings.apiConfig.aliyunServiceType":
+		"阿里服务",
+	"settings.functionSettings.translationSettings.apiConfig.aliyunService.general":
+		"通用版",
+	"settings.functionSettings.translationSettings.apiConfig.aliyunService.professional":
+		"专业版",
+	"settings.functionSettings.translationSettings.apiConfig.accessKeyId":
+		"AccessKeyId",
+	"settings.functionSettings.translationSettings.apiConfig.accessKeyId.required":
+		"请输入 AccessKeyId",
+	"settings.functionSettings.translationSettings.apiConfig.accessKeySecret":
+		"AccessKeySecret",
+	"settings.functionSettings.translationSettings.apiConfig.accessKeySecret.required":
+		"请输入 AccessKeySecret",
+	"settings.functionSettings.translationSettings.apiConfig.secretKey":
+		"Secret Key",
+	"settings.functionSettings.translationSettings.apiConfig.secretKey.required":
+		"请输入 Secret Key",
+	"settings.functionSettings.translationSettings.apiConfig.region":
+		"地域（Region）",
 	"settings.functionSettings.trayIconSettings": "托盘",
 	"settings.functionSettings.trayIconSettings.iconClickAction": "左键点击后",
 	"settings.functionSettings.trayIconSettings.iconClickAction.screenshot":
@@ -671,6 +716,8 @@ export const settings = {
 		"服务类型",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language":
 		"识别语言",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.targetLanguage":
+		"翻译目标语言",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.youdao":
 		"网易有道",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.tencent":
@@ -685,6 +732,24 @@ export const settings = {
 		"自定义",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoOcr":
 		"通用文字识别",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoImageTranslation":
+		"图片翻译",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunImageTranslation":
+		"图片翻译",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.volcengineImageTranslation":
+		"图片翻译",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduImageTranslation":
+		"图片翻译",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneralAccurate":
+		"通用文字识别（高精度含位置版）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneral":
+		"通用文字识别（标准含位置版）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduWebImageLocation":
+		"网络图片文字识别（含位置版）",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduWebImage":
+		"网络图片文字识别",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduHandwriting":
+		"手写文字识别",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralBasicOcr":
 		"通用印刷体识别",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralAccurateOcr":
@@ -697,6 +762,8 @@ export const settings = {
 		"通用文字识别（高精度版）",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunRecognizeGeneral":
 		"通用文字识别",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunRecognizeHandwriting":
+		"通用手写体识别",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.volcengineOcrNormal":
 		"通用文字识别",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri": "API 地址",

@@ -5,11 +5,12 @@ use base64::Engine;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use super::build_http_client;
-use super::normalize_error_code;
 use super::ocr_line_to_text_block;
 use super::prepare_image_bytes;
 use super::OnlineOcrConfig;
+use crate::common::build_http_client;
+use crate::common::normalize_error_code;
+use crate::common::post_and_log;
 use snow_shot_app_services::ocr_service::OcrDetectResult;
 
 const YOUDAO_OCR_ENDPOINT: &str = "https://openapi.youdao.com/ocrapi";
@@ -82,30 +83,32 @@ pub(super) async fn detect_with_youdao(
     };
 
     let client = build_http_client()?;
-    let response = client
-        .post(YOUDAO_OCR_ENDPOINT)
-        .form(&[
-            ("img", img_base64.as_str()),
-            ("imageType", "1"),
-            ("detectType", "10012"),
-            ("langType", language.as_str()),
-            ("appKey", app_key),
-            ("salt", salt.as_str()),
-            ("curtime", curtime.as_str()),
-            ("sign", sign.as_str()),
-            ("docType", "json"),
-            ("signType", "v3"),
-            ("angle", if detect_angle { "1" } else { "0" }),
-        ])
-        .send()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Youdao request failed: {}", e))?;
-
-    let status = response.status();
-    let body = response
-        .text()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Youdao read response failed: {}", e))?;
+    let (status, body) = post_and_log(
+        &client,
+        "[youdao_ocr]",
+        YOUDAO_OCR_ENDPOINT,
+        &format!(
+            "(form, img base64 {} chars, langType: {})",
+            img_base64.len(),
+            language
+        ),
+        |request| {
+            request.form(&[
+                ("img", img_base64.as_str()),
+                ("imageType", "1"),
+                ("detectType", "10012"),
+                ("langType", language.as_str()),
+                ("appKey", app_key),
+                ("salt", salt.as_str()),
+                ("curtime", curtime.as_str()),
+                ("sign", sign.as_str()),
+                ("docType", "json"),
+                ("signType", "v3"),
+                ("angle", if detect_angle { "1" } else { "0" }),
+            ])
+        },
+    )
+    .await?;
 
     let ocr_response: YoudaoOcrResponse = serde_json::from_str(&body).map_err(|e| {
         format!(

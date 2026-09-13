@@ -536,6 +536,51 @@ export const settings = {
 		"Max Paragraphs Per Request",
 	"settings.functionSettings.translationSettings.apiConfig.maxParagraphCount.tip":
 		"Number of paragraphs sent to the translation service per request, too many paragraphs may slow down the interface response",
+	"settings.functionSettings.translationSettings.apiConfig.serviceName": "Service Name",
+	"settings.functionSettings.translationSettings.apiConfig.serviceName.tip":
+		"Displayed in the translation service list",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.youdao":
+		"Youdao Translate",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoServiceType":
+		"Youdao Service",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoService.text":
+		"Text Translation",
+	"settings.functionSettings.translationSettings.apiConfig.youdaoService.llm":
+		"LLM Translation",
+	"settings.functionSettings.translationSettings.apiConfig.appKey":
+		"App ID (appKey)",
+	"settings.functionSettings.translationSettings.apiConfig.appKey.required":
+		"Please enter the app ID (appKey)",
+	"settings.functionSettings.translationSettings.apiConfig.appSecret":
+		"App Secret (appSecret)",
+	"settings.functionSettings.translationSettings.apiConfig.appSecret.required":
+		"Please enter the app secret (appSecret)",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.aliyun":
+		"Alibaba Cloud Translate",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.volcengine":
+		"Volcengine Translate",
+	"settings.functionSettings.translationSettings.apiConfig.apiType.baidu":
+		"Baidu Translate",
+	"settings.functionSettings.translationSettings.apiConfig.aliyunServiceType":
+		"Alibaba Service",
+	"settings.functionSettings.translationSettings.apiConfig.aliyunService.general":
+		"General Edition",
+	"settings.functionSettings.translationSettings.apiConfig.aliyunService.professional":
+		"Professional Edition",
+	"settings.functionSettings.translationSettings.apiConfig.accessKeyId":
+		"AccessKeyId",
+	"settings.functionSettings.translationSettings.apiConfig.accessKeyId.required":
+		"Please enter the AccessKeyId",
+	"settings.functionSettings.translationSettings.apiConfig.accessKeySecret":
+		"AccessKeySecret",
+	"settings.functionSettings.translationSettings.apiConfig.accessKeySecret.required":
+		"Please enter the AccessKeySecret",
+	"settings.functionSettings.translationSettings.apiConfig.secretKey":
+		"Secret Key",
+	"settings.functionSettings.translationSettings.apiConfig.secretKey.required":
+		"Please enter the Secret Key",
+	"settings.functionSettings.translationSettings.apiConfig.region":
+		"Region",
 	"settings.functionSettings.trayIconSettings": "Tray Icon",
 	"settings.functionSettings.trayIconSettings.iconClickAction":
 		"Left Click Action",
@@ -708,6 +753,8 @@ export const settings = {
 		"Service Type",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.language":
 		"Recognition Language",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.targetLanguage":
+		"Translation Target Language",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.youdao":
 		"NetEase Youdao",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.provider.tencent":
@@ -722,18 +769,34 @@ export const settings = {
 		"Custom",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoOcr":
 		"General OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.youdaoImageTranslation":
+		"Image Translation",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunImageTranslation":
+		"Image Translation",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.volcengineImageTranslation":
+		"Image Translation",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduImageTranslation":
+		"Image Translation",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneralAccurate":
+		"General OCR (Accurate with Location)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneral":
+		"General OCR (Standard with Location)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduWebImageLocation":
+		"Web Image OCR (with Location)",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduWebImage":
+		"Web Image OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduHandwriting":
+		"Handwriting OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralBasicOcr":
 		"General Printed Text OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.tencentGeneralAccurateOcr":
 		"General Accurate OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.custom":
 		"Custom",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneralBasic":
-		"General OCR",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.baiduGeneralAccurateBasic":
-		"General Accurate OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunRecognizeGeneral":
 		"General OCR",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.aliyunRecognizeHandwriting":
+		"Handwriting OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.volcengineOcrNormal":
 		"General OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri": "API URI",

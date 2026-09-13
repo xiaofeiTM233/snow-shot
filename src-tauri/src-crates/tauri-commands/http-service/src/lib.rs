@@ -1,4 +1,6 @@
+mod common;
 pub mod ocr;
+pub mod translation;
 
 use snow_shot_http_services::{S3Config, S3Service};
 
