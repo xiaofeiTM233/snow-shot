@@ -291,15 +291,21 @@ const MenuLayoutCore: React.FC<{ children: React.ReactNode }> = ({
 								label: intl.formatMessage({ id: "settings.commonSettings" }),
 							},
 							{
+								key: "colorSettings",
+								label: intl.formatMessage({
+									id: "settings.colorSettings",
+								}),
+							},
+							{
 								key: "screenshotSettings",
 								label: intl.formatMessage({
 									id: "settings.screenshotSettings",
 								}),
 							},
 							{
-								key: "fixedContentSettings",
+								key: "toolbarSettings",
 								label: intl.formatMessage({
-									id: "settings.fixedContentSettings",
+									id: "settings.toolbarSettings",
 								}),
 							},
 							{

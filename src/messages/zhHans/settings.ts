@@ -60,6 +60,7 @@ export const settings = {
 	"settings.commonSettings.draw.toolIndependentStyle": "独立的工具样式",
 	"settings.commonSettings.draw.toolIndependentStyle.tip":
 		"每个工具都有独立的样式配置，修改某个工具的样式后，不会影响其他工具的样式",
+	"settings.colorSettings": "配色",
 	"settings.fixedContentSettings": "贴图",
 	"settings.fixedContentSettings.borderColor": "边框颜色",
 	"settings.selectRectMaskColor": "选区遮罩颜色",
@@ -67,7 +68,10 @@ export const settings = {
 	"settings.monitorCenterAuxiliaryLineColor": "显示器中心辅助线颜色",
 	"settings.colorPickerCenterAuxiliaryLineColor": "颜色拾取器中心辅助线颜色",
 	"settings.showOcrTranslate": "启用文本识别翻译工具",
-	"settings.toolbarCustomizer.title": "工具栏自定义",
+	"settings.toolbarSettings": "工具栏",
+	"settings.toolbarSettings.mainToolbar": "截图工具栏自定义",
+	"settings.toolbarSettings.fullScreenDrawToolbar": "全屏绘制工具栏自定义",
+	"settings.toolbarSettings.fixedContentToolbar": "贴图工具栏自定义",
 	"settings.toolbarCustomizer.tip":
 		"拖动图标调整顺序；拖到另一个图标中心可合并为组合（悬停组合在上方弹出成员面板，成员可拖出或排序）；拖到下方托盘即隐藏。隐藏的工具仍可通过热键使用。",
 	"settings.toolbarCustomizer.visibleTools": "显示中的工具",
@@ -78,9 +82,6 @@ export const settings = {
 	"settings.toolbarCustomizer.reset": "恢复默认",
 	"settings.toolbarCustomizer.pluginNotReady":
 		"插件未就绪，该工具暂不会显示在工具栏",
-	"settings.fixedContentSettings.toolbarCustomizer": "贴图工具栏自定义",
-	"settings.functionSettings.fullScreenDrawSettings.toolbarCustomizer":
-		"全屏绘制工具栏自定义",
 	"settings.enableQrcodeScan": "启用二维码识别",
 	"settings.findChildrenElements": "查找窗口子元素",
 	"settings.performanceMode": "性能优先",

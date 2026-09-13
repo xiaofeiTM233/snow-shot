@@ -24,7 +24,7 @@ import type { AggregationColor } from "antd/es/color-picker/color";
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { ContentWrap } from "@/components/contentWrap";
-import { GroupTitle } from "@/components/groupTitle";
+import { GroupTitle, SubGroupTitle } from "@/components/groupTitle";
 import { IconLabel } from "@/components/iconLable";
 import { DarkModeIcon, LanguageIcon } from "@/components/icons";
 import { PathInput } from "@/components/pathInput";
@@ -55,8 +55,10 @@ export const GeneralSettingsPage = () => {
 	const [commonForm] = Form.useForm<AppSettingsData[AppSettingsGroup.Common]>();
 	const [screenshotForm] =
 		Form.useForm<AppSettingsData[AppSettingsGroup.Screenshot]>();
-	const [fixedContentForm] =
-		Form.useForm<AppSettingsData[AppSettingsGroup.FixedContent]>();
+	const [colorForm] = Form.useForm<{
+		mainColor: string;
+		borderColor: string;
+	}>();
 	const [trayIconForm] =
 		Form.useForm<AppSettingsData[AppSettingsGroup.CommonTrayIcon]>();
 
@@ -93,17 +95,20 @@ export const GeneralSettingsPage = () => {
 
 				if (
 					preSettings === undefined ||
-					preSettings[AppSettingsGroup.FixedContent] !==
-						settings[AppSettingsGroup.FixedContent]
+					preSettings[AppSettingsGroup.Common].mainColor !==
+						settings[AppSettingsGroup.Common].mainColor ||
+					preSettings[AppSettingsGroup.FixedContent].borderColor !==
+						settings[AppSettingsGroup.FixedContent].borderColor
 				) {
-					fixedContentForm.setFieldsValue(
-						settings[AppSettingsGroup.FixedContent],
-					);
+					colorForm.setFieldsValue({
+						mainColor: settings[AppSettingsGroup.Common].mainColor,
+						borderColor: settings[AppSettingsGroup.FixedContent].borderColor,
+					});
 				}
 			},
 			[
+				colorForm,
 				commonForm,
-				fixedContentForm,
 				screenshotForm,
 				setAppSettingsLoading,
 				trayIconForm,
@@ -343,6 +348,97 @@ export const GeneralSettingsPage = () => {
 			<Divider />
 
 			<GroupTitle
+				id="colorSettings"
+				extra={
+					<ResetSettingsButton
+						title={intl.formatMessage({ id: "settings.fixedContentSettings" })}
+						appSettingsGroup={AppSettingsGroup.FixedContent}
+					/>
+				}
+			>
+				<FormattedMessage id="settings.colorSettings" />
+			</GroupTitle>
+
+			<ProForm<{
+				mainColor: string;
+				borderColor: string;
+			}>
+				className="settings-form color-settings-form"
+				form={colorForm}
+				submitter={false}
+				onValuesChange={(changedValues) => {
+					if (changedValues.mainColor !== undefined) {
+						let mainColor = changedValues.mainColor;
+						if (typeof mainColor === "object") {
+							mainColor = (mainColor as AggregationColor).toHexString();
+						}
+
+						updateAppSettings(
+							AppSettingsGroup.Common,
+							{ mainColor },
+							true,
+							true,
+							true,
+						);
+					}
+
+					if (changedValues.borderColor !== undefined) {
+						let borderColor = changedValues.borderColor;
+						if (typeof borderColor === "object") {
+							borderColor = (borderColor as AggregationColor).toHexString();
+						}
+
+						updateAppSettings(
+							AppSettingsGroup.FixedContent,
+							{ borderColor },
+							true,
+							true,
+							true,
+							true,
+							false,
+						);
+					}
+				}}
+				layout="vertical"
+			>
+				<Spin spinning={appSettingsLoading}>
+					<Row gutter={token.marginLG}>
+						<Col span={12}>
+							<ProForm.Item
+								name="mainColor"
+								label={
+									<IconLabel
+										label={<FormattedMessage id="settings.theme.mainColor" />}
+									/>
+								}
+								required={false}
+							>
+								<ColorPicker showText placement="bottom" />
+							</ProForm.Item>
+						</Col>
+
+						<Col span={12}>
+							<ProForm.Item
+								name="borderColor"
+								label={
+									<IconLabel
+										label={
+											<FormattedMessage id="settings.fixedContentSettings.borderColor" />
+										}
+									/>
+								}
+								required={false}
+							>
+								<ColorPicker showText placement="bottom" />
+							</ProForm.Item>
+						</Col>
+					</Row>
+				</Spin>
+			</ProForm>
+
+			<Divider />
+
+			<GroupTitle
 				id="screenshotSettings"
 				extra={
 					<ResetSettingsButton
@@ -455,8 +551,10 @@ export const GeneralSettingsPage = () => {
 								label={<FormattedMessage id="settings.disableAnimation" />}
 							/>
 						</Col>
+					</Row>
 
-						<Col span={12}>
+					<Row gutter={token.marginLG}>
+						<Col span={24}>
 							<ProFormRadio.Group
 								name="colorPickerShowMode"
 								layout="horizontal"
@@ -485,23 +583,9 @@ export const GeneralSettingsPage = () => {
 								]}
 							/>
 						</Col>
+					</Row>
 
-						<Col span={12}>
-							<ProForm.Item
-								name="selectRectMaskColor"
-								label={
-									<IconLabel
-										label={
-											<FormattedMessage id="settings.selectRectMaskColor" />
-										}
-									/>
-								}
-								required={false}
-							>
-								<ColorPicker showText placement="bottom" />
-							</ProForm.Item>
-						</Col>
-
+					<Row gutter={token.marginLG}>
 						<Col span={12}>
 							<ProFormSlider
 								label={
@@ -594,73 +678,14 @@ export const GeneralSettingsPage = () => {
 								<ColorPicker showText placement="bottom" />
 							</ProForm.Item>
 						</Col>
-					</Row>
 
-					<Row gutter={token.marginLG}>
-						<Col span={24}>
-							<ProForm.Item
-								label={
-									<IconLabel
-										label={
-											<FormattedMessage id="settings.toolbarCustomizer.title" />
-										}
-									/>
-								}
-								required={false}
-							>
-								<ToolbarCustomizer toolbarId={ToolbarId.Main} />
-							</ProForm.Item>
-						</Col>
-					</Row>
-				</Spin>
-			</ProForm>
-
-			<Divider />
-
-			<GroupTitle
-				id="fixedContentSettings"
-				extra={
-					<ResetSettingsButton
-						title={intl.formatMessage({ id: "settings.fixedContentSettings" })}
-						appSettingsGroup={AppSettingsGroup.FixedContent}
-					/>
-				}
-			>
-				<FormattedMessage id="settings.fixedContentSettings" />
-			</GroupTitle>
-
-			<ProForm<AppSettingsData[AppSettingsGroup.FixedContent]>
-				className="settings-form fixed-content-settings-form"
-				form={fixedContentForm}
-				submitter={false}
-				onValuesChange={(_, values) => {
-					if (typeof values.borderColor === "object") {
-						values.borderColor = (
-							values.borderColor as AggregationColor
-						).toHexString();
-					}
-
-					updateAppSettings(
-						AppSettingsGroup.FixedContent,
-						values,
-						true,
-						true,
-						true,
-						true,
-						false,
-					);
-				}}
-				layout="vertical"
-			>
-				<Spin spinning={appSettingsLoading}>
-					<Row gutter={token.marginLG}>
 						<Col span={12}>
 							<ProForm.Item
-								name="borderColor"
+								name="selectRectMaskColor"
 								label={
 									<IconLabel
 										label={
-											<FormattedMessage id="settings.fixedContentSettings.borderColor" />
+											<FormattedMessage id="settings.selectRectMaskColor" />
 										}
 									/>
 								}
@@ -675,9 +700,23 @@ export const GeneralSettingsPage = () => {
 
 			<Divider />
 
-			<GroupTitle id="fixedContentToolbarSettings">
-				<FormattedMessage id="settings.fixedContentSettings.toolbarCustomizer" />
+			<GroupTitle id="toolbarSettings">
+				<FormattedMessage id="settings.toolbarSettings" />
 			</GroupTitle>
+
+			<SubGroupTitle>
+				<FormattedMessage id="settings.toolbarSettings.mainToolbar" />
+			</SubGroupTitle>
+			<ToolbarCustomizer toolbarId={ToolbarId.Main} />
+
+			<SubGroupTitle>
+				<FormattedMessage id="settings.toolbarSettings.fullScreenDrawToolbar" />
+			</SubGroupTitle>
+			<ToolbarCustomizer toolbarId={ToolbarId.FullScreen} />
+
+			<SubGroupTitle>
+				<FormattedMessage id="settings.toolbarSettings.fixedContentToolbar" />
+			</SubGroupTitle>
 			<ToolbarCustomizer toolbarId={ToolbarId.FixedContent} />
 
 			<Divider />

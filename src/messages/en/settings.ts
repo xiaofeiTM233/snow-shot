@@ -61,6 +61,7 @@ export const settings = {
 		"Independent Tool Styles",
 	"settings.commonSettings.draw.toolIndependentStyle.tip":
 		"Each tool has independent style configuration, modifying one tool's style won't affect others",
+	"settings.colorSettings": "Colors",
 	"settings.fixedContentSettings": "Pin to Screen",
 	"settings.fixedContentSettings.borderColor": "Border Color",
 	"settings.selectRectMaskColor": "Selection Mask Color",
@@ -69,7 +70,12 @@ export const settings = {
 	"settings.colorPickerCenterAuxiliaryLineColor":
 		"Color Picker Center Guide Line Color",
 	"settings.showOcrTranslate": "Enable OCR Translation Tool",
-	"settings.toolbarCustomizer.title": "Toolbar Customization",
+	"settings.toolbarSettings": "Toolbar",
+	"settings.toolbarSettings.mainToolbar": "Screenshot Toolbar Customization",
+	"settings.toolbarSettings.fullScreenDrawToolbar":
+		"Full Screen Draw Toolbar Customization",
+	"settings.toolbarSettings.fixedContentToolbar":
+		"Sticker Toolbar Customization",
 	"settings.toolbarCustomizer.tip":
 		"Drag icons to reorder. Drop onto the center of another icon to merge them into a group; drop beside it to insert. Hover a group to open its member panel — drag members out or rearrange them. Drop icons into the tray below to hide them. Hidden tools still work via hotkeys.",
 	"settings.toolbarCustomizer.visibleTools": "Visible Tools",
@@ -80,10 +86,6 @@ export const settings = {
 	"settings.toolbarCustomizer.reset": "Reset to Default",
 	"settings.toolbarCustomizer.pluginNotReady":
 		"Plugin is not ready; this tool is hidden on the toolbar for now",
-	"settings.fixedContentSettings.toolbarCustomizer":
-		"Sticker Toolbar Customization",
-	"settings.functionSettings.fullScreenDrawSettings.toolbarCustomizer":
-		"Full Screen Draw Toolbar Customization",
 	"settings.enableQrcodeScan": "Enable QR Code Scan",
 	"settings.findChildrenElements": "Find Window Child Elements",
 	"settings.performanceMode": "Performance Mode",

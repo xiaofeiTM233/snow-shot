@@ -44,7 +44,6 @@ import { DirectoryInput } from "@/components/directoryInput";
 import { GroupTitle, SubGroupTitle } from "@/components/groupTitle";
 import { IconLabel } from "@/components/iconLable";
 import { ResetSettingsButton } from "@/components/resetSettingsButton";
-import { ToolbarCustomizer } from "@/components/toolbarCustomizer";
 import {
 	defaultAppSettingsData,
 	ONLINE_OCR_MODEL_PREFIX,
@@ -86,7 +85,6 @@ import {
 	VideoMaxSize,
 } from "@/types/appSettings";
 import { DrawState } from "@/types/draw";
-import { ToolbarId } from "@/types/toolbarTool";
 import { ImageFormat } from "@/types/utils/file";
 import {
 	generateImageFileName,
@@ -2712,11 +2710,6 @@ export const FunctionSettingsPage = () => {
 					</Row>
 				</ProForm>
 			</Spin>
-
-			<SubGroupTitle>
-				<FormattedMessage id="settings.functionSettings.fullScreenDrawSettings.toolbarCustomizer" />
-			</SubGroupTitle>
-			<ToolbarCustomizer toolbarId={ToolbarId.FullScreen} />
 
 			<Divider />
 

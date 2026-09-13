@@ -60,6 +60,7 @@ export const settings = {
 	"settings.commonSettings.draw.toolIndependentStyle": "獨立的工具樣式",
 	"settings.commonSettings.draw.toolIndependentStyle.tip":
 		"每個工具都有獨立的樣式配置，修改某個工具的樣式後，不會影響其他工具的樣式",
+	"settings.colorSettings": "配色",
 	"settings.fixedContentSettings": "貼圖",
 	"settings.fixedContentSettings.borderColor": "邊框顏色",
 	"settings.selectRectMaskColor": "選區遮罩顏色",
@@ -67,7 +68,10 @@ export const settings = {
 	"settings.monitorCenterAuxiliaryLineColor": "螢幕中心輔助線顏色",
 	"settings.colorPickerCenterAuxiliaryLineColor": "取色器中心輔助線顏色",
 	"settings.showOcrTranslate": "啟用文字辨識翻譯工具",
-	"settings.toolbarCustomizer.title": "工具列自訂",
+	"settings.toolbarSettings": "工具列",
+	"settings.toolbarSettings.mainToolbar": "截圖工具欄自訂",
+	"settings.toolbarSettings.fullScreenDrawToolbar": "全螢幕繪製工具欄自訂",
+	"settings.toolbarSettings.fixedContentToolbar": "貼圖工具欄自訂",
 	"settings.toolbarCustomizer.tip":
 		"拖曳圖示調整順序；拖到另一個圖示中心可合併為組合（懸停組合在上方彈出成員面板，成員可拖出或排序）；拖到下方托盤即隱藏。隱藏的工具仍可透過熱鍵使用。",
 	"settings.toolbarCustomizer.visibleTools": "顯示中的工具",
@@ -78,9 +82,6 @@ export const settings = {
 	"settings.toolbarCustomizer.reset": "恢復預設",
 	"settings.toolbarCustomizer.pluginNotReady":
 		"外掛未就緒，該工具暫不會顯示在工具列",
-	"settings.fixedContentSettings.toolbarCustomizer": "貼圖工具欄自訂",
-	"settings.functionSettings.fullScreenDrawSettings.toolbarCustomizer":
-		"全螢幕繪製工具欄自訂",
 	"settings.enableQrcodeScan": "啟用 QR Code 辨識",
 	"settings.findChildrenElements": "偵測視窗子元素",
 	"settings.performanceMode": "效能優先",
