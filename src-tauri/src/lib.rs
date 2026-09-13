@@ -340,6 +340,9 @@ pub fn run() {
                 .build(),
         )
         .setup(move |app| {
+            // 尽早记录启动信息，便于从日志中确认每次启动的软件/构建/系统环境
+            log_app_startup_info(app.handle());
+
             let main_window = app
                 .get_webview_window("main")
                 .expect("[lib::setup] no main window");
@@ -595,6 +598,70 @@ pub fn run() {
             save_main_window_geometry(app);
         }
     });
+}
+
+/// 记录软件启动信息（info 级别）。
+///
+/// 包含三组信息，便于根据用户日志定位环境问题：
+/// - 软件基本信息：名称、版本、包名、标识符、作者、描述、仓库、日志目录
+/// - 构建版本信息：Cargo 包版本、commit、构建类型（debug/release）、构建目标三元组
+/// - 系统基本信息：系统类型与版本、架构、主机名、语言、CPU 核心数
+///
+/// 注意：release 下运行日志级别默认为 warn，需要前端将运行日志级别调到
+/// info 及以上才会写入日志文件（debug 下始终输出）。
+fn log_app_startup_info(app: &tauri::AppHandle) {
+    let config = app.config();
+
+    let app_name = config
+        .product_name
+        .clone()
+        .unwrap_or_else(|| env!("CARGO_PKG_NAME").to_string());
+    let app_version = config
+        .version
+        .clone()
+        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
+
+    let log_dir = app
+        .path()
+        .app_log_dir()
+        .map(|dir| dir.to_string_lossy().to_string())
+        .unwrap_or_else(|_| String::from("unknown"));
+
+    let cpu_cores = std::thread::available_parallelism()
+        .map(|cores| cores.get().to_string())
+        .unwrap_or_else(|_| String::from("unknown"));
+
+    let locale = tauri_plugin_os::locale().unwrap_or_else(|| String::from("unknown"));
+
+    let build_profile = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    };
+
+    log::info!(
+        "[app_startup] {} v{} starting | app: package={}, identifier={}, authors=\"{}\", description=\"{}\", repository={}, log_dir={} | build: version={}, commit={}, profile={}, target={} | system: os={} {}, platform={}, family={}, arch={}, hostname={}, locale={}, cpu_cores={}",
+        app_name,
+        app_version,
+        env!("CARGO_PKG_NAME"),
+        config.identifier,
+        env!("CARGO_PKG_AUTHORS"),
+        env!("CARGO_PKG_DESCRIPTION"),
+        env!("CARGO_PKG_REPOSITORY"),
+        log_dir,
+        env!("CARGO_PKG_VERSION"),
+        option_env!("COMMIT_SHA").unwrap_or("unknown"),
+        build_profile,
+        option_env!("BUILD_TARGET").unwrap_or("unknown"),
+        tauri_plugin_os::type_(),
+        tauri_plugin_os::version(),
+        tauri_plugin_os::platform(),
+        tauri_plugin_os::family(),
+        tauri_plugin_os::arch(),
+        tauri_plugin_os::hostname(),
+        locale,
+        cpu_cores,
+    );
 }
 
 /// 使用标准库生成 `YYYY-MM-DD_HH-MM-SS` 形式的时间戳（UTC），

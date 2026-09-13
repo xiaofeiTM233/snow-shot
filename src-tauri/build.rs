@@ -15,5 +15,9 @@ fn main() {
 
     println!("cargo:rustc-env=COMMIT_SHA={}", commit_sha);
 
+    // 构建目标三元组（如 x86_64-pc-windows-msvc），用于启动日志中记录构建信息
+    let target = std::env::var("TARGET").unwrap_or_else(|_| String::from("unknown"));
+    println!("cargo:rustc-env=BUILD_TARGET={}", target);
+
     tauri_build::build();
 }
