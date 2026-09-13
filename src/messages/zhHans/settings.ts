@@ -296,6 +296,10 @@ export const settings = {
 		"文件保存目录",
 	"settings.functionSettings.screenshotSettings.autoSaveFileMode.saveFileFormat":
 		"保存文件格式",
+	"settings.functionSettings.screenshotSettings.saveFileDialog":
+		"保存文件参数弹窗",
+	"settings.functionSettings.screenshotSettings.saveFileDialog.tip":
+		"开启后，点击「保存为文件」将弹出参数弹窗，可调整文件名、保存路径、图片格式和尺寸；关闭后使用系统对话框",
 	"settings.functionSettings.outputSettings": "输出",
 	"settings.functionSettings.outputSettings.variables": "支持的变量",
 	"settings.functionSettings.outputSettings.variables.focusedWindowAppName":
@@ -551,6 +555,14 @@ export const settings = {
 		"通用版",
 	"settings.functionSettings.translationSettings.apiConfig.aliyunService.professional":
 		"专业版",
+	"settings.functionSettings.translationSettings.apiConfig.serviceType":
+		"服务类型",
+	"settings.functionSettings.translationSettings.apiConfig.deepLService.text":
+		"文本翻译",
+	"settings.functionSettings.translationSettings.apiConfig.volcengineService.text":
+		"文本翻译",
+	"settings.functionSettings.translationSettings.apiConfig.baiduService.text":
+		"文本翻译",
 	"settings.functionSettings.translationSettings.apiConfig.accessKeyId":
 		"AccessKeyId",
 	"settings.functionSettings.translationSettings.apiConfig.accessKeyId.required":
