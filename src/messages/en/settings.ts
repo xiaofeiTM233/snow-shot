@@ -69,9 +69,21 @@ export const settings = {
 	"settings.colorPickerCenterAuxiliaryLineColor":
 		"Color Picker Center Guide Line Color",
 	"settings.showOcrTranslate": "Enable OCR Translation Tool",
-	"settings.customToolbarToolList": "Hide Toolbar Tools",
-	"settings.customToolbarToolList.tip":
-		"Tools can still be used via hotkeys when hidden",
+	"settings.toolbarCustomizer.title": "Toolbar Customization",
+	"settings.toolbarCustomizer.tip":
+		"Drag icons to reorder. Drop onto the center of another icon to merge them into a group; drop beside it to insert. Hover a group to open its member panel — drag members out or rearrange them. Drop icons into the tray below to hide them. Hidden tools still work via hotkeys.",
+	"settings.toolbarCustomizer.visibleTools": "Visible Tools",
+	"settings.toolbarCustomizer.hiddenTools": "Hidden",
+	"settings.toolbarCustomizer.hiddenToolsEmpty": "No hidden tools",
+	"settings.toolbarCustomizer.show": "Show",
+	"settings.toolbarCustomizer.hide": "Hide",
+	"settings.toolbarCustomizer.reset": "Reset to Default",
+	"settings.toolbarCustomizer.pluginNotReady":
+		"Plugin is not ready; this tool is hidden on the toolbar for now",
+	"settings.fixedContentSettings.toolbarCustomizer":
+		"Sticker Toolbar Customization",
+	"settings.functionSettings.fullScreenDrawSettings.toolbarCustomizer":
+		"Full Screen Draw Toolbar Customization",
 	"settings.enableQrcodeScan": "Enable QR Code Scan",
 	"settings.findChildrenElements": "Find Window Child Elements",
 	"settings.performanceMode": "Performance Mode",
@@ -298,6 +310,10 @@ export const settings = {
 		"Save Directory",
 	"settings.functionSettings.screenshotSettings.autoSaveFileMode.saveFileFormat":
 		"Save File Format",
+	"settings.functionSettings.screenshotSettings.saveFileDialog":
+		"Save File Dialog",
+	"settings.functionSettings.screenshotSettings.saveFileDialog.tip":
+		'When enabled, clicking "Save to File" opens a dialog to adjust the file name, save path, image format and size; when disabled, the system dialog is used',
 	"settings.functionSettings.outputSettings": "Output Settings",
 	"settings.functionSettings.outputSettings.variables": "Supported Variables",
 	"settings.functionSettings.outputSettings.variables.focusedWindowAppName":
@@ -536,7 +552,8 @@ export const settings = {
 		"Max Paragraphs Per Request",
 	"settings.functionSettings.translationSettings.apiConfig.maxParagraphCount.tip":
 		"Number of paragraphs sent to the translation service per request, too many paragraphs may slow down the interface response",
-	"settings.functionSettings.translationSettings.apiConfig.serviceName": "Service Name",
+	"settings.functionSettings.translationSettings.apiConfig.serviceName":
+		"Service Name",
 	"settings.functionSettings.translationSettings.apiConfig.serviceName.tip":
 		"Displayed in the translation service list",
 	"settings.functionSettings.translationSettings.apiConfig.apiType.youdao":
@@ -579,8 +596,7 @@ export const settings = {
 		"Secret Key",
 	"settings.functionSettings.translationSettings.apiConfig.secretKey.required":
 		"Please enter the Secret Key",
-	"settings.functionSettings.translationSettings.apiConfig.region":
-		"Region",
+	"settings.functionSettings.translationSettings.apiConfig.region": "Region",
 	"settings.functionSettings.trayIconSettings": "Tray Icon",
 	"settings.functionSettings.trayIconSettings.iconClickAction":
 		"Left Click Action",
@@ -799,16 +815,20 @@ export const settings = {
 		"Handwriting OCR",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.volcengineOcrNormal":
 		"General OCR",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri": "API URI",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri":
+		"API URI",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri.required":
 		"Please enter the API URI",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey": "API Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey":
+		"API Key",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey.required":
 		"Please enter the API Key",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey": "Secret Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey":
+		"Secret Key",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey.required":
 		"Please enter the Secret Key",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId": "AccessKeyId",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId":
+		"AccessKeyId",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId.required":
 		"Please enter the AccessKeyId",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeySecret":

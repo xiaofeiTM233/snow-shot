@@ -67,8 +67,20 @@ export const settings = {
 	"settings.monitorCenterAuxiliaryLineColor": "螢幕中心輔助線顏色",
 	"settings.colorPickerCenterAuxiliaryLineColor": "取色器中心輔助線顏色",
 	"settings.showOcrTranslate": "啟用文字辨識翻譯工具",
-	"settings.customToolbarToolList": "隱藏工具列工具",
-	"settings.customToolbarToolList.tip": "工具列隱藏後，仍可透過熱鍵使用",
+	"settings.toolbarCustomizer.title": "工具列自訂",
+	"settings.toolbarCustomizer.tip":
+		"拖曳圖示調整順序；拖到另一個圖示中心可合併為組合（懸停組合在上方彈出成員面板，成員可拖出或排序）；拖到下方托盤即隱藏。隱藏的工具仍可透過熱鍵使用。",
+	"settings.toolbarCustomizer.visibleTools": "顯示中的工具",
+	"settings.toolbarCustomizer.hiddenTools": "已隱藏",
+	"settings.toolbarCustomizer.hiddenToolsEmpty": "沒有隱藏的工具",
+	"settings.toolbarCustomizer.show": "恢復顯示",
+	"settings.toolbarCustomizer.hide": "隱藏",
+	"settings.toolbarCustomizer.reset": "恢復預設",
+	"settings.toolbarCustomizer.pluginNotReady":
+		"外掛未就緒，該工具暫不會顯示在工具列",
+	"settings.fixedContentSettings.toolbarCustomizer": "貼圖工具欄自訂",
+	"settings.functionSettings.fullScreenDrawSettings.toolbarCustomizer":
+		"全螢幕繪製工具欄自訂",
 	"settings.enableQrcodeScan": "啟用 QR Code 辨識",
 	"settings.findChildrenElements": "偵測視窗子元素",
 	"settings.performanceMode": "效能優先",
@@ -507,7 +519,8 @@ export const settings = {
 		"每次請求最大段落數",
 	"settings.functionSettings.translationSettings.apiConfig.maxParagraphCount.tip":
 		"每次傳送給翻譯服務的段落數量，如果段落數量過多，可能會導致介面的回應變慢",
-	"settings.functionSettings.translationSettings.apiConfig.serviceName": "服務名稱",
+	"settings.functionSettings.translationSettings.apiConfig.serviceName":
+		"服務名稱",
 	"settings.functionSettings.translationSettings.apiConfig.serviceName.tip":
 		"用於在翻譯服務列表中顯示",
 	"settings.functionSettings.translationSettings.apiConfig.apiType.youdao":
@@ -766,16 +779,20 @@ export const settings = {
 		"通用手寫體識別",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.volcengineOcrNormal":
 		"通用文字識別",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri": "API 位址",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri":
+		"API 位址",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri.required":
 		"請輸入 API 位址",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey": "API Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey":
+		"API Key",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey.required":
 		"請輸入 API Key",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey": "Secret Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey":
+		"Secret Key",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey.required":
 		"請輸入 Secret Key",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId": "AccessKeyId",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId":
+		"AccessKeyId",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId.required":
 		"請輸入 AccessKeyId",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeySecret":

@@ -7,8 +7,9 @@ import type {
 	CommonKeyEventKey,
 	CommonKeyEventValue,
 } from "./core/commonKeyEvent";
-import { DrawState } from "./draw";
+import type { DrawState } from "./draw";
 import type { TranslationDomain, TranslationType } from "./servies/translation";
+import type { ToolbarGroupsMap, ToolbarToolKey } from "./toolbarTool";
 import type { ImageFormat } from "./utils/file";
 
 export enum HistoryValidDuration {
@@ -202,7 +203,9 @@ export type YoudaoTranslationApiConfig = {
 	/** 服务名称，用于在翻译服务列表中显示 */
 	service_name?: string;
 	/** 有道服务类型：文本翻译 / 大模型翻译 */
-	service_type: TranslationServiceType.YoudaoText | TranslationServiceType.YoudaoLLM;
+	service_type:
+		| TranslationServiceType.YoudaoText
+		| TranslationServiceType.YoudaoLLM;
 	app_key: string;
 	app_secret: string;
 };
@@ -545,8 +548,24 @@ export type AppSettingsData = {
 		colorPickerCenterAuxiliaryLineColor: string;
 		/** 禁用动画 */
 		disableAnimation: boolean;
-		/** 隐藏工具栏工具 */
-		toolbarHiddenToolList: DrawState[];
+		/** 主工具栏工具顺序（组合占一个槽位，键为 head） */
+		toolbarToolOrder: ToolbarToolKey[];
+		/** 主工具栏组合（head → 成员） */
+		toolbarGroups: ToolbarGroupsMap;
+		/** 主工具栏隐藏工具 */
+		toolbarHiddenTools: ToolbarToolKey[];
+		/** 全屏工具栏工具顺序 */
+		fullScreenToolbarToolOrder: ToolbarToolKey[];
+		/** 全屏工具栏组合 */
+		fullScreenToolbarGroups: ToolbarGroupsMap;
+		/** 全屏工具栏隐藏工具 */
+		fullScreenToolbarHiddenTools: ToolbarToolKey[];
+		/** 贴图工具栏工具顺序 */
+		fixedContentToolbarToolOrder: ToolbarToolKey[];
+		/** 贴图工具栏组合 */
+		fixedContentToolbarGroups: ToolbarGroupsMap;
+		/** 贴图工具栏隐藏工具 */
+		fixedContentToolbarHiddenTools: ToolbarToolKey[];
 	};
 	[AppSettingsGroup.FixedContent]: {
 		/** 边框颜色 */
@@ -601,6 +620,8 @@ export type AppSettingsData = {
 		lastExtraTool: ExtraToolList;
 		// 记录上一次使用的绘制额外工具
 		lastDrawExtraTool: DrawState;
+		/** 工具栏组合最后使用的成员（head → 成员键） */
+		toolbarLastUsedTool: Partial<Record<ToolbarToolKey, ToolbarToolKey>>;
 		// 上一次水印内容
 		lastWatermarkText: string;
 		/** 延迟截图秒数 */
@@ -856,22 +877,3 @@ export type AppSettingsData = {
 		disableOnFocusedFullScreenWindow: boolean;
 	};
 };
-
-export const CanHiddenToolSet: Set<DrawState> = new Set([
-	DrawState.Select,
-	DrawState.Ellipse,
-	DrawState.Arrow,
-	DrawState.Pen,
-	DrawState.Text,
-	DrawState.SerialNumber,
-	DrawState.Blur,
-	DrawState.BlurFreeDraw,
-	DrawState.Watermark,
-	DrawState.Highlight,
-	DrawState.Eraser,
-	DrawState.Redo,
-	DrawState.Fixed,
-	DrawState.OcrDetect,
-	DrawState.OcrTranslate,
-	DrawState.ScrollScreenshot,
-]);

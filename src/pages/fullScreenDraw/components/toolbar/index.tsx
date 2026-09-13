@@ -18,12 +18,16 @@ import {
 	ExcalidrawEventPublisher,
 } from "@/components/drawCore/extra";
 import {
+	ArrowIcon,
 	ArrowSelectIcon,
 	CircleIcon,
+	DiamondIcon,
 	EraserIcon,
 	LaserPointerIcon,
+	LineIcon,
 	MouseThroughIcon,
 	PenIcon,
+	RectIcon,
 	ResetCanvasIcon,
 	SerialNumberIcon,
 	TextIcon,
@@ -33,13 +37,15 @@ import { fullScreenDrawChangeMouseThrough } from "@/functions/fullScreenDraw";
 import { useAppSettingsLoad } from "@/hooks/useAppSettingsLoad";
 import { useStateRef } from "@/hooks/useStateRef";
 import { useStateSubscriber } from "@/hooks/useStateSubscriber";
+import { findToolGroupHead, useToolbarLayout } from "@/hooks/useToolbarLayout";
 import { HistoryControls } from "@/pages/draw/components/drawToolbar/components/historyControls";
 import { ToolButton } from "@/pages/draw/components/drawToolbar/components/toolButton";
-import { ArrowTool } from "@/pages/draw/components/drawToolbar/components/tools/arrowTool";
-import { RectTool } from "@/pages/draw/components/drawToolbar/components/tools/rectTool";
+import { ToolbarGroupSlot } from "@/pages/draw/components/drawToolbar/components/toolbarGroupSlot";
+import { buildToolbarContent } from "@/pages/draw/components/drawToolbar/toolbarContent";
 import { type AppSettingsData, AppSettingsGroup } from "@/types/appSettings";
 import { DrawToolbarKeyEventKey } from "@/types/components/drawToolbar";
 import { DrawState } from "@/types/draw";
+import { ToolbarId, ToolbarToolKey } from "@/types/toolbarTool";
 import { zIndexs } from "@/utils/zIndex";
 import { useDrawContext } from "../../extra";
 
@@ -71,6 +77,51 @@ export const FullScreenDrawToolbar: React.FC<{
 	const [enableLockDrawTool, setEnableLockDrawTool, enableLockDrawToolRef] =
 		useStateRef(false);
 	const [mouseThroughHotkey, setMouseThroughHotkey] = useState("");
+
+	const { orderedKeys, hiddenSet, groupsMap } = useToolbarLayout(
+		ToolbarId.FullScreen,
+	);
+	const [toolbarLastUsedTool, setToolbarLastUsedTool, toolbarLastUsedToolRef] =
+		useStateRef<Partial<Record<ToolbarToolKey, ToolbarToolKey>>>({});
+
+	/** 工具运行时可见性 */
+	const isToolRuntimeVisible = useCallback(
+		(key: ToolbarToolKey) => {
+			switch (key) {
+				case ToolbarToolKey.LockTool:
+					return showLockDrawToolRef.current;
+				default:
+					return true;
+			}
+		},
+		[showLockDrawToolRef],
+	);
+
+	/** 记录组合最后使用的成员 */
+	const updateGroupLastUsed = useCallback(
+		(memberKey: ToolbarToolKey) => {
+			const headKey = findToolGroupHead(memberKey, groupsMap);
+			if (!headKey) {
+				return;
+			}
+
+			updateAppSettings(
+				AppSettingsGroup.Cache,
+				{
+					toolbarLastUsedTool: {
+						...toolbarLastUsedToolRef.current,
+						[headKey]: memberKey,
+					},
+				},
+				true,
+				true,
+				false,
+				true,
+				false,
+			);
+		},
+		[groupsMap, toolbarLastUsedToolRef, updateAppSettings],
+	);
 
 	const onToolClick = useCallback(
 		(drawState: DrawState) => {
@@ -261,6 +312,10 @@ export const FullScreenDrawToolbar: React.FC<{
 				setEnableLockDrawTool(
 					settings[AppSettingsGroup.Cache].enableLockDrawTool,
 				);
+				// 工具栏组合最后使用的成员
+				setToolbarLastUsedTool(
+					settings[AppSettingsGroup.Cache].toolbarLastUsedTool,
+				);
 
 				setMouseThroughHotkey(
 					settings[AppSettingsGroup.AppFunction].fullScreenDraw.shortcutKey,
@@ -272,7 +327,12 @@ export const FullScreenDrawToolbar: React.FC<{
 				appSettingsReadyRef.current = true;
 				initDefaultTool();
 			},
-			[setEnableLockDrawTool, setShowLockDrawTool, initDefaultTool],
+			[
+				setEnableLockDrawTool,
+				setShowLockDrawTool,
+				setToolbarLastUsedTool,
+				initDefaultTool,
+			],
 		),
 	);
 
@@ -337,200 +397,297 @@ export const FullScreenDrawToolbar: React.FC<{
 		setCurrentPlatform(tauriOs.platform());
 	}, []);
 
+	const renderToolbarTool = useCallback(
+		(key: ToolbarToolKey): React.ReactNode => {
+			switch (key) {
+				case ToolbarToolKey.SelectTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.SelectTool}
+							icon={<ArrowSelectIcon style={{ fontSize: "1.2em" }} />}
+							drawState={DrawState.Select}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.Select);
+							}}
+						/>
+					);
+				case ToolbarToolKey.LockTool:
+					if (!showLockDrawTool) {
+						return null;
+					}
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.LockDrawTool}
+							icon={<LockOutlined />}
+							drawState={DrawState.Lock}
+							enableState={enableLockDrawTool}
+							onClick={() => {
+								onToolClick(DrawState.Lock);
+							}}
+						/>
+					);
+				case ToolbarToolKey.RectTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.RectTool}
+							icon={<RectIcon style={{ fontSize: "1em" }} />}
+							drawState={DrawState.Rect}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.Rect);
+							}}
+						/>
+					);
+				case ToolbarToolKey.DiamondTool:
+					return (
+						<ToolButton
+							icon={<DiamondIcon />}
+							drawState={DrawState.Diamond}
+							buttonProps={{
+								...toolButtonProps,
+								title: intl.formatMessage({ id: "draw.diamondTool" }),
+							}}
+							onClick={() => {
+								onToolClick(DrawState.Diamond);
+							}}
+						/>
+					);
+				case ToolbarToolKey.EllipseTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.EllipseTool}
+							icon={
+								<CircleIcon
+									style={{
+										fontSize: "1em",
+									}}
+								/>
+							}
+							buttonProps={toolButtonProps}
+							drawState={DrawState.Ellipse}
+							onClick={() => {
+								onToolClick(DrawState.Ellipse);
+							}}
+						/>
+					);
+				case ToolbarToolKey.ArrowTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.ArrowTool}
+							icon={<ArrowIcon style={{ fontSize: "0.83em" }} />}
+							drawState={DrawState.Arrow}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.Arrow);
+							}}
+						/>
+					);
+				case ToolbarToolKey.LineTool:
+					return (
+						<ToolButton
+							icon={<LineIcon style={{ fontSize: "1.15em", height: "1em" }} />}
+							drawState={DrawState.Line}
+							buttonProps={{
+								...toolButtonProps,
+								title: intl.formatMessage({ id: "draw.lineTool" }),
+							}}
+							onClick={() => {
+								onToolClick(DrawState.Line);
+							}}
+						/>
+					);
+				case ToolbarToolKey.PenTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.PenTool}
+							icon={<PenIcon style={{ fontSize: "1.15em" }} />}
+							buttonProps={toolButtonProps}
+							drawState={DrawState.Pen}
+							onClick={() => {
+								onToolClick(DrawState.Pen);
+							}}
+						/>
+					);
+				case ToolbarToolKey.TextTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.TextTool}
+							icon={<TextIcon style={{ fontSize: "1.15em" }} />}
+							drawState={DrawState.Text}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.Text);
+							}}
+						/>
+					);
+				case ToolbarToolKey.SerialNumberTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.SerialNumberTool}
+							icon={
+								<SerialNumberIcon
+									style={{
+										fontSize: "1.16em",
+									}}
+								/>
+							}
+							drawState={DrawState.SerialNumber}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.SerialNumber);
+							}}
+						/>
+					);
+				case ToolbarToolKey.EraserTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.EraserTool}
+							icon={
+								<EraserIcon
+									style={{
+										fontSize: "0.95em",
+									}}
+								/>
+							}
+							drawState={DrawState.Eraser}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.Eraser);
+							}}
+						/>
+					);
+				case ToolbarToolKey.LaserPointerTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.LaserPointerTool}
+							icon={
+								<LaserPointerIcon
+									style={{
+										fontSize: "1.1em",
+									}}
+								/>
+							}
+							buttonProps={toolButtonProps}
+							drawState={DrawState.LaserPointer}
+							onClick={() => {
+								onToolClick(DrawState.LaserPointer);
+							}}
+						/>
+					);
+				case ToolbarToolKey.ResetCanvasTool:
+					return (
+						<ToolButton
+							icon={
+								<ResetCanvasIcon
+									style={{
+										fontSize: "1.08em",
+									}}
+								/>
+							}
+							drawState={DrawState.ResetCanvas}
+							buttonProps={{
+								...toolButtonProps,
+								title: intl.formatMessage({ id: "draw.resetCanvasTool" }),
+							}}
+							onClick={() => {
+								getDrawCoreAction()?.updateScene({
+									elements: [],
+									captureUpdate: "IMMEDIATELY",
+								});
+							}}
+						/>
+					);
+				case ToolbarToolKey.MouseThroughTool:
+					return (
+						<ToolButton
+							icon={
+								<MouseThroughIcon
+									style={{
+										fontSize: "0.95em",
+									}}
+								/>
+							}
+							drawState={DrawState.MouseThrough}
+							buttonProps={{
+								...toolButtonProps,
+								title: mouseThroughButtonTitle,
+							}}
+							onClick={() => {
+								fullScreenDrawChangeMouseThrough();
+							}}
+						/>
+					);
+				case ToolbarToolKey.CancelTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.CancelTool}
+							icon={
+								<CloseOutlined
+									style={{
+										fontSize: "0.9em",
+										color: token.colorError,
+									}}
+								/>
+							}
+							buttonProps={toolButtonProps}
+							drawState={DrawState.Cancel}
+							onClick={() => {
+								closeFullScreenDrawWindow();
+							}}
+						/>
+					);
+				default:
+					return null;
+			}
+		},
+		[
+			enableLockDrawTool,
+			getDrawCoreAction,
+			intl,
+			mouseThroughButtonTitle,
+			onToolClick,
+			showLockDrawTool,
+			token.colorError,
+			toolButtonProps,
+		],
+	);
+
+	const renderGroup = useCallback(
+		(headKey: ToolbarToolKey, members: ToolbarToolKey[]) => (
+			<ToolbarGroupSlot
+				headKey={headKey}
+				members={members}
+				hiddenSet={hiddenSet}
+				isToolVisible={isToolRuntimeVisible}
+				lastUsedKey={toolbarLastUsedTool[headKey]}
+				onMemberClick={updateGroupLastUsed}
+				renderTool={renderToolbarTool}
+			/>
+		),
+		[
+			hiddenSet,
+			isToolRuntimeVisible,
+			renderToolbarTool,
+			toolbarLastUsedTool,
+			updateGroupLastUsed,
+		],
+	);
+
 	return (
 		<div className="full-screen-draw-toolbar-container">
 			<div className="full-screen-draw-toolbar">
 				<Flex align="center" gap={token.paddingXS}>
-					{/* 选择状态 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.SelectTool}
-						icon={<ArrowSelectIcon style={{ fontSize: "1.2em" }} />}
-						drawState={DrawState.Select}
-						buttonProps={toolButtonProps}
-						onClick={() => {
-							onToolClick(DrawState.Select);
-						}}
-					/>
-
-					{showLockDrawTool && (
-						<>
-							{/* 锁定绘制工具 */}
-							<ToolButton
-								componentKey={DrawToolbarKeyEventKey.LockDrawTool}
-								icon={<LockOutlined />}
-								drawState={DrawState.Lock}
-								enableState={enableLockDrawTool}
-								onClick={() => {
-									onToolClick(DrawState.Lock);
-								}}
-							/>
-						</>
+					{buildToolbarContent(
+						orderedKeys,
+						hiddenSet,
+						renderToolbarTool,
+						token.paddingXS,
+						groupsMap,
+						renderGroup,
 					)}
 
-					<div className="draw-toolbar-splitter" />
-
-					<RectTool
-						customToolbarToolHiddenMap={undefined}
-						onToolClickAction={onToolClick}
-						disable={false}
-					/>
-
-					{/* 椭圆 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.EllipseTool}
-						icon={
-							<CircleIcon
-								style={{
-									fontSize: "1em",
-								}}
-							/>
-						}
-						buttonProps={toolButtonProps}
-						drawState={DrawState.Ellipse}
-						onClick={() => {
-							onToolClick(DrawState.Ellipse);
-						}}
-					/>
-
-					{/* 箭头 */}
-					<ArrowTool
-						customToolbarToolHiddenMap={undefined}
-						onToolClickAction={onToolClick}
-						disable={false}
-					/>
-
-					{/* 画笔 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.PenTool}
-						icon={<PenIcon style={{ fontSize: "1.15em" }} />}
-						buttonProps={toolButtonProps}
-						drawState={DrawState.Pen}
-						onClick={() => {
-							onToolClick(DrawState.Pen);
-						}}
-					/>
-
-					{/* 文本 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.TextTool}
-						icon={<TextIcon style={{ fontSize: "1.15em" }} />}
-						drawState={DrawState.Text}
-						buttonProps={toolButtonProps}
-						onClick={() => {
-							onToolClick(DrawState.Text);
-						}}
-					/>
-
-					{/* 序列号 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.SerialNumberTool}
-						icon={
-							<SerialNumberIcon
-								style={{
-									fontSize: "1.16em",
-								}}
-							/>
-						}
-						drawState={DrawState.SerialNumber}
-						buttonProps={toolButtonProps}
-						onClick={() => {
-							onToolClick(DrawState.SerialNumber);
-						}}
-					/>
-
-					{/* 橡皮擦 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.EraserTool}
-						icon={
-							<EraserIcon
-								style={{
-									fontSize: "0.95em",
-								}}
-							/>
-						}
-						drawState={DrawState.Eraser}
-						buttonProps={toolButtonProps}
-						onClick={() => {
-							onToolClick(DrawState.Eraser);
-						}}
-					/>
-
-					{/* 激光笔 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.LaserPointerTool}
-						icon={
-							<LaserPointerIcon
-								style={{
-									fontSize: "1.1em",
-								}}
-							/>
-						}
-						buttonProps={toolButtonProps}
-						drawState={DrawState.LaserPointer}
-						onClick={() => {
-							onToolClick(DrawState.LaserPointer);
-						}}
-					/>
-
-					<div className="draw-toolbar-splitter" />
-
-					<ToolButton
-						icon={
-							<ResetCanvasIcon
-								style={{
-									fontSize: "1.08em",
-								}}
-							/>
-						}
-						drawState={DrawState.ResetCanvas}
-						buttonProps={{
-							...toolButtonProps,
-							title: intl.formatMessage({ id: "draw.resetCanvasTool" }),
-						}}
-						onClick={() => {
-							getDrawCoreAction()?.updateScene({
-								elements: [],
-								captureUpdate: "IMMEDIATELY",
-							});
-						}}
-					/>
-
-					<ToolButton
-						icon={
-							<MouseThroughIcon
-								style={{
-									fontSize: "0.95em",
-								}}
-							/>
-						}
-						drawState={DrawState.MouseThrough}
-						buttonProps={{
-							...toolButtonProps,
-							title: mouseThroughButtonTitle,
-						}}
-						onClick={() => {
-							fullScreenDrawChangeMouseThrough();
-						}}
-					/>
-
-					{/* 取消截图 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.CancelTool}
-						icon={
-							<CloseOutlined
-								style={{
-									fontSize: "0.9em",
-									color: token.colorError,
-								}}
-							/>
-						}
-						buttonProps={toolButtonProps}
-						drawState={DrawState.Cancel}
-						onClick={() => {
-							closeFullScreenDrawWindow();
-						}}
-					/>
-
+					{/* 撤销/重做仅用于注册快捷键，不显示 */}
 					<HistoryControls hidden={true} disable={false} />
 				</Flex>
 			</div>
