@@ -20,37 +20,45 @@ import {
 } from "@/components/drawCore/extra";
 import { EventListenerContext } from "@/components/eventListener";
 import {
+	ArrowIcon,
 	ArrowSelectIcon,
 	CircleIcon,
 	CropIcon,
+	DiamondIcon,
 	DragWindowIcon,
 	EraserIcon,
+	FilterFreeDrawIcon,
+	FilterIcon,
+	HighlightIcon,
+	LineIcon,
 	PenIcon,
+	RectIcon,
 	SerialNumberIcon,
 	TextIcon,
+	WatermarkIcon,
 } from "@/components/icons";
 import { AppSettingsActionContext } from "@/contexts/appSettingsActionContext";
 import { useAppSettingsLoad } from "@/hooks/useAppSettingsLoad";
 import { useStateRef } from "@/hooks/useStateRef";
 import { useStateSubscriber } from "@/hooks/useStateSubscriber";
+import { findToolGroupHead, useToolbarLayout } from "@/hooks/useToolbarLayout";
 import {
-	useDragElement,
 	type DragElementOptionalConfig,
+	useDragElement,
 } from "@/pages/draw/components/drawToolbar/components/dragButton";
 import { HistoryControls } from "@/pages/draw/components/drawToolbar/components/historyControls";
 import { ToolButton } from "@/pages/draw/components/drawToolbar/components/toolButton";
-import { ArrowTool } from "@/pages/draw/components/drawToolbar/components/tools/arrowTool";
-import { BlurGroupTool } from "@/pages/draw/components/drawToolbar/components/tools/blurGroupTool";
+import { ToolbarGroupSlot } from "@/pages/draw/components/drawToolbar/components/toolbarGroupSlot";
 import { BlurTool } from "@/pages/draw/components/drawToolbar/components/tools/blurTool";
-import { DrawExtraTool } from "@/pages/draw/components/drawToolbar/components/tools/drawExtraTool";
 import { HighlightTool } from "@/pages/draw/components/drawToolbar/components/tools/highlightTool";
-import { RectTool } from "@/pages/draw/components/drawToolbar/components/tools/rectTool";
 import { getButtonTypeByState } from "@/pages/draw/components/drawToolbar/extra";
+import { buildToolbarContent } from "@/pages/draw/components/drawToolbar/toolbarContent";
 import type { DrawToolbarActionType } from "@/pages/fullScreenDraw/components/toolbar";
 import { useDrawContext } from "@/pages/fullScreenDraw/extra";
 import { type AppSettingsData, AppSettingsGroup } from "@/types/appSettings";
 import { DrawToolbarKeyEventKey } from "@/types/components/drawToolbar";
 import { DrawState } from "@/types/draw";
+import { ToolbarId, ToolbarToolKey } from "@/types/toolbarTool";
 import { formatKey } from "@/utils/format";
 import { zIndexs } from "@/utils/zIndex";
 import type { FixedContentWindowSize } from "../..";
@@ -84,6 +92,53 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 	const [enableLockDrawTool, setEnableLockDrawTool, enableLockDrawToolRef] =
 		useStateRef(false);
 	const [switchDrawHotKey, setSwitchDrawHotKey] = useState("");
+
+	const { orderedKeys, hiddenSet, groupsMap } = useToolbarLayout(
+		ToolbarId.FixedContent,
+	);
+	const [toolbarLastUsedTool, setToolbarLastUsedTool, toolbarLastUsedToolRef] =
+		useStateRef<Partial<Record<ToolbarToolKey, ToolbarToolKey>>>({});
+
+	/** 工具运行时可见性 */
+	const isToolRuntimeVisible = useCallback(
+		(key: ToolbarToolKey) => {
+			switch (key) {
+				case ToolbarToolKey.LockTool:
+					return showLockDrawToolRef.current;
+				case ToolbarToolKey.CropTool:
+					return !!onCrop;
+				default:
+					return true;
+			}
+		},
+		[onCrop, showLockDrawToolRef],
+	);
+
+	/** 记录组合最后使用的成员 */
+	const updateGroupLastUsed = useCallback(
+		(memberKey: ToolbarToolKey) => {
+			const headKey = findToolGroupHead(memberKey, groupsMap);
+			if (!headKey) {
+				return;
+			}
+
+			updateAppSettings(
+				AppSettingsGroup.Cache,
+				{
+					toolbarLastUsedTool: {
+						...toolbarLastUsedToolRef.current,
+						[headKey]: memberKey,
+					},
+				},
+				true,
+				true,
+				false,
+				true,
+				false,
+			);
+		},
+		[groupsMap, toolbarLastUsedToolRef, updateAppSettings],
+	);
 
 	const {
 		getLimitRect,
@@ -440,12 +495,16 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 				setEnableLockDrawTool(
 					settings[AppSettingsGroup.Cache].enableLockDrawTool,
 				);
+				// 工具栏组合最后使用的成员
+				setToolbarLastUsedTool(
+					settings[AppSettingsGroup.Cache].toolbarLastUsedTool,
+				);
 				setSwitchDrawHotKey(
 					settings[AppSettingsGroup.CommonKeyEvent].fixedContentEnableDraw
 						.hotKey,
 				);
 			},
-			[setEnableLockDrawTool, setShowLockDrawTool],
+			[setEnableLockDrawTool, setShowLockDrawTool, setToolbarLastUsedTool],
 		),
 	);
 
@@ -520,6 +579,278 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 		return intl.formatMessage({ id: "draw.dragWindow" });
 	}, [intl]);
 
+	const renderToolbarTool = useCallback(
+		(key: ToolbarToolKey): React.ReactNode => {
+			switch (key) {
+				case ToolbarToolKey.SelectTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.SelectTool}
+							icon={<ArrowSelectIcon style={{ fontSize: "1.2em" }} />}
+							drawState={DrawState.Select}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.Select);
+							}}
+						/>
+					);
+				case ToolbarToolKey.LockTool:
+					if (!showLockDrawTool) {
+						return null;
+					}
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.LockDrawTool}
+							icon={<LockOutlined />}
+							drawState={DrawState.Lock}
+							enableState={enableLockDrawTool}
+							onClick={() => {
+								onToolClick(DrawState.Lock);
+							}}
+						/>
+					);
+				case ToolbarToolKey.CropTool:
+					if (!onCrop) {
+						return null;
+					}
+					return (
+						<Button
+							{...toolButtonProps}
+							icon={
+								<CropIcon
+									style={{
+										fontSize: "1.1em",
+									}}
+								/>
+							}
+							type={getButtonTypeByState(false)}
+							title={intl.formatMessage({ id: "draw.crop" })}
+							onClick={() => {
+								onCrop();
+							}}
+						/>
+					);
+				case ToolbarToolKey.RectTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.RectTool}
+							icon={<RectIcon style={{ fontSize: "1em" }} />}
+							drawState={DrawState.Rect}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.Rect);
+							}}
+						/>
+					);
+				case ToolbarToolKey.DiamondTool:
+					return (
+						<ToolButton
+							icon={<DiamondIcon />}
+							drawState={DrawState.Diamond}
+							buttonProps={{
+								...toolButtonProps,
+								title: intl.formatMessage({ id: "draw.diamondTool" }),
+							}}
+							onClick={() => {
+								onToolClick(DrawState.Diamond);
+							}}
+						/>
+					);
+				case ToolbarToolKey.EllipseTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.EllipseTool}
+							icon={
+								<CircleIcon
+									style={{
+										fontSize: "1em",
+									}}
+								/>
+							}
+							buttonProps={toolButtonProps}
+							drawState={DrawState.Ellipse}
+							onClick={() => {
+								onToolClick(DrawState.Ellipse);
+							}}
+						/>
+					);
+				case ToolbarToolKey.ArrowTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.ArrowTool}
+							icon={<ArrowIcon style={{ fontSize: "0.83em" }} />}
+							drawState={DrawState.Arrow}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.Arrow);
+							}}
+						/>
+					);
+				case ToolbarToolKey.LineTool:
+					return (
+						<ToolButton
+							icon={<LineIcon style={{ fontSize: "1.15em", height: "1em" }} />}
+							drawState={DrawState.Line}
+							buttonProps={{
+								...toolButtonProps,
+								title: intl.formatMessage({ id: "draw.lineTool" }),
+							}}
+							onClick={() => {
+								onToolClick(DrawState.Line);
+							}}
+						/>
+					);
+				case ToolbarToolKey.PenTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.PenTool}
+							icon={<PenIcon style={{ fontSize: "1.15em" }} />}
+							buttonProps={toolButtonProps}
+							drawState={DrawState.Pen}
+							onClick={() => {
+								onToolClick(DrawState.Pen);
+							}}
+						/>
+					);
+				case ToolbarToolKey.TextTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.TextTool}
+							icon={<TextIcon style={{ fontSize: "1.15em" }} />}
+							drawState={DrawState.Text}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.Text);
+							}}
+						/>
+					);
+				case ToolbarToolKey.SerialNumberTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.SerialNumberTool}
+							icon={
+								<SerialNumberIcon
+									style={{
+										fontSize: "1.16em",
+									}}
+								/>
+							}
+							drawState={DrawState.SerialNumber}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.SerialNumber);
+							}}
+						/>
+					);
+				case ToolbarToolKey.BlurTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.BlurTool}
+							icon={<FilterIcon />}
+							drawState={DrawState.Blur}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.Blur);
+							}}
+						/>
+					);
+				case ToolbarToolKey.BlurFreeDrawTool:
+					return (
+						<ToolButton
+							icon={<FilterFreeDrawIcon style={{ fontSize: "1em" }} />}
+							drawState={DrawState.BlurFreeDraw}
+							buttonProps={{
+								...toolButtonProps,
+								title: intl.formatMessage({ id: "draw.blurFreeDrawTool" }),
+							}}
+							onClick={() => {
+								onToolClick(DrawState.BlurFreeDraw);
+							}}
+						/>
+					);
+				case ToolbarToolKey.EraserTool:
+					return (
+						<ToolButton
+							componentKey={DrawToolbarKeyEventKey.EraserTool}
+							icon={
+								<EraserIcon
+									style={{
+										fontSize: "0.95em",
+									}}
+								/>
+							}
+							drawState={DrawState.Eraser}
+							buttonProps={toolButtonProps}
+							onClick={() => {
+								onToolClick(DrawState.Eraser);
+							}}
+						/>
+					);
+				case ToolbarToolKey.WatermarkTool:
+					return (
+						<ToolButton
+							icon={<WatermarkIcon />}
+							drawState={DrawState.Watermark}
+							buttonProps={{
+								...toolButtonProps,
+								title: intl.formatMessage({ id: "draw.watermarkTool" }),
+							}}
+							onClick={() => {
+								onToolClick(DrawState.Watermark);
+							}}
+						/>
+					);
+				case ToolbarToolKey.HighlightTool:
+					return (
+						<ToolButton
+							icon={<HighlightIcon />}
+							drawState={DrawState.Highlight}
+							buttonProps={{
+								...toolButtonProps,
+								title: intl.formatMessage({ id: "draw.highlightTool" }),
+							}}
+							onClick={() => {
+								onToolClick(DrawState.Highlight);
+							}}
+						/>
+					);
+				case ToolbarToolKey.HistoryTool:
+					return <HistoryControls disable={disabled ?? false} />;
+				case ToolbarToolKey.ConfirmTool:
+					return (
+						<Button
+							{...toolButtonProps}
+							icon={
+								<CheckOutlined
+									style={{
+										color: token.colorPrimary,
+									}}
+								/>
+							}
+							type={getButtonTypeByState(false)}
+							title={confirmButtonTitle}
+							onClick={() => {
+								onToolClick(DrawState.Confirm);
+							}}
+						/>
+					);
+				default:
+					return null;
+			}
+		},
+		[
+			confirmButtonTitle,
+			disabled,
+			enableLockDrawTool,
+			intl,
+			onCrop,
+			onToolClick,
+			showLockDrawTool,
+			token.colorPrimary,
+			toolButtonProps,
+		],
+	);
+
 	const { addListener, removeListener } = useContext(EventListenerContext);
 
 	const isDragToolRef = useRef(false);
@@ -556,6 +887,27 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 		};
 	}, [addListener, removeListener, switchDraw]);
 
+	const renderGroup = useCallback(
+		(headKey: ToolbarToolKey, members: ToolbarToolKey[]) => (
+			<ToolbarGroupSlot
+				headKey={headKey}
+				members={members}
+				hiddenSet={hiddenSet}
+				isToolVisible={isToolRuntimeVisible}
+				lastUsedKey={toolbarLastUsedTool[headKey]}
+				onMemberClick={updateGroupLastUsed}
+				renderTool={renderToolbarTool}
+			/>
+		),
+		[
+			hiddenSet,
+			isToolRuntimeVisible,
+			renderToolbarTool,
+			toolbarLastUsedTool,
+			updateGroupLastUsed,
+		],
+	);
+
 	return (
 		<div className="fixed-content-draw-toolbar-container">
 			<div className="fixed-content-draw-toolbar" ref={toolbarElementRef}>
@@ -568,6 +920,7 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 						<HolderOutlined />
 					</div>
 
+					{/* 拖动窗口按钮是窗口锚点，固定在头部，不参与排序与显隐 */}
 					<Button
 						{...toolButtonProps}
 						icon={
@@ -582,172 +935,14 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 						onMouseDown={startFreeDragAction}
 					/>
 
-					{/* 选择状态 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.SelectTool}
-						icon={<ArrowSelectIcon style={{ fontSize: "1.2em" }} />}
-						drawState={DrawState.Select}
-						buttonProps={toolButtonProps}
-						onClick={() => {
-							onToolClick(DrawState.Select);
-						}}
-					/>
-
-					{showLockDrawTool && (
-						<>
-							{/* 锁定绘制工具 */}
-							<ToolButton
-								componentKey={DrawToolbarKeyEventKey.LockDrawTool}
-								icon={<LockOutlined />}
-								drawState={DrawState.Lock}
-								enableState={enableLockDrawTool}
-								onClick={() => {
-									onToolClick(DrawState.Lock);
-								}}
-							/>
-						</>
+					{buildToolbarContent(
+						orderedKeys,
+						hiddenSet,
+						renderToolbarTool,
+						token.paddingXS,
+						groupsMap,
+						renderGroup,
 					)}
-
-					{onCrop && (
-						<Button
-							{...toolButtonProps}
-							icon={
-								<CropIcon
-									style={{
-										fontSize: "1.1em",
-									}}
-								/>
-							}
-							type={getButtonTypeByState(false)}
-							title={intl.formatMessage({ id: "draw.crop" })}
-							onClick={() => {
-								onCrop();
-							}}
-						/>
-					)}
-
-					<div className="draw-toolbar-splitter" />
-
-					<RectTool
-						customToolbarToolHiddenMap={undefined}
-						onToolClickAction={onToolClick}
-						disable={false}
-					/>
-
-					{/* 椭圆 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.EllipseTool}
-						icon={
-							<CircleIcon
-								style={{
-									fontSize: "1em",
-								}}
-							/>
-						}
-						buttonProps={toolButtonProps}
-						drawState={DrawState.Ellipse}
-						onClick={() => {
-							onToolClick(DrawState.Ellipse);
-						}}
-					/>
-
-					{/* 箭头 */}
-					<ArrowTool
-						customToolbarToolHiddenMap={undefined}
-						onToolClickAction={onToolClick}
-						disable={false}
-					/>
-
-					{/* 画笔 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.PenTool}
-						icon={<PenIcon style={{ fontSize: "1.15em" }} />}
-						buttonProps={toolButtonProps}
-						drawState={DrawState.Pen}
-						onClick={() => {
-							onToolClick(DrawState.Pen);
-						}}
-					/>
-
-					{/* 文本 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.TextTool}
-						icon={<TextIcon style={{ fontSize: "1.15em" }} />}
-						drawState={DrawState.Text}
-						buttonProps={toolButtonProps}
-						onClick={() => {
-							onToolClick(DrawState.Text);
-						}}
-					/>
-
-					{/* 序列号 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.SerialNumberTool}
-						icon={
-							<SerialNumberIcon
-								style={{
-									fontSize: "1.16em",
-								}}
-							/>
-						}
-						drawState={DrawState.SerialNumber}
-						buttonProps={toolButtonProps}
-						onClick={() => {
-							onToolClick(DrawState.SerialNumber);
-						}}
-					/>
-
-					{/* 模糊 */}
-					<BlurGroupTool
-						customToolbarToolHiddenMap={undefined}
-						onToolClickAction={onToolClick}
-						disable={false}
-					/>
-
-					{/* 橡皮擦 */}
-					<ToolButton
-						componentKey={DrawToolbarKeyEventKey.EraserTool}
-						icon={
-							<EraserIcon
-								style={{
-									fontSize: "0.95em",
-								}}
-							/>
-						}
-						drawState={DrawState.Eraser}
-						buttonProps={toolButtonProps}
-						onClick={() => {
-							onToolClick(DrawState.Eraser);
-						}}
-					/>
-
-					<DrawExtraTool
-						customToolbarToolHiddenMap={undefined}
-						onToolClickAction={onToolClick}
-						disable={false}
-					/>
-
-					<div className="draw-toolbar-splitter" />
-
-					<HistoryControls disable={disabled ?? false} />
-
-					<div className="draw-toolbar-splitter" />
-
-					<Button
-						{...toolButtonProps}
-						icon={
-							<CheckOutlined
-								style={{
-									color: token.colorPrimary,
-								}}
-							/>
-						}
-						type={getButtonTypeByState(false)}
-						title={confirmButtonTitle}
-						onClick={() => {
-							onToolClick(DrawState.Confirm);
-						}}
-					/>
 				</Flex>
 
 				<BlurTool />

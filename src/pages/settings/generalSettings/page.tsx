@@ -3,7 +3,6 @@
 import {
 	ProForm,
 	ProFormRadio,
-	ProFormSelect,
 	ProFormSlider,
 	ProFormSwitch,
 } from "@ant-design/pro-components";
@@ -30,10 +29,9 @@ import { IconLabel } from "@/components/iconLable";
 import { DarkModeIcon, LanguageIcon } from "@/components/icons";
 import { PathInput } from "@/components/pathInput";
 import { ResetSettingsButton } from "@/components/resetSettingsButton";
+import { ToolbarCustomizer } from "@/components/toolbarCustomizer";
 import { getDefaultIconPath } from "@/components/trayIconLoader";
-import { PLUGIN_ID_RAPID_OCR } from "@/constants/pluginService";
 import { AppSettingsActionContext } from "@/contexts/appSettingsActionContext";
-import { usePluginServiceContext } from "@/contexts/pluginServiceContext";
 import { useAppSettingsLoad } from "@/hooks/useAppSettingsLoad";
 import { useStateRef } from "@/hooks/useStateRef";
 import {
@@ -45,7 +43,7 @@ import {
 	ColorPickerShowMode,
 	TrayIconDefaultIcon,
 } from "@/types/appSettings";
-import { DrawState } from "@/types/draw";
+import { ToolbarId } from "@/types/toolbarTool";
 
 const { Option } = Select;
 
@@ -113,86 +111,6 @@ export const GeneralSettingsPage = () => {
 		),
 		true,
 	);
-
-	const { isReadyStatus } = usePluginServiceContext();
-
-	const customToolbarToolListOptions = useMemo(() => {
-		if (!isReadyStatus) {
-			return [];
-		}
-
-		return [
-			{
-				label: intl.formatMessage({ id: "draw.selectTool" }),
-				value: DrawState.Select,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.ellipseTool" }),
-				value: DrawState.Ellipse,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.arrowTool" }),
-				value: DrawState.Arrow,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.penTool" }),
-				value: DrawState.Pen,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.textTool" }),
-				value: DrawState.Text,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.serialNumberTool" }),
-				value: DrawState.SerialNumber,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.blurTool" }),
-				value: DrawState.Blur,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.eraserTool" }),
-				value: DrawState.Eraser,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.watermarkTool" }),
-				value: DrawState.Watermark,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.highlightTool" }),
-				value: DrawState.Highlight,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.redoUndoTool" }),
-				value: DrawState.Redo,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.fixedTool" }),
-				value: DrawState.Fixed,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.ocrDetectTool" }),
-				value: DrawState.OcrDetect,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.ocrTranslateTool" }),
-				value: DrawState.OcrTranslate,
-			},
-			{
-				label: intl.formatMessage({ id: "draw.scrollScreenshotTool" }),
-				value: DrawState.ScrollScreenshot,
-			},
-		].filter((item) => {
-			if (
-				item.value === DrawState.OcrDetect ||
-				item.value === DrawState.OcrTranslate
-			) {
-				return isReadyStatus(PLUGIN_ID_RAPID_OCR);
-			}
-
-			return true;
-		});
-	}, [intl, isReadyStatus]);
 
 	const [defaultIconsOptions, setDefaultIconsOptions] = useState<
 		CheckboxOptionType<TrayIconDefaultIcon>[]
@@ -680,12 +598,18 @@ export const GeneralSettingsPage = () => {
 
 					<Row gutter={token.marginLG}>
 						<Col span={24}>
-							<ProFormSelect
-								name="toolbarHiddenToolList"
-								label={<FormattedMessage id="settings.customToolbarToolList" />}
-								options={customToolbarToolListOptions}
-								fieldProps={{ mode: "multiple" }}
-							/>
+							<ProForm.Item
+								label={
+									<IconLabel
+										label={
+											<FormattedMessage id="settings.toolbarCustomizer.title" />
+										}
+									/>
+								}
+								required={false}
+							>
+								<ToolbarCustomizer toolbarId={ToolbarId.Main} />
+							</ProForm.Item>
 						</Col>
 					</Row>
 				</Spin>
@@ -748,6 +672,13 @@ export const GeneralSettingsPage = () => {
 					</Row>
 				</Spin>
 			</ProForm>
+
+			<Divider />
+
+			<GroupTitle id="fixedContentToolbarSettings">
+				<FormattedMessage id="settings.fixedContentSettings.toolbarCustomizer" />
+			</GroupTitle>
+			<ToolbarCustomizer toolbarId={ToolbarId.FixedContent} />
 
 			<Divider />
 

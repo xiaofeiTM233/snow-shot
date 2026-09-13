@@ -67,8 +67,20 @@ export const settings = {
 	"settings.monitorCenterAuxiliaryLineColor": "显示器中心辅助线颜色",
 	"settings.colorPickerCenterAuxiliaryLineColor": "颜色拾取器中心辅助线颜色",
 	"settings.showOcrTranslate": "启用文本识别翻译工具",
-	"settings.customToolbarToolList": "隐藏工具栏工具",
-	"settings.customToolbarToolList.tip": "工具栏隐藏后，仍可通过热键使用",
+	"settings.toolbarCustomizer.title": "工具栏自定义",
+	"settings.toolbarCustomizer.tip":
+		"拖动图标调整顺序；拖到另一个图标中心可合并为组合（悬停组合在上方弹出成员面板，成员可拖出或排序）；拖到下方托盘即隐藏。隐藏的工具仍可通过热键使用。",
+	"settings.toolbarCustomizer.visibleTools": "显示中的工具",
+	"settings.toolbarCustomizer.hiddenTools": "已隐藏",
+	"settings.toolbarCustomizer.hiddenToolsEmpty": "没有隐藏的工具",
+	"settings.toolbarCustomizer.show": "恢复显示",
+	"settings.toolbarCustomizer.hide": "隐藏",
+	"settings.toolbarCustomizer.reset": "恢复默认",
+	"settings.toolbarCustomizer.pluginNotReady":
+		"插件未就绪，该工具暂不会显示在工具栏",
+	"settings.fixedContentSettings.toolbarCustomizer": "贴图工具栏自定义",
+	"settings.functionSettings.fullScreenDrawSettings.toolbarCustomizer":
+		"全屏绘制工具栏自定义",
 	"settings.enableQrcodeScan": "启用二维码识别",
 	"settings.findChildrenElements": "查找窗口子元素",
 	"settings.performanceMode": "性能优先",
@@ -507,7 +519,8 @@ export const settings = {
 		"每次请求最大段落数",
 	"settings.functionSettings.translationSettings.apiConfig.maxParagraphCount.tip":
 		"每次发送给翻译服务的段落数量，如果段落数量过多，可能会导致接口的响应变慢",
-	"settings.functionSettings.translationSettings.apiConfig.serviceName": "服务名称",
+	"settings.functionSettings.translationSettings.apiConfig.serviceName":
+		"服务名称",
 	"settings.functionSettings.translationSettings.apiConfig.serviceName.tip":
 		"用于在翻译服务列表中显示",
 	"settings.functionSettings.translationSettings.apiConfig.apiType.youdao":
@@ -766,16 +779,20 @@ export const settings = {
 		"通用手写体识别",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.service.volcengineOcrNormal":
 		"通用文字识别",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri": "API 地址",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri":
+		"API 地址",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.apiUri.required":
 		"请输入 API 地址",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey": "API Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey":
+		"API Key",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduApiKey.required":
 		"请输入 API Key",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey": "Secret Key",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey":
+		"Secret Key",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.baiduSecretKey.required":
 		"请输入 Secret Key",
-	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId": "AccessKeyId",
+	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId":
+		"AccessKeyId",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeyId.required":
 		"请输入 AccessKeyId",
 	"settings.functionSettings.ocrSettings.onlineOcrModelConfig.accessKeySecret":

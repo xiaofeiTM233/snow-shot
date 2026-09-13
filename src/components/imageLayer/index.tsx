@@ -10,25 +10,24 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { defaultWatermarkProps } from "@/pages/draw/components/drawToolbar/components/tools/drawExtraTool/components/watermarkTool";
+import { useAppSettingsLoad } from "@/hooks/useAppSettingsLoad";
+import { defaultWatermarkProps } from "@/pages/draw/components/drawToolbar/components/tools/watermarkTool";
 import type { CaptureBoundingBoxInfo } from "@/pages/draw/extra";
 import type { ImageSharedBufferData } from "@/pages/draw/tools";
 import type { FixedContentProcessImageConfig } from "@/pages/fixedContent/components/fixedContentCore";
-import type { ElementRect, ImageBuffer } from "@/types/commands/screenshot";
-import type { CaptureHistoryItem } from "@/utils/appStore";
-import { useAppSettingsLoad } from "@/hooks/useAppSettingsLoad";
 import {
 	type AppSettingsData,
 	AppSettingsGroup,
-	RenderBackend,
+	type RenderBackend,
 } from "@/types/appSettings";
+import type { ElementRect, ImageBuffer } from "@/types/commands/screenshot";
+import type { CaptureHistoryItem } from "@/utils/appStore";
 import { getCaptureHistoryImageAbsPath } from "@/utils/captureHistory";
 import { supportOffscreenCanvas } from "@/utils/environment";
 import { appError, appInfo, appWarn } from "@/utils/log";
 import {
 	addImageToContainerAction,
 	applyProcessImageConfigToCanvasAction,
-	ensureImageRenderedAction,
 	canvasRenderAction,
 	clearCanvasAction,
 	clearContainerAction,
@@ -37,6 +36,7 @@ import {
 	createNewCanvasContainerAction,
 	deleteBlurSpriteAction,
 	disposeCanvasAction,
+	ensureImageRenderedAction,
 	getImageBitmapAction,
 	INIT_CONTAINER_KEY,
 	initBaseImageTextureAction,
@@ -287,20 +287,19 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 				);
 			};
 			worker.onmessageerror = (event) => {
-				appError(
-					`[ImageLayer] rendererWorker messageerror: ${event.type}`,
-				);
+				appError(`[ImageLayer] rendererWorker messageerror: ${event.type}`);
 			};
 			// 处理 worker 自发转发的诊断日志（worker console 不落盘，转发到主线程落盘）
 			worker.addEventListener(
 				"message",
-				(event: MessageEvent<{ type?: string; payload?: { level?: string; message?: string } }>) => {
+				(
+					event: MessageEvent<{
+						type?: string;
+						payload?: { level?: string; message?: string };
+					}>,
+				) => {
 					const data = event.data;
-					if (
-						data &&
-						data.type === "forwardLog" &&
-						data.payload?.message
-					) {
+					if (data && data.type === "forwardLog" && data.payload?.message) {
 						const msg = `[worker-render] ${data.payload.message}`;
 						if (data.payload.level === "warn") {
 							appWarn(msg);
@@ -590,39 +589,45 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 
 	const renderImageSharedBufferToPng = useCallback<
 		ImageLayerActionType["renderImageSharedBufferToPng"]
-	>(async (imageSharedBuffer?: ImageSharedBufferData) => {
-		// 优先使用外部传入的 sharedBuffer（主线程保存的独立拷贝，不受 worker transfer 影响）；
-		// 否则回退到 worker 内部同步的 imageSharedBufferRef。
-		// 修复：截图的 sharedBuffer 传给 worker 时会被 transfer（所有权转移），主线程无法再访问，
-		// 一旦 worker 侧 ref 丢失（worker 重建 / 多窗口实例），保存历史就会 invalid imageBuffer。
-		const buffer =
-			imageSharedBuffer ??
-			(await transferImageSharedBufferAction(
-				rendererWorker,
-				imageSharedBufferRef,
-			));
-		if (!buffer) {
-			return undefined;
-		}
-		return await encodeImage(encodeImageWorker, buffer);
-	}, [encodeImageWorker, rendererWorker]);
+	>(
+		async (imageSharedBuffer?: ImageSharedBufferData) => {
+			// 优先使用外部传入的 sharedBuffer（主线程保存的独立拷贝，不受 worker transfer 影响）；
+			// 否则回退到 worker 内部同步的 imageSharedBufferRef。
+			// 修复：截图的 sharedBuffer 传给 worker 时会被 transfer（所有权转移），主线程无法再访问，
+			// 一旦 worker 侧 ref 丢失（worker 重建 / 多窗口实例），保存历史就会 invalid imageBuffer。
+			const buffer =
+				imageSharedBuffer ??
+				(await transferImageSharedBufferAction(
+					rendererWorker,
+					imageSharedBufferRef,
+				));
+			if (!buffer) {
+				return undefined;
+			}
+			return await encodeImage(encodeImageWorker, buffer);
+		},
+		[encodeImageWorker, rendererWorker],
+	);
 
 	// 黑屏兜底：检查截图容器是否已渲染，空则用主线程持有的 sharedBuffer 拷贝重新渲染
 	const ensureImageRendered = useCallback<
 		ImageLayerActionType["ensureImageRendered"]
-	>(async (fallbackImageBuffer) => {
-		return await ensureImageRenderedAction(
-			rendererWorker,
-			canvasContainerMapRef,
-			currentImageTextureRef,
-			sharedBufferImageTextureRef,
-			imageSharedBufferRef,
-			baseImageTextureRef,
-			blurSpriteMapRef,
-			INIT_CONTAINER_KEY,
-			fallbackImageBuffer,
-		);
-	}, [rendererWorker]);
+	>(
+		async (fallbackImageBuffer) => {
+			return await ensureImageRenderedAction(
+				rendererWorker,
+				canvasContainerMapRef,
+				currentImageTextureRef,
+				sharedBufferImageTextureRef,
+				imageSharedBufferRef,
+				baseImageTextureRef,
+				blurSpriteMapRef,
+				INIT_CONTAINER_KEY,
+				fallbackImageBuffer,
+			);
+		},
+		[rendererWorker],
+	);
 
 	const renderToPng = useCallback<ImageLayerActionType["renderToPng"]>(
 		async (selectRect: ElementRect, containerId: string | undefined) => {
@@ -935,18 +940,18 @@ export const ImageLayer: React.FC<ImageLayerProps> = ({
 					imageBuffer,
 				);
 			}
-		// 高亮层
-		highlightContainerKeyRef.current = await createNewCanvasContainer(
-			DRAW_LAYER_HIGHLIGHT_CONTAINER_KEY,
-		);
-		// 模糊层
-		blurContainerKeyRef.current = await createNewCanvasContainer(
-			DRAW_LAYER_BLUR_CONTAINER_KEY,
-		);
-		// 水印层（最后创建，确保位于最顶层，避免被高亮层的不透明底图遮挡）
-		watermarkContainerKeyRef.current = await createNewCanvasContainer(
-			DRAW_LAYER_WATERMARK_CONTAINER_KEY,
-		);
+			// 高亮层
+			highlightContainerKeyRef.current = await createNewCanvasContainer(
+				DRAW_LAYER_HIGHLIGHT_CONTAINER_KEY,
+			);
+			// 模糊层
+			blurContainerKeyRef.current = await createNewCanvasContainer(
+				DRAW_LAYER_BLUR_CONTAINER_KEY,
+			);
+			// 水印层（最后创建，确保位于最顶层，避免被高亮层的不透明底图遮挡）
+			watermarkContainerKeyRef.current = await createNewCanvasContainer(
+				DRAW_LAYER_WATERMARK_CONTAINER_KEY,
+			);
 
 			await canvasRender();
 		},
