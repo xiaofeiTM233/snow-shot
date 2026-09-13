@@ -100,7 +100,7 @@ const AppSettingsContextProviderCore: React.FC<{
 	const appWindowRef = useRef<AppWindow>(undefined);
 	const [currentSystemTheme, setCurrentSystemTheme] =
 		useState<AppSettingsTheme>(AppSettingsTheme.Light);
-	const themeUnlisten = useRef<() => void>(() => { });
+	const themeUnlisten = useRef<() => void>(() => {});
 	const InitedAppContext = useRef<boolean>(false);
 	const initAppContext = useCallback(async () => {
 		if (InitedAppContext.current) {
@@ -425,7 +425,7 @@ const AppSettingsContextProviderCore: React.FC<{
 					toolbarLastUsedTool: parseToolbarLastUsedToolMap(
 						newSettings?.toolbarLastUsedTool,
 						prevSettings?.toolbarLastUsedTool ??
-						defaultAppSettingsData[group].toolbarLastUsedTool,
+							defaultAppSettingsData[group].toolbarLastUsedTool,
 					),
 					delayScreenshotSeconds:
 						typeof newSettings?.delayScreenshotSeconds === "number"
@@ -500,9 +500,9 @@ const AppSettingsContextProviderCore: React.FC<{
 					beyondSelectRectElementOpacity:
 						typeof newSettings?.beyondSelectRectElementOpacity === "number"
 							? Math.min(
-								Math.max(newSettings.beyondSelectRectElementOpacity, 0),
-								100,
-							)
+									Math.max(newSettings.beyondSelectRectElementOpacity, 0),
+									100,
+								)
 							: (prevSettings?.beyondSelectRectElementOpacity ??
 								defaultAppSettingsData[group].beyondSelectRectElementOpacity),
 					selectRectMaskColor:
@@ -531,50 +531,50 @@ const AppSettingsContextProviderCore: React.FC<{
 					toolbarToolOrder: parseToolbarToolKeyList(
 						newSettings?.toolbarToolOrder,
 						prevSettings?.toolbarToolOrder ??
-						defaultAppSettingsData[group].toolbarToolOrder,
+							defaultAppSettingsData[group].toolbarToolOrder,
 					),
 					toolbarGroups: normalizeToolbarGroupsMap(
 						newSettings?.toolbarGroups,
 						getToolbarAvailableKeys(ToolbarId.Main),
 						prevSettings?.toolbarGroups ??
-						DEFAULT_TOOLBAR_GROUPS[ToolbarId.Main],
+							DEFAULT_TOOLBAR_GROUPS[ToolbarId.Main],
 					),
 					toolbarHiddenTools: parseToolbarToolKeyList(
 						newSettings?.toolbarHiddenTools ?? migratedToolbarHiddenTools,
 						prevSettings?.toolbarHiddenTools ??
-						defaultAppSettingsData[group].toolbarHiddenTools,
+							defaultAppSettingsData[group].toolbarHiddenTools,
 					),
 					fullScreenToolbarToolOrder: parseToolbarToolKeyList(
 						newSettings?.fullScreenToolbarToolOrder,
 						prevSettings?.fullScreenToolbarToolOrder ??
-						defaultAppSettingsData[group].fullScreenToolbarToolOrder,
+							defaultAppSettingsData[group].fullScreenToolbarToolOrder,
 					),
 					fullScreenToolbarGroups: normalizeToolbarGroupsMap(
 						newSettings?.fullScreenToolbarGroups,
 						getToolbarAvailableKeys(ToolbarId.FullScreen),
 						prevSettings?.fullScreenToolbarGroups ??
-						DEFAULT_TOOLBAR_GROUPS[ToolbarId.FullScreen],
+							DEFAULT_TOOLBAR_GROUPS[ToolbarId.FullScreen],
 					),
 					fullScreenToolbarHiddenTools: parseToolbarToolKeyList(
 						newSettings?.fullScreenToolbarHiddenTools,
 						prevSettings?.fullScreenToolbarHiddenTools ??
-						defaultAppSettingsData[group].fullScreenToolbarHiddenTools,
+							defaultAppSettingsData[group].fullScreenToolbarHiddenTools,
 					),
 					fixedContentToolbarToolOrder: parseToolbarToolKeyList(
 						newSettings?.fixedContentToolbarToolOrder,
 						prevSettings?.fixedContentToolbarToolOrder ??
-						defaultAppSettingsData[group].fixedContentToolbarToolOrder,
+							defaultAppSettingsData[group].fixedContentToolbarToolOrder,
 					),
 					fixedContentToolbarGroups: normalizeToolbarGroupsMap(
 						newSettings?.fixedContentToolbarGroups,
 						getToolbarAvailableKeys(ToolbarId.FixedContent),
 						prevSettings?.fixedContentToolbarGroups ??
-						DEFAULT_TOOLBAR_GROUPS[ToolbarId.FixedContent],
+							DEFAULT_TOOLBAR_GROUPS[ToolbarId.FixedContent],
 					),
 					fixedContentToolbarHiddenTools: parseToolbarToolKeyList(
 						newSettings?.fixedContentToolbarHiddenTools,
 						prevSettings?.fixedContentToolbarHiddenTools ??
-						defaultAppSettingsData[group].fixedContentToolbarHiddenTools,
+							defaultAppSettingsData[group].fixedContentToolbarHiddenTools,
 					),
 				};
 			} else if (group === AppSettingsGroup.FunctionDraw) {
@@ -792,7 +792,7 @@ const AppSettingsContextProviderCore: React.FC<{
 								defaultAppSettingsData[group].antialias),
 					renderBackend:
 						newSettings?.renderBackend === RenderBackend.WebGL ||
-							newSettings?.renderBackend === RenderBackend.WebGPU
+						newSettings?.renderBackend === RenderBackend.WebGPU
 							? newSettings.renderBackend
 							: (prevSettings?.renderBackend ??
 								defaultAppSettingsData[group].renderBackend),
@@ -957,13 +957,13 @@ const AppSettingsContextProviderCore: React.FC<{
 								defaultAppSettingsData[group].autoCreateNewSession),
 					chatApiConfigList: Array.isArray(newSettings?.chatApiConfigList)
 						? newSettings.chatApiConfigList.map((item) => ({
-							api_uri: `${item.api_uri ?? ""}`,
-							api_key: `${item.api_key ?? ""}`,
-							api_model: `${item.api_model ?? ""}`,
-							model_name: `${item.model_name ?? ""}`,
-							support_thinking: !!item.support_thinking,
-							support_vision: !!item.support_vision,
-						}))
+								api_uri: `${item.api_uri ?? ""}`,
+								api_key: `${item.api_key ?? ""}`,
+								api_model: `${item.api_model ?? ""}`,
+								model_name: `${item.model_name ?? ""}`,
+								support_thinking: !!item.support_thinking,
+								support_vision: !!item.support_vision,
+							}))
 						: (prevSettings?.chatApiConfigList ??
 							defaultAppSettingsData[group].chatApiConfigList),
 					autoCreateNewSessionOnCloseWindow:
@@ -997,7 +997,7 @@ const AppSettingsContextProviderCore: React.FC<{
 								defaultAppSettingsData[group].cacheTranslationDomain),
 					cacheTranslationType:
 						typeof newSettings?.cacheTranslationType === "number" ||
-							typeof newSettings?.cacheTranslationType === "string"
+						typeof newSettings?.cacheTranslationType === "string"
 							? newSettings.cacheTranslationType
 							: (prevSettings?.cacheTranslationType ??
 								defaultAppSettingsData[group].cacheTranslationType),
@@ -1023,56 +1023,56 @@ const AppSettingsContextProviderCore: React.FC<{
 						newSettings?.translationApiConfigList,
 					)
 						? (newSettings.translationApiConfigList.map((rawItem) => {
-							// 不同类型的翻译 API 配置字段差异较大，统一按记录视图读取
-							const item = rawItem as unknown as Record<string, unknown>;
+								// 不同类型的翻译 API 配置字段差异较大，统一按记录视图读取
+								const item = rawItem as unknown as Record<string, unknown>;
 
-							// 服务类型是唯一事实来源，接口类型由其推导；
-							// 旧版本归一化会给所有缺失服务类型的行写入 youdao:text，
-							// 因此服务类型与接口类型矛盾时以接口类型为准
-							const rawServiceType = isTranslationServiceType(
-								item.service_type,
-							)
-								? item.service_type
-								: undefined;
-							const apiType = (
-								Object.values(TranslationApiType) as string[]
-							).includes(item.api_type as string)
-								? (item.api_type as TranslationApiType)
-								: undefined;
-							const serviceType =
-								apiType !== undefined
-									? rawServiceType &&
-										TRANSLATION_API_TYPE_BY_SERVICE_TYPE[rawServiceType] ===
-										apiType
-										? rawServiceType
-										: TRANSLATION_DEFAULT_SERVICE_TYPE_BY_API_TYPE[apiType]
-									: (rawServiceType ?? TranslationServiceType.DeepL);
+								// 服务类型是唯一事实来源，接口类型由其推导；
+								// 旧版本归一化会给所有缺失服务类型的行写入 youdao:text，
+								// 因此服务类型与接口类型矛盾时以接口类型为准
+								const rawServiceType = isTranslationServiceType(
+									item.service_type,
+								)
+									? item.service_type
+									: undefined;
+								const apiType = (
+									Object.values(TranslationApiType) as string[]
+								).includes(item.api_type as string)
+									? (item.api_type as TranslationApiType)
+									: undefined;
+								const serviceType =
+									apiType !== undefined
+										? rawServiceType &&
+											TRANSLATION_API_TYPE_BY_SERVICE_TYPE[rawServiceType] ===
+												apiType
+											? rawServiceType
+											: TRANSLATION_DEFAULT_SERVICE_TYPE_BY_API_TYPE[apiType]
+										: (rawServiceType ?? TranslationServiceType.DeepL);
 
-							return {
-								api_type: TRANSLATION_API_TYPE_BY_SERVICE_TYPE[serviceType],
-								service_name: `${item.service_name ?? ""}`,
-								api_uri: `${item.api_uri ?? ""}`,
-								api_key: `${item.api_key ?? ""}`,
-								deepl_prefer_quality_optimized:
-									typeof item.deepl_prefer_quality_optimized === "boolean"
-										? item.deepl_prefer_quality_optimized
-										: false,
-								max_requests_per_second:
-									typeof item.max_requests_per_second === "number"
-										? item.max_requests_per_second
-										: undefined,
-								max_paragraph_count:
-									typeof item.max_paragraph_count === "number"
-										? item.max_paragraph_count
-										: undefined,
-								service_type: serviceType,
-								app_key: `${item.app_key ?? ""}`,
-								app_secret: `${item.app_secret ?? ""}`,
-								secret_id: `${item.secret_id ?? ""}`,
-								secret_key: `${item.secret_key ?? ""}`,
-								region: `${item.region ?? ""}`,
-							};
-						}) as TranslationApiConfig[])
+								return {
+									api_type: TRANSLATION_API_TYPE_BY_SERVICE_TYPE[serviceType],
+									service_name: `${item.service_name ?? ""}`,
+									api_uri: `${item.api_uri ?? ""}`,
+									api_key: `${item.api_key ?? ""}`,
+									deepl_prefer_quality_optimized:
+										typeof item.deepl_prefer_quality_optimized === "boolean"
+											? item.deepl_prefer_quality_optimized
+											: false,
+									max_requests_per_second:
+										typeof item.max_requests_per_second === "number"
+											? item.max_requests_per_second
+											: undefined,
+									max_paragraph_count:
+										typeof item.max_paragraph_count === "number"
+											? item.max_paragraph_count
+											: undefined,
+									service_type: serviceType,
+									app_key: `${item.app_key ?? ""}`,
+									app_secret: `${item.app_secret ?? ""}`,
+									secret_id: `${item.secret_id ?? ""}`,
+									secret_key: `${item.secret_key ?? ""}`,
+									region: `${item.region ?? ""}`,
+								};
+							}) as TranslationApiConfig[])
 						: (prevSettings?.translationApiConfigList ??
 							defaultAppSettingsData[group].translationApiConfigList),
 					sourceLanguage:
@@ -1092,7 +1092,7 @@ const AppSettingsContextProviderCore: React.FC<{
 								defaultAppSettingsData[group].translationDomain),
 					translationType:
 						typeof newSettings?.translationType === "number" ||
-							typeof newSettings?.translationType === "string"
+						typeof newSettings?.translationType === "string"
 							? newSettings.translationType
 							: (prevSettings?.translationType ??
 								defaultAppSettingsData[group].translationType),
@@ -1213,8 +1213,8 @@ const AppSettingsContextProviderCore: React.FC<{
 								defaultAppSettingsData[group].saveFileDialog),
 					saveFileResizePercent:
 						typeof newSettings?.saveFileResizePercent === "number" &&
-							Number.isFinite(newSettings.saveFileResizePercent) &&
-							newSettings.saveFileResizePercent > 0
+						Number.isFinite(newSettings.saveFileResizePercent) &&
+						newSettings.saveFileResizePercent > 0
 							? newSettings.saveFileResizePercent
 							: (prevSettings?.saveFileResizePercent ??
 								defaultAppSettingsData[group].saveFileResizePercent),
@@ -1328,9 +1328,9 @@ const AppSettingsContextProviderCore: React.FC<{
 					imageFeatureDescriptionLength:
 						typeof newSettings?.imageFeatureDescriptionLength === "number"
 							? Math.min(
-								Math.max(newSettings.imageFeatureDescriptionLength, 8),
-								128,
-							)
+									Math.max(newSettings.imageFeatureDescriptionLength, 8),
+									128,
+								)
 							: (prevSettings?.imageFeatureDescriptionLength ??
 								defaultAppSettingsData[group].imageFeatureDescriptionLength),
 					tryRollback:
@@ -1575,15 +1575,15 @@ const AppSettingsContextProviderCore: React.FC<{
 								defaultAppSettingsData[group].enableMultipleMonitor),
 					captureMethod:
 						newSettings?.captureMethod != null &&
-							Object.values(CaptureMethod).includes(newSettings.captureMethod)
+						Object.values(CaptureMethod).includes(newSettings.captureMethod)
 							? newSettings.captureMethod
 							: (prevSettings?.captureMethod ??
 								defaultAppSettingsData[group].captureMethod),
 					hdrColorCorrection:
 						newSettings?.hdrColorCorrection != null &&
-							Object.values(HdrColorCorrection).includes(
-								newSettings.hdrColorCorrection,
-							)
+						Object.values(HdrColorCorrection).includes(
+							newSettings.hdrColorCorrection,
+						)
 							? newSettings.hdrColorCorrection
 							: (prevSettings?.hdrColorCorrection ??
 								defaultAppSettingsData[group].hdrColorCorrection),

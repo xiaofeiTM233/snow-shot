@@ -35,6 +35,7 @@ import {
 	TranslationDomain,
 	TranslationType,
 } from "@/types/servies/translation";
+import { ToolbarId } from "@/types/toolbarTool";
 import { ImageFormat } from "@/types/utils/file";
 import { getPlatformValue } from "@/utils/platform";
 import { defaultAppFunctionConfigs } from "./appFunction";
@@ -42,6 +43,7 @@ import { defaultCommonKeyEventSettings } from "./commonKeyEvent";
 import { FOCUS_WINDOW_APP_NAME_ENV_VARIABLE } from "./components/chat";
 import { defaultTranslationPrompt } from "./components/translation";
 import { defaultDrawToolbarKeyEventSettings } from "./drawToolbarKeyEvent";
+import { DEFAULT_TOOLBAR_GROUPS } from "./toolbarTools";
 
 export const defaultAppSettingsData: AppSettingsData = {
 	[AppSettingsGroup.Common]: {
@@ -77,10 +79,14 @@ export const defaultAppSettingsData: AppSettingsData = {
 		hotKeyTipOpacity: 100,
 		colorPickerCenterAuxiliaryLineColor: "#00000000",
 		toolbarToolOrder: [],
+		toolbarGroups: DEFAULT_TOOLBAR_GROUPS[ToolbarId.Main],
 		toolbarHiddenTools: [],
 		fullScreenToolbarToolOrder: [],
+		fullScreenToolbarGroups: DEFAULT_TOOLBAR_GROUPS[ToolbarId.FullScreen],
 		fullScreenToolbarHiddenTools: [],
 		fixedContentToolbarToolOrder: [],
+		fixedContentToolbarGroups:
+			DEFAULT_TOOLBAR_GROUPS[ToolbarId.FixedContent],
 		fixedContentToolbarHiddenTools: [],
 	},
 	[AppSettingsGroup.FixedContent]: {
