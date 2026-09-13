@@ -73,10 +73,12 @@ impl OcrService {
     }
 
     fn build_session(builder: SessionBuilder) -> Result<SessionBuilder, ort::Error> {
-        let num_thread = num_cpus::get_physical();
+        // 线程数过大会把 CPU 占满，识别期间界面会明显卡顿（渲染进程抢不到时间片）。
+        // OCR 是 det -> cls -> rec 的串行流程，算子间并行没有收益，只保留算子内并行并限制上限。
+        let num_thread = num_cpus::get_physical().clamp(1, 8);
         Ok(builder
-            .with_inter_threads(num_thread)?
             .with_intra_threads(num_thread)?
+            .with_inter_threads(1)?
             .with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level3)?)
     }
 
@@ -172,20 +174,20 @@ impl OcrService {
         self.rec_model = rec_model_config;
         self.hot_start = hot_start;
 
+        // 模型配置可能已变化，先丢弃旧 session，确保下次使用的是新模型
+        self.ocr_core.take();
+
         if self.hot_start {
             self.init_session().await?;
-        } else {
-            self.ocr_core.take();
         }
 
         Ok(())
     }
 
-    /// 释放 onnx session，并初始化新的 session
+    /// 释放 onnx session。热启动时保持 session 常驻：
+    /// 每次识别后重建 session 需要重新读盘并构建模型，会造成明显的 CPU 尖峰与卡顿
     pub async fn release_session(&mut self) -> Result<(), String> {
-        if self.hot_start {
-            self.init_session().await?;
-        } else {
+        if !self.hot_start {
             self.ocr_core.take();
         }
 
