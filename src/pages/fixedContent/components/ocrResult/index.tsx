@@ -695,11 +695,19 @@ export const OcrResult: React.FC<{
 
 				return;
 			} else {
-				const tempOcrResult = await ocrDetectByCanvas(
-					canvas,
-					monitorScaleFactorRef.current,
-					getAppSettings()[AppSettingsGroup.SystemScreenshot].ocrDetectAngle,
-				);
+				let tempOcrResult: OcrDetectResult | undefined;
+				try {
+					tempOcrResult = await ocrDetectByCanvas(
+						canvas,
+						monitorScaleFactorRef.current,
+						getAppSettings()[AppSettingsGroup.SystemScreenshot].ocrDetectAngle,
+					);
+				} catch (error) {
+					// 在线服务报错时弹出错误信息，避免 Promise 拒绝无人处理导致界面一直等待
+					appError("[ocrDetectByCanvas] ocrDetectByCanvas failed", error);
+					message.error(String(error));
+					return;
+				}
 
 				if (!tempOcrResult) {
 					appError("[ocrDetectByCanvas] ocrDetectByCanvas failed");
@@ -731,6 +739,7 @@ export const OcrResult: React.FC<{
 		},
 		[
 			isReady,
+			message,
 			onOcrDetect,
 			updateOcrTextElements,
 			ocrDetectByCanvas,
@@ -769,11 +778,19 @@ export const OcrResult: React.FC<{
 			};
 			monitorScaleFactorRef.current = params.monitorScaleFactor;
 
-			const ocrResult = await ocrDetectByCanvas(
-				canvas,
-				monitorScaleFactorRef.current,
-				getAppSettings()[AppSettingsGroup.SystemScreenshot].ocrDetectAngle,
-			);
+			let ocrResult: OcrDetectResult | undefined;
+			try {
+				ocrResult = await ocrDetectByCanvas(
+					canvas,
+					params.monitorScaleFactor,
+					getAppSettings()[AppSettingsGroup.SystemScreenshot].ocrDetectAngle,
+				);
+			} catch (error) {
+				// 在线服务报错时弹出错误信息，避免 Promise 拒绝无人处理导致界面一直等待
+				appError("[ocrDetectByCanvas] ocrDetectByCanvas failed", error);
+				message.error(String(error));
+				return;
+			}
 
 			if (!ocrResult) {
 				appError("[ocrDetectByCanvas] ocrDetectByCanvas failed");
@@ -790,6 +807,7 @@ export const OcrResult: React.FC<{
 		[
 			getAppSettings,
 			isReady,
+			message,
 			onOcrDetect,
 			updateOcrTextElements,
 			ocrDetectByCanvas,

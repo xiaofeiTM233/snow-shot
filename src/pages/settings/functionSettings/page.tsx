@@ -28,6 +28,7 @@ import {
 } from "antd";
 import type { AggregationColor } from "antd/es/color-picker/color";
 import {
+	memo,
 	useCallback,
 	useContext,
 	useEffect,
@@ -79,7 +80,7 @@ import {
 	OcrDetectAfterAction,
 	OcrModel,
 	type OnlineOcrModelConfig,
-	TranslationApiType,
+	TranslationServiceType,
 	TrayIconClickAction,
 	VideoMaxSize,
 } from "@/types/appSettings";
@@ -93,6 +94,135 @@ import {
 import { OnlineOcrConfig } from "./components/onlineOcrConfig";
 import { TestChat } from "./components/testChat";
 import { TranslationConfig } from "./components/translationConfig";
+
+const TRANSLATION_API_CONFIG_I18N_PREFIX =
+	"settings.functionSettings.translationSettings.apiConfig";
+
+type TranslationServiceTypeItem = {
+	providerLabelId: string;
+	value: TranslationServiceType;
+	labelId: string;
+};
+
+const TRANSLATION_SERVICE_TYPE_LIST: TranslationServiceTypeItem[] = [
+	{
+		providerLabelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiType.deepL`,
+		value: TranslationServiceType.DeepL,
+		labelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.deepLService.text`,
+	},
+	{
+		providerLabelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiType.custom`,
+		value: TranslationServiceType.Custom,
+		labelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiType.custom`,
+	},
+	{
+		providerLabelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiType.youdao`,
+		value: TranslationServiceType.YoudaoText,
+		labelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.youdaoService.text`,
+	},
+	{
+		providerLabelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiType.youdao`,
+		value: TranslationServiceType.YoudaoLLM,
+		labelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.youdaoService.llm`,
+	},
+	{
+		providerLabelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiType.aliyun`,
+		value: TranslationServiceType.AliyunGeneral,
+		labelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.aliyunService.general`,
+	},
+	{
+		providerLabelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiType.aliyun`,
+		value: TranslationServiceType.AliyunProfessional,
+		labelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.aliyunService.professional`,
+	},
+	{
+		providerLabelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiType.volcengine`,
+		value: TranslationServiceType.VolcengineText,
+		labelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.volcengineService.text`,
+	},
+	{
+		providerLabelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiType.baidu`,
+		value: TranslationServiceType.BaiduText,
+		labelId: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.baiduService.text`,
+	},
+];
+
+type OcrModelSelectFieldProps = {
+	ocrModelOptions: SelectProps["options"];
+	customOcrModelConfigList?: CustomOcrModelConfig[];
+	onlineOcrModelConfigList?: OnlineOcrModelConfig[];
+};
+
+const OcrModelSelectField = memo<OcrModelSelectFieldProps>(
+	({
+		ocrModelOptions,
+		customOcrModelConfigList,
+		onlineOcrModelConfigList,
+	}) => {
+		const intl = useIntl();
+
+		const allOptions = useMemo(() => {
+			const localOptions = [
+				...(ocrModelOptions || []),
+				...(customOcrModelConfigList || [])
+					.filter((c) => c.model_name)
+					.map((c) => ({
+						label: c.model_name,
+						value: c.model_name,
+					})),
+			];
+			const onlineOptions = (onlineOcrModelConfigList || [])
+				.filter((c) => c.model_name)
+				.map((c) => ({
+					label: c.model_name,
+					value: `${ONLINE_OCR_MODEL_PREFIX}${c.model_name}`,
+				}));
+
+			// 添加了在线识别时，按【本地识别】/【在线识别】分组展示
+			return onlineOptions.length > 0
+				? [
+						{
+							label: intl.formatMessage({
+								id: "settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.local",
+							}),
+							title: intl.formatMessage({
+								id: "settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.local",
+							}),
+							options: localOptions,
+						},
+						{
+							label: intl.formatMessage({
+								id: "settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.online",
+							}),
+							title: intl.formatMessage({
+								id: "settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.online",
+							}),
+							options: onlineOptions,
+						},
+					]
+				: localOptions;
+		}, [
+			intl,
+			ocrModelOptions,
+			customOcrModelConfigList,
+			onlineOcrModelConfigList,
+		]);
+
+		return (
+			<ProFormSelect
+				label={
+					<IconLabel
+						label={
+							<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrModel" />
+						}
+					/>
+				}
+				name="ocrModel"
+				options={allOptions}
+			/>
+		);
+	},
+);
 
 export const FunctionSettingsPage = () => {
 	const intl = useIntl();
@@ -577,21 +707,29 @@ export const FunctionSettingsPage = () => {
 		];
 	}, [intl]);
 
-	const translationApiTypeOptions = useMemo(() => {
-		return [
-			{
-				label: intl.formatMessage({
-					id: "settings.functionSettings.translationSettings.apiConfig.apiType.deepL",
-				}),
-				value: TranslationApiType.DeepL,
-			},
-			{
-				label: intl.formatMessage({
-					id: "settings.functionSettings.translationSettings.apiConfig.apiType.custom",
-				}),
-				value: TranslationApiType.Custom,
-			},
-		];
+	const translationServiceTypeOptions = useMemo(() => {
+		const providerGroups = new Map<
+			string,
+			{ label: string; value: string }[]
+		>();
+
+		TRANSLATION_SERVICE_TYPE_LIST.forEach((item) => {
+			const providerLabel = intl.formatMessage({ id: item.providerLabelId });
+			if (!providerGroups.has(providerLabel)) {
+				providerGroups.set(providerLabel, []);
+			}
+
+			providerGroups.get(providerLabel)?.push({
+				label: intl.formatMessage({ id: item.labelId }),
+				value: item.value,
+			});
+		});
+
+		return Array.from(providerGroups.entries()).map(([label, options]) => ({
+			label,
+			title: label,
+			options,
+		}));
 	}, [intl]);
 
 	const encoderPresetOptions = useMemo(() => {
@@ -1492,62 +1630,17 @@ export const FunctionSettingsPage = () => {
 										{({
 											customOcrModelConfigList,
 											onlineOcrModelConfigList,
-										}) => {
-											const localOptions = [
-												...ocrModelOptions,
-												...(customOcrModelConfigList || [])
-													.filter((c: CustomOcrModelConfig) => c.model_name)
-													.map((c: CustomOcrModelConfig) => ({
-														label: c.model_name,
-														value: c.model_name,
-													})),
-											];
-											const onlineOptions = (onlineOcrModelConfigList || [])
-												.filter((c: OnlineOcrModelConfig) => c.model_name)
-												.map((c: OnlineOcrModelConfig) => ({
-													label: c.model_name,
-													value: `${ONLINE_OCR_MODEL_PREFIX}${c.model_name}`,
-												}));
-
-											// 添加了在线识别时，按【本地识别】/【在线识别】分组展示
-											const allOptions =
-												onlineOptions.length > 0
-													? [
-															{
-																label: intl.formatMessage({
-																	id: "settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.local",
-																}),
-																title: intl.formatMessage({
-																	id: "settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.local",
-																}),
-																options: localOptions,
-															},
-															{
-																label: intl.formatMessage({
-																	id: "settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.online",
-																}),
-																title: intl.formatMessage({
-																	id: "settings.functionSettings.ocrSettings.onlineOcrModelConfig.modelGroup.online",
-																}),
-																options: onlineOptions,
-															},
-														]
-													: localOptions;
-
-											return (
-												<ProFormSelect
-													label={
-														<IconLabel
-															label={
-																<FormattedMessage id="settings.systemSettings.screenshotSettings.ocrModel" />
-															}
-														/>
-													}
-													name="ocrModel"
-													options={allOptions}
-												/>
-											);
-										}}
+										}) => (
+											<OcrModelSelectField
+												ocrModelOptions={ocrModelOptions}
+												customOcrModelConfigList={
+													customOcrModelConfigList
+												}
+												onlineOcrModelConfigList={
+													onlineOcrModelConfigList
+												}
+											/>
+										)}
 									</ProFormDependency>
 								</Col>
 
@@ -1693,42 +1786,40 @@ export const FunctionSettingsPage = () => {
 							</Row>
 
 							{isReadyStatus?.(PLUGIN_ID_AI_CHAT) && (
-								<>
-									<Row gutter={token.marginLG}>
-										<Col span={24}>
-											<ProFormTextArea
-												name="htmlVisionModelSystemPrompt"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.ocrSettings.htmlVisionModelSystemPrompt" />
-														}
-													/>
-												}
-												fieldProps={{
-													rows: 1,
-													style: { resize: "vertical" },
-												}}
-											/>
-										</Col>
-										<Col span={24}>
-											<ProFormTextArea
-												name="markdownVisionModelSystemPrompt"
-												label={
-													<IconLabel
-														label={
-															<FormattedMessage id="settings.functionSettings.ocrSettings.markdownVisionModelSystemPrompt" />
-														}
-													/>
-												}
-												fieldProps={{
-													rows: 1,
-													style: { resize: "vertical" },
-												}}
-											/>
-										</Col>
-									</Row>
-								</>
+								<Row gutter={token.marginLG}>
+									<Col span={24}>
+										<ProFormTextArea
+											name="htmlVisionModelSystemPrompt"
+											label={
+												<IconLabel
+													label={
+														<FormattedMessage id="settings.functionSettings.ocrSettings.htmlVisionModelSystemPrompt" />
+													}
+												/>
+											}
+											fieldProps={{
+												rows: 1,
+												style: { resize: "vertical" },
+											}}
+										/>
+									</Col>
+									<Col span={24}>
+										<ProFormTextArea
+											name="markdownVisionModelSystemPrompt"
+											label={
+												<IconLabel
+													label={
+														<FormattedMessage id="settings.functionSettings.ocrSettings.markdownVisionModelSystemPrompt" />
+													}
+												/>
+											}
+											fieldProps={{
+												rows: 1,
+												style: { resize: "vertical" },
+											}}
+										/>
+									</Col>
+								</Row>
 							)}
 						</ProForm>
 					</Spin>
@@ -1772,38 +1863,21 @@ export const FunctionSettingsPage = () => {
 							submitter={false}
 						>
 							<Row gutter={token.marginLG}>
-								<Col span={12}>
-									<ProFormSwitch
-										name="optimizeAiTranslationLayout"
-										label={
-											<IconLabel
-												label={
-													<FormattedMessage id="settings.functionSettings.translationSettings.optimizeAiTranslationLayout" />
-												}
-												tooltipTitle={
-													<FormattedMessage id="settings.functionSettings.translationSettings.optimizeAiTranslationLayout.tip" />
-												}
-											/>
-										}
-										layout="vertical"
-									/>
-								</Col>
-							</Row>
-
-							<Row gutter={token.marginLG}>
 								<Col span={24}>
 									<ProFormList
 										name="translationApiConfigList"
 										label={
 											<IconLabel
 												label={
-													<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig" />
+													<FormattedMessage
+														id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}`}
+													/>
 												}
 											/>
 										}
 										creatorButtonProps={{
 											creatorButtonText: intl.formatMessage({
-												id: "settings.functionSettings.translationSettings.apiConfig.add",
+												id: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.add`,
 											}),
 										}}
 										className="api-config-list"
@@ -1811,72 +1885,81 @@ export const FunctionSettingsPage = () => {
 										itemRender={({ listDom, action }) => (
 											<Flex align="end" justify="space-between">
 												{listDom}
-
 												<div>{action}</div>
 											</Flex>
 										)}
 										creatorRecord={() => ({
+											service_name: "",
+											service_type: TranslationServiceType.DeepL,
 											api_uri: "",
 											api_key: "",
-											api_type: TranslationApiType.DeepL,
+											deepl_prefer_quality_optimized: false,
 											max_requests_per_second: 5,
 											max_paragraph_count: 1,
+											app_key: "",
+											app_secret: "",
+											secret_id: "",
+											secret_key: "",
+											region: "cn-north-1",
 										})}
 									>
 										<Row gutter={token.marginLG} style={{ width: "100%" }}>
 											<Col span={12}>
-												<ProFormSelect
-													name="api_type"
+												<ProFormText
+													name="service_name"
 													label={
 														<IconLabel
 															label={
-																<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiType" />
+																<FormattedMessage
+																	id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.serviceName`}
+																/>
+															}
+															tooltipTitle={
+																<FormattedMessage
+																	id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.serviceName.tip`}
+																/>
+															}
+														/>
+													}
+												/>
+											</Col>
+											<Col span={12}>
+												<ProFormSelect
+													name="service_type"
+													label={
+														<IconLabel
+															label={
+																<FormattedMessage
+																	id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.serviceType`}
+																/>
 															}
 														/>
 													}
 													allowClear={false}
-													options={translationApiTypeOptions}
+													options={translationServiceTypeOptions}
 												/>
 											</Col>
-											<Col span={12}>
-												<ProFormText
-													name="api_uri"
-													label={
-														<IconLabel
-															label={
-																<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiUri" />
-															}
-															tooltipTitle={
-																<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiUri.tip" />
-															}
-														/>
-													}
-													rules={[
-														{
-															required: true,
-															message: intl.formatMessage({
-																id: "settings.functionSettings.translationSettings.apiConfig.apiUri.required",
-															}),
-														},
-													]}
-												/>
-											</Col>
-											<ProFormDependency<{ api_type: TranslationApiType }>
-												name={["api_type"]}
-											>
-												{({ api_type }) => {
-													if (api_type === TranslationApiType.DeepL) {
+											<ProFormDependency name={["service_type"]}>
+												{({ service_type }) => {
+													if (
+														service_type === TranslationServiceType.DeepL ||
+														service_type === TranslationServiceType.Custom
+													) {
 														return (
 															<Col span={12}>
-																<ProFormText.Password
-																	name="api_key"
+																<ProFormText
+																	name="api_uri"
 																	label={
 																		<IconLabel
 																			label={
-																				<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiKey" />
+																				<FormattedMessage
+																					id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiUri`}
+																				/>
 																			}
 																			tooltipTitle={
-																				<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.apiKey.tip" />
+																				<FormattedMessage
+																					id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiUri.tip`}
+																				/>
 																			}
 																		/>
 																	}
@@ -1884,7 +1967,7 @@ export const FunctionSettingsPage = () => {
 																		{
 																			required: true,
 																			message: intl.formatMessage({
-																				id: "settings.functionSettings.translationSettings.apiConfig.apiKey.required",
+																				id: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiUri.required`,
 																			}),
 																		},
 																	]}
@@ -1895,32 +1978,64 @@ export const FunctionSettingsPage = () => {
 													return null;
 												}}
 											</ProFormDependency>
-
-											<ProFormDependency<{ api_type: TranslationApiType }>
-												name={["api_type"]}
-											>
-												{({ api_type }) => {
-													if (api_type === TranslationApiType.DeepL) {
+											<ProFormDependency name={["service_type"]}>
+												{({ service_type }) => {
+													if (service_type === TranslationServiceType.DeepL) {
 														return (
-															<Col span={12}>
-																<ProFormSwitch
-																	name="deepl_prefer_quality_optimized"
-																	label={
-																		<IconLabel
-																			label={
-																				<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.deeplPreferQualityOptimized" />
-																			}
-																			tooltipTitle={
-																				<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.deeplPreferQualityOptimized.tip" />
-																			}
-																		/>
-																	}
-																/>
-															</Col>
+															<>
+																<Col span={12}>
+																	<ProFormText.Password
+																		name="api_key"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiKey`}
+																					/>
+																				}
+																				tooltipTitle={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiKey.tip`}
+																					/>
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiKey.required`,
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormSwitch
+																		name="deepl_prefer_quality_optimized"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.deeplPreferQualityOptimized`}
+																					/>
+																				}
+																				tooltipTitle={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.deeplPreferQualityOptimized.tip`}
+																					/>
+																				}
+																			/>
+																		}
+																	/>
+																</Col>
+															</>
 														);
 													}
 
-													if (api_type === TranslationApiType.Custom) {
+													if (
+														service_type === TranslationServiceType.Custom
+													) {
 														return (
 															<>
 																<Col span={12}>
@@ -1929,10 +2044,14 @@ export const FunctionSettingsPage = () => {
 																		label={
 																			<IconLabel
 																				label={
-																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.maxRequestsPerSecond" />
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.maxRequestsPerSecond`}
+																					/>
 																				}
 																				tooltipTitle={
-																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.maxRequestsPerSecond.tip" />
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.maxRequestsPerSecond.tip`}
+																					/>
 																				}
 																			/>
 																		}
@@ -1950,10 +2069,14 @@ export const FunctionSettingsPage = () => {
 																		label={
 																			<IconLabel
 																				label={
-																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.maxParagraphCount" />
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.maxParagraphCount`}
+																					/>
 																				}
 																				tooltipTitle={
-																					<FormattedMessage id="settings.functionSettings.translationSettings.apiConfig.maxParagraphCount.tip" />
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.maxParagraphCount.tip`}
+																					/>
 																				}
 																			/>
 																		}
@@ -1968,6 +2091,240 @@ export const FunctionSettingsPage = () => {
 															</>
 														);
 													}
+
+													if (
+														service_type === TranslationServiceType.YoudaoText ||
+														service_type === TranslationServiceType.YoudaoLLM
+													) {
+														return (
+															<>
+																<Col span={12}>
+																	<ProFormText
+																		name="app_key"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.appKey`}
+																					/>
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.appKey.required`,
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormText.Password
+																		name="app_secret"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.appSecret`}
+																					/>
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.appSecret.required`,
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+															</>
+														);
+													}
+
+													if (
+														service_type ===
+															TranslationServiceType.AliyunGeneral ||
+														service_type ===
+															TranslationServiceType.AliyunProfessional
+													) {
+														return (
+															<>
+																<Col span={12}>
+																	<ProFormText
+																		name="secret_id"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.accessKeyId`}
+																					/>
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.accessKeyId.required`,
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormText.Password
+																		name="secret_key"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.accessKeySecret`}
+																					/>
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.accessKeySecret.required`,
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+															</>
+														);
+													}
+
+													if (
+														service_type ===
+														TranslationServiceType.VolcengineText
+													) {
+														return (
+															<>
+																<Col span={12}>
+																	<ProFormText
+																		name="secret_id"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.accessKeyId`}
+																					/>
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.accessKeyId.required`,
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormText.Password
+																		name="secret_key"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.accessKeySecret`}
+																					/>
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.accessKeySecret.required`,
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormText
+																		name="region"
+																		initialValue="cn-north-1"
+																		placeholder="cn-north-1"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.region`}
+																					/>
+																				}
+																			/>
+																		}
+																	/>
+																</Col>
+															</>
+														);
+													}
+
+													if (
+														service_type === TranslationServiceType.BaiduText
+													) {
+														return (
+															<>
+																<Col span={12}>
+																	<ProFormText
+																		name="api_key"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiKey`}
+																					/>
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.apiKey.required`,
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+																<Col span={12}>
+																	<ProFormText.Password
+																		name="secret_key"
+																		label={
+																			<IconLabel
+																				label={
+																					<FormattedMessage
+																						id={`${TRANSLATION_API_CONFIG_I18N_PREFIX}.secretKey`}
+																					/>
+																				}
+																			/>
+																		}
+																		rules={[
+																			{
+																				required: true,
+																				message: intl.formatMessage({
+																					id: `${TRANSLATION_API_CONFIG_I18N_PREFIX}.secretKey.required`,
+																				}),
+																			},
+																		]}
+																	/>
+																</Col>
+															</>
+														);
+													}
+
 													return null;
 												}}
 											</ProFormDependency>

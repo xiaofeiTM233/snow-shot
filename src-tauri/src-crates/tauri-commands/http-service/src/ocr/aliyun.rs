@@ -1,16 +1,16 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use snow_shot_app_services::ocr_service::{OcrDetectResult, Point, TextBlock};
 
-use super::build_http_client;
-use super::clamp_to_u32;
-use super::hmac_sha256;
 use super::prepare_image_bytes;
-use super::utc_datetime_from_unix;
 use super::OnlineOcrConfig;
-use snow_shot_app_services::ocr_service::OcrDetectResult;
+use crate::common::build_http_client;
+use crate::common::clamp_to_u32;
+use crate::common::hmac_sha256;
+use crate::common::post_and_log;
+use crate::common::utc_datetime_from_unix;
 
 const ALIYUN_OCR_ENDPOINT: &str = "https://ocr-api.cn-hangzhou.aliyuncs.com/";
 const ALIYUN_OCR_HOST: &str = "ocr-api.cn-hangzhou.aliyuncs.com";
@@ -20,11 +20,11 @@ const ALIYUN_MAX_BASE64_LENGTH: usize = 9_500_000;
 #[derive(Deserialize)]
 struct AliyunOcrResponse {
     /// Data 为内嵌 JSON 的字符串
-    #[serde(default)]
+    #[serde(rename = "Data", default)]
     data: Option<String>,
-    #[serde(default)]
+    #[serde(rename = "Code", default)]
     code: Option<String>,
-    #[serde(default)]
+    #[serde(rename = "Message", default)]
     message: Option<String>,
 }
 
@@ -112,26 +112,26 @@ pub(super) async fn detect_with_aliyun(
     );
 
     let client = build_http_client()?;
-    let response = client
-        .post(ALIYUN_OCR_ENDPOINT)
-        .query(&[("Action", action), ("Version", ALIYUN_OCR_VERSION)])
-        .header("Content-Type", "application/octet-stream")
-        .header("x-acs-action", action)
-        .header("x-acs-content-sha256", &payload_hash)
-        .header("x-acs-date", &x_date)
-        .header("x-acs-signature-nonce", &nonce)
-        .header("x-acs-version", ALIYUN_OCR_VERSION)
-        .header("Authorization", authorization)
-        .body(image_bytes)
-        .send()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Aliyun request failed: {}", e))?;
-
-    let status = response.status();
-    let body = response
-        .text()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Aliyun read response failed: {}", e))?;
+    let image_size = image_bytes.len();
+    let (status, body) = post_and_log(
+        &client,
+        &format!("[aliyun_ocr:{action}]"),
+        ALIYUN_OCR_ENDPOINT,
+        &format!("(binary body, {} bytes)", image_size),
+        |request| {
+            request
+                .query(&[("Action", action), ("Version", ALIYUN_OCR_VERSION)])
+                .header("Content-Type", "application/octet-stream")
+                .header("x-acs-action", action)
+                .header("x-acs-content-sha256", &payload_hash)
+                .header("x-acs-date", &x_date)
+                .header("x-acs-signature-nonce", &nonce)
+                .header("x-acs-version", ALIYUN_OCR_VERSION)
+                .header("Authorization", authorization)
+                .body(image_bytes)
+        },
+    )
+    .await?;
 
     let ocr_response: AliyunOcrResponse = serde_json::from_str(&body).map_err(|e| {
         format!(
@@ -141,11 +141,14 @@ pub(super) async fn detect_with_aliyun(
     })?;
 
     if let Some(code) = &ocr_response.code {
-        return Err(format!(
-            "[ocr_detect_online] Aliyun error {}: {}",
-            code,
-            ocr_response.message.unwrap_or_default()
-        ));
+        // ocr-api 成功时 Code 为 200（字符串），其余视为错误
+        if code != "200" {
+            return Err(format!(
+                "[ocr_detect_online] Aliyun error {}: {}",
+                code,
+                ocr_response.message.unwrap_or_default()
+            ));
+        }
     }
 
     // Data 为内嵌 JSON 的字符串，需要二次解析

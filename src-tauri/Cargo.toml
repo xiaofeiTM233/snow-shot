@@ -68,6 +68,7 @@ sha2 = "^0.10"
 hmac = "^0.12"
 hex = "^0.4"
 percent-encoding = "^2.3"
+paddle-ocr-rs = "0.6.0"
 
 # 项目内依赖
 snow-shot-app-services = { path = "src-crates/app-services" }

@@ -53,8 +53,19 @@ import {
 	OcrDetectAfterAction,
 	RenderBackend,
 	type RunLogLevel,
+	TRANSLATION_API_TYPE_BY_SERVICE_TYPE,
+	TRANSLATION_DEFAULT_SERVICE_TYPE_BY_API_TYPE,
+	type TranslationApiConfig,
+	TranslationApiType,
+	TranslationServiceType,
 	type TrayIconClickAction,
 	type TrayIconDefaultIcon,
+	TranslationApiType,
+	type TranslationApiConfig,
+	TRANSLATION_API_TYPE_BY_SERVICE_TYPE,
+	TRANSLATION_DEFAULT_SERVICE_TYPE_BY_API_TYPE,
+	TranslationServiceType,
+	isTranslationServiceType,
 	type VideoMaxSize,
 } from "@/types/appSettings";
 import type {
@@ -798,6 +809,12 @@ const AppSettingsContextProviderCore: React.FC<{
 					| AppSettingsData[typeof group]
 					| undefined;
 
+				const newOnlineOcrModelConfigList = Array.isArray(
+					newSettings?.onlineOcrModelConfigList,
+				)
+					? newSettings.onlineOcrModelConfigList
+					: undefined;
+
 				settings = {
 					ocrModel:
 						typeof newSettings?.ocrModel === "string"
@@ -825,23 +842,39 @@ const AppSettingsContextProviderCore: React.FC<{
 						? newSettings.customOcrModelConfigList
 						: (prevSettings?.customOcrModelConfigList ??
 							defaultAppSettingsData[group].customOcrModelConfigList),
-					onlineOcrModelConfigList: Array.isArray(
-						newSettings?.onlineOcrModelConfigList,
-					)
-						? newSettings.onlineOcrModelConfigList.map((item) => ({
-								model_name: `${item.model_name ?? ""}`,
-								service_type: `${item.service_type ?? ""}`,
-								language: `${item.language ?? "auto"}`,
-								api_uri: `${item.api_uri ?? ""}`,
-								api_key: `${item.api_key ?? ""}`,
-								app_key: `${item.app_key ?? ""}`,
-								app_secret: `${item.app_secret ?? ""}`,
-								secret_id: `${item.secret_id ?? ""}`,
-								secret_key: `${item.secret_key ?? ""}`,
-								region: `${item.region ?? "ap-guangzhou"}`,
-							}))
-						: (prevSettings?.onlineOcrModelConfigList ??
-							defaultAppSettingsData[group].onlineOcrModelConfigList),
+					onlineOcrModelConfigList: (() => {
+						const prevOnlineList = prevSettings?.onlineOcrModelConfigList;
+						if (newOnlineOcrModelConfigList === undefined) {
+							return (
+								prevOnlineList ??
+								defaultAppSettingsData[group].onlineOcrModelConfigList
+							);
+						}
+
+						const mappedList = newOnlineOcrModelConfigList.map((item) => ({
+							model_name: `${item.model_name ?? ""}`,
+							service_type: `${item.service_type ?? ""}`,
+							language: `${item.language ?? "auto"}`,
+							target_language: `${item.target_language ?? ""}`,
+							api_uri: `${item.api_uri ?? ""}`,
+							api_key: `${item.api_key ?? ""}`,
+							app_key: `${item.app_key ?? ""}`,
+							app_secret: `${item.app_secret ?? ""}`,
+							secret_id: `${item.secret_id ?? ""}`,
+							secret_key: `${item.secret_key ?? ""}`,
+							region: `${item.region ?? "ap-guangzhou"}`,
+						}));
+
+						// 内容未变化时复用旧引用，避免表单回灌触发不必要的重渲染
+						if (
+							prevOnlineList !== undefined &&
+							isEqual(mappedList, prevOnlineList)
+						) {
+							return prevOnlineList;
+						}
+
+						return mappedList;
+					})(),
 				};
 			} else if (group === AppSettingsGroup.FunctionChat) {
 				newSettings = newSettings as AppSettingsData[typeof group];
@@ -922,24 +955,60 @@ const AppSettingsContextProviderCore: React.FC<{
 					translationApiConfigList: Array.isArray(
 						newSettings?.translationApiConfigList,
 					)
-						? newSettings.translationApiConfigList.map((item) => ({
-								api_uri: `${item.api_uri ?? ""}`,
-								api_key: `${item.api_key ?? ""}`,
-								api_type: item.api_type,
-								deepl_prefer_quality_optimized:
-									"deepl_prefer_quality_optimized" in item &&
-									typeof item.deepl_prefer_quality_optimized === "boolean"
-										? item.deepl_prefer_quality_optimized
-										: false,
-								max_requests_per_second:
-									typeof item.max_requests_per_second === "number"
-										? item.max_requests_per_second
-										: undefined,
-								max_paragraph_count:
-									typeof item.max_paragraph_count === "number"
-										? item.max_paragraph_count
-										: undefined,
-							}))
+						? newSettings.translationApiConfigList.map((rawItem) => {
+								// 不同类型的翻译 API 配置字段差异较大，统一按记录视图读取
+								const item = rawItem as unknown as Record<string, unknown>;
+
+								// 服务类型是唯一事实来源，接口类型由其推导；
+								// 旧版本归一化会给所有缺失服务类型的行写入 youdao:text，
+								// 因此服务类型与接口类型矛盾时以接口类型为准
+								const rawServiceType = isTranslationServiceType(
+									item.service_type,
+								)
+									? item.service_type
+									: undefined;
+								const apiType = (
+									Object.values(TranslationApiType) as string[]
+								).includes(item.api_type as string)
+									? (item.api_type as TranslationApiType)
+									: undefined;
+								const serviceType =
+									apiType !== undefined
+										? (rawServiceType &&
+											TRANSLATION_API_TYPE_BY_SERVICE_TYPE[
+												rawServiceType
+											] === apiType
+											? rawServiceType
+											: TRANSLATION_DEFAULT_SERVICE_TYPE_BY_API_TYPE[apiType])
+										: (rawServiceType ??
+											TranslationServiceType.DeepL);
+
+								return {
+									api_type:
+										TRANSLATION_API_TYPE_BY_SERVICE_TYPE[serviceType],
+									service_name: `${item.service_name ?? ""}`,
+									api_uri: `${item.api_uri ?? ""}`,
+									api_key: `${item.api_key ?? ""}`,
+									deepl_prefer_quality_optimized:
+										typeof item.deepl_prefer_quality_optimized === "boolean"
+											? item.deepl_prefer_quality_optimized
+											: false,
+									max_requests_per_second:
+										typeof item.max_requests_per_second === "number"
+											? item.max_requests_per_second
+											: undefined,
+									max_paragraph_count:
+										typeof item.max_paragraph_count === "number"
+											? item.max_paragraph_count
+											: undefined,
+									service_type: serviceType,
+									app_key: `${item.app_key ?? ""}`,
+									app_secret: `${item.app_secret ?? ""}`,
+									secret_id: `${item.secret_id ?? ""}`,
+									secret_key: `${item.secret_key ?? ""}`,
+									region: `${item.region ?? ""}`,
+								};
+							}) as TranslationApiConfig[]
 						: (prevSettings?.translationApiConfigList ??
 							defaultAppSettingsData[group].translationApiConfigList),
 					sourceLanguage:
@@ -1073,6 +1142,18 @@ const AppSettingsContextProviderCore: React.FC<{
 						typeof newSettings?.saveFileFormat === "string"
 							? newSettings.saveFileFormat
 							: (prevSettings?.saveFileFormat ?? ImageFormat.PNG),
+					saveFileDialog:
+						typeof newSettings?.saveFileDialog === "boolean"
+							? newSettings.saveFileDialog
+							: (prevSettings?.saveFileDialog ??
+								defaultAppSettingsData[group].saveFileDialog),
+					saveFileResizePercent:
+						typeof newSettings?.saveFileResizePercent === "number" &&
+						Number.isFinite(newSettings.saveFileResizePercent) &&
+						newSettings.saveFileResizePercent > 0
+							? newSettings.saveFileResizePercent
+							: (prevSettings?.saveFileResizePercent ??
+								defaultAppSettingsData[group].saveFileResizePercent),
 					ocrAfterAction:
 						typeof newSettings?.ocrAfterAction === "string"
 							? (newSettings.ocrAfterAction as OcrDetectAfterAction)

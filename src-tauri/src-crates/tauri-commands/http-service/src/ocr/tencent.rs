@@ -2,17 +2,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
-use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use snow_shot_app_services::ocr_service::{OcrDetectResult, Point, TextBlock};
 
-use super::build_http_client;
-use super::clamp_to_u32;
-use super::hmac_sha256;
 use super::prepare_image_bytes;
-use super::utc_date_from_unix;
 use super::OnlineOcrConfig;
-use snow_shot_app_services::ocr_service::OcrDetectResult;
+use crate::common::build_http_client;
+use crate::common::clamp_to_u32;
+use crate::common::hmac_sha256;
+use crate::common::post_and_log;
+use crate::common::utc_date_from_unix;
 
 const TENCENT_OCR_ENDPOINT: &str = "https://ocr.tencentcloudapi.com";
 const TENCENT_OCR_HOST: &str = "ocr.tencentcloudapi.com";
@@ -149,23 +149,23 @@ pub(super) async fn detect_with_tencent(
     );
 
     let client = build_http_client()?;
-    let response = client
-        .post(TENCENT_OCR_ENDPOINT)
-        .header("Content-Type", "application/json; charset=utf-8")
-        .header("X-TC-Action", action)
-        .header("X-TC-Version", TENCENT_OCR_VERSION)
-        .header("X-TC-Timestamp", timestamp.to_string())
-        .header("X-TC-Region", region)
-        .header("Authorization", authorization)
-        .body(payload)
-        .send()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Tencent request failed: {}", e))?;
-
-    let body = response
-        .text()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Tencent read response failed: {}", e))?;
+    let (_status, body) = post_and_log(
+        &client,
+        &format!("[tencent_ocr:{action}]"),
+        TENCENT_OCR_ENDPOINT,
+        &payload,
+        |request| {
+            request
+                .header("Content-Type", "application/json; charset=utf-8")
+                .header("X-TC-Action", action)
+                .header("X-TC-Version", TENCENT_OCR_VERSION)
+                .header("X-TC-Timestamp", timestamp.to_string())
+                .header("X-TC-Region", region)
+                .header("Authorization", authorization)
+                .body(payload.clone())
+        },
+    )
+    .await?;
 
     let ocr_response: TencentOcrResponse = serde_json::from_str(&body).map_err(|e| {
         format!(

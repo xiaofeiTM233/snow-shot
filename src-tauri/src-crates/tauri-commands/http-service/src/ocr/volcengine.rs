@@ -2,18 +2,18 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
-use paddle_ocr_rs::ocr_result::{Point, TextBlock};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+use snow_shot_app_services::ocr_service::{OcrDetectResult, Point, TextBlock};
 
-use super::build_http_client;
-use super::clamp_to_u32;
-use super::hmac_sha256;
 use super::prepare_image_bytes;
 use super::rect_to_box_points;
-use super::utc_date_from_unix;
 use super::OnlineOcrConfig;
-use snow_shot_app_services::ocr_service::OcrDetectResult;
+use crate::common::build_http_client;
+use crate::common::clamp_to_u32;
+use crate::common::hmac_sha256;
+use crate::common::post_and_log;
+use crate::common::utc_date_from_unix;
 
 const VOLC_OCR_ENDPOINT: &str = "https://visual.volcengineapi.com/";
 const VOLC_OCR_HOST: &str = "visual.volcengineapi.com";
@@ -146,23 +146,22 @@ pub(super) async fn detect_with_volc(
     );
 
     let client = build_http_client()?;
-    let response = client
-        .post(VOLC_OCR_ENDPOINT)
-        .query(&[("Action", VOLC_OCR_ACTION), ("Version", VOLC_OCR_VERSION)])
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .header("X-Date", &x_date)
-        .header("X-Content-Sha256", &body_hash)
-        .header("Authorization", authorization)
-        .body(body)
-        .send()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Volcengine request failed: {}", e))?;
-
-    let status = response.status();
-    let body = response
-        .text()
-        .await
-        .map_err(|e| format!("[ocr_detect_online] Volcengine read response failed: {}", e))?;
+    let (status, body) = post_and_log(
+        &client,
+        &format!("[volcengine_ocr:{}]", VOLC_OCR_ACTION.to_lowercase()),
+        VOLC_OCR_ENDPOINT,
+        &body,
+        |request| {
+            request
+                .query(&[("Action", VOLC_OCR_ACTION), ("Version", VOLC_OCR_VERSION)])
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("X-Date", &x_date)
+                .header("X-Content-Sha256", &body_hash)
+                .header("Authorization", authorization)
+                .body(body.clone())
+        },
+    )
+    .await?;
 
     let ocr_response: VolcOcrResponse = serde_json::from_str(&body).map_err(|e| {
         format!(

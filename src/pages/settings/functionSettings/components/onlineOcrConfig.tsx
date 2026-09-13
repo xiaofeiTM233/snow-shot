@@ -25,6 +25,41 @@ const ONLINE_OCR_SERVICE_TYPE_LIST: OnlineOcrServiceTypeItem[] = [
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.youdaoOcr`,
 	},
 	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduGeneralAccurate,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneralAccurate`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduGeneral,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneral`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduWebImageLocation,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduWebImageLocation`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduGeneralAccurateBasic,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneralAccurateBasic`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduGeneralBasic,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneralBasic`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduWebImage,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduWebImage`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduHandwriting,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduHandwriting`,
+	},
+	{
 		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.tencent`,
 		value: OnlineOcrServiceType.TencentGeneralBasicOcr,
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.tencentGeneralBasicOcr`,
@@ -35,19 +70,14 @@ const ONLINE_OCR_SERVICE_TYPE_LIST: OnlineOcrServiceTypeItem[] = [
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.tencentGeneralAccurateOcr`,
 	},
 	{
-		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
-		value: OnlineOcrServiceType.BaiduGeneralBasic,
-		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneralBasic`,
-	},
-	{
-		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
-		value: OnlineOcrServiceType.BaiduGeneralAccurateBasic,
-		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduGeneralAccurateBasic`,
-	},
-	{
 		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.aliyun`,
 		value: OnlineOcrServiceType.AliyunRecognizeGeneral,
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.aliyunRecognizeGeneral`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.aliyun`,
+		value: OnlineOcrServiceType.AliyunRecognizeHandwriting,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.aliyunRecognizeHandwriting`,
 	},
 	{
 		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.volcengine`,
@@ -58,6 +88,26 @@ const ONLINE_OCR_SERVICE_TYPE_LIST: OnlineOcrServiceTypeItem[] = [
 		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.custom`,
 		value: OnlineOcrServiceType.Custom,
 		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.custom`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.youdao`,
+		value: OnlineOcrServiceType.YoudaoImageTranslation,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.youdaoImageTranslation`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.aliyun`,
+		value: OnlineOcrServiceType.AliyunImageTranslation,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.aliyunImageTranslation`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.volcengine`,
+		value: OnlineOcrServiceType.VolcengineImageTranslation,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.volcengineImageTranslation`,
+	},
+	{
+		providerLabelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.provider.baidu`,
+		value: OnlineOcrServiceType.BaiduImageTranslation,
+		labelId: `${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.service.baiduImageTranslation`,
 	},
 ];
 
@@ -202,6 +252,7 @@ const useOnlineOcrLanguageOptions = (serviceType: string | undefined) => {
 		let languageList: OnlineOcrLanguageItem[];
 		switch (serviceType) {
 			case OnlineOcrServiceType.YoudaoOcr:
+			case OnlineOcrServiceType.YoudaoImageTranslation:
 				languageList = YOUDAO_LANGUAGE_LIST;
 				break;
 			case OnlineOcrServiceType.TencentGeneralBasicOcr:
@@ -211,10 +262,11 @@ const useOnlineOcrLanguageOptions = (serviceType: string | undefined) => {
 				languageList = TENCENT_GENERAL_ACCURATE_LANGUAGE_LIST;
 				break;
 			case OnlineOcrServiceType.BaiduGeneralBasic:
-			case OnlineOcrServiceType.BaiduGeneralAccurateBasic:
+			case OnlineOcrServiceType.BaiduGeneral:
 				languageList = BAIDU_LANGUAGE_LIST;
 				break;
 			default:
+				// 腾讯云图片翻译自动识别源语言，无源语言选项
 				return [];
 		}
 
@@ -223,6 +275,63 @@ const useOnlineOcrLanguageOptions = (serviceType: string | undefined) => {
 			label: intl.formatMessage({ id: item.labelId }),
 		}));
 	}, [intl, serviceType]);
+};
+
+const useOnlineOcrTargetLanguageOptions = (
+	serviceType: string | undefined,
+) => {
+	const intl = useIntl();
+
+	return useMemo(() => {
+		let languageList: OnlineOcrLanguageItem[];
+		switch (serviceType) {
+			case OnlineOcrServiceType.YoudaoImageTranslation:
+			case OnlineOcrServiceType.AliyunImageTranslation:
+			case OnlineOcrServiceType.VolcengineImageTranslation:
+			case OnlineOcrServiceType.BaiduImageTranslation:
+				languageList = YOUDAO_LANGUAGE_LIST;
+				break;
+			default:
+				return [];
+		}
+
+		return languageList
+			.filter((item) => item.value !== "auto")
+			.map((item) => ({
+				value: item.value,
+				label: intl.formatMessage({ id: item.labelId }),
+			}));
+	}, [intl, serviceType]);
+};
+
+const OnlineOcrTargetLanguageField: React.FC<{ serviceType?: string }> = ({
+	serviceType,
+}) => {
+	const targetLanguageOptions = useOnlineOcrTargetLanguageOptions(serviceType);
+
+	if (targetLanguageOptions.length === 0) {
+		return null;
+	}
+
+	return (
+		<Col span={12}>
+			<ProFormSelect
+				name="target_language"
+				initialValue="zh-CHS"
+				label={
+					<IconLabel
+						label={
+							<FormattedMessage
+								id={`${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.targetLanguage`}
+							/>
+						}
+					/>
+				}
+				allowClear={false}
+				options={targetLanguageOptions}
+			/>
+		</Col>
+	);
 };
 
 const OnlineOcrLanguageField: React.FC<{ serviceType?: string }> = ({
@@ -296,6 +405,7 @@ export const OnlineOcrConfig = () => {
 				model_name: "",
 				service_type: OnlineOcrServiceType.TencentGeneralBasicOcr,
 				language: "auto",
+				target_language: "zh-CHS",
 				api_uri: "",
 				api_key: "",
 				app_key: "",
@@ -306,25 +416,25 @@ export const OnlineOcrConfig = () => {
 			})}
 		>
 			<Row gutter={token.marginLG} style={{ width: "100%" }}>
-					<Col span={12}>
-						<ProFormText
-							name="model_name"
-							label={
-								<IconLabel
-									label={
-										<FormattedMessage
-											id={`${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.modelName`}
-										/>
-									}
-									tooltipTitle={
-										<FormattedMessage
-											id={`${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.modelName.tip`}
-										/>
-									}
-								/>
-							}
-						/>
-					</Col>
+				<Col span={12}>
+					<ProFormText
+						name="model_name"
+						label={
+							<IconLabel
+								label={
+									<FormattedMessage
+										id={`${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.modelName`}
+									/>
+								}
+								tooltipTitle={
+									<FormattedMessage
+										id={`${OCR_SETTINGS_I18N_PREFIX}.onlineOcrModelConfig.modelName.tip`}
+									/>
+								}
+							/>
+						}
+					/>
+				</Col>
 				<Col span={12}>
 					<ProFormSelect
 						name="service_type"
@@ -343,7 +453,10 @@ export const OnlineOcrConfig = () => {
 				</Col>
 				<ProFormDependency name={["service_type"]}>
 					{({ service_type }) => (
-						<OnlineOcrLanguageField serviceType={service_type} />
+						<>
+							<OnlineOcrLanguageField serviceType={service_type} />
+							<OnlineOcrTargetLanguageField serviceType={service_type} />
+						</>
 					)}
 				</ProFormDependency>
 				<ProFormDependency name={["service_type"]}>
@@ -375,7 +488,10 @@ export const OnlineOcrConfig = () => {
 							);
 						}
 
-						if (service_type === OnlineOcrServiceType.YoudaoOcr) {
+						if (
+							service_type === OnlineOcrServiceType.YoudaoOcr ||
+							service_type === OnlineOcrServiceType.YoudaoImageTranslation
+						) {
 							return (
 								<>
 									<Col span={12}>
@@ -495,7 +611,8 @@ export const OnlineOcrConfig = () => {
 
 						if (
 							service_type === OnlineOcrServiceType.BaiduGeneralBasic ||
-							service_type === OnlineOcrServiceType.BaiduGeneralAccurateBasic
+							service_type === OnlineOcrServiceType.BaiduGeneralAccurateBasic ||
+							service_type === OnlineOcrServiceType.BaiduImageTranslation
 						) {
 							return (
 								<>
@@ -547,7 +664,10 @@ export const OnlineOcrConfig = () => {
 							);
 						}
 
-						if (service_type === OnlineOcrServiceType.AliyunRecognizeGeneral) {
+						if (
+							service_type === OnlineOcrServiceType.AliyunRecognizeGeneral ||
+							service_type === OnlineOcrServiceType.AliyunImageTranslation
+						) {
 							return (
 								<>
 									<Col span={12}>
@@ -598,7 +718,10 @@ export const OnlineOcrConfig = () => {
 							);
 						}
 
-						if (service_type === OnlineOcrServiceType.VolcengineOcrNormal) {
+						if (
+							service_type === OnlineOcrServiceType.VolcengineOcrNormal ||
+							service_type === OnlineOcrServiceType.VolcengineImageTranslation
+						) {
 							return (
 								<>
 									<Col span={12}>
