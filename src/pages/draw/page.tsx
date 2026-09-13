@@ -45,6 +45,10 @@ import {
 } from "@/components/drawCore/extra";
 import { EventListenerContext } from "@/components/eventListener";
 import { ImageLayer, type ImageLayerActionType } from "@/components/imageLayer";
+import {
+	type SaveImageDialogActionType,
+	SaveImageDialog,
+} from "@/components/saveImageDialog";
 import { TextScaleFactorContextProvider } from "@/components/textScaleFactorContextProvider";
 import { AntdContext } from "@/contexts/antdContext";
 import {
@@ -215,6 +219,9 @@ const DrawPageCore: React.FC<{
 	const captureHistoryActionRef = useRef<CaptureHistoryActionType | undefined>(
 		undefined,
 	);
+	const saveImageDialogActionRef = useRef<
+		SaveImageDialogActionType | undefined
+	>(undefined);
 	const ocrBlocksActionRef = useRef<OcrBlocksActionType | undefined>(undefined);
 
 	// 状态
@@ -1008,6 +1015,11 @@ const DrawPageCore: React.FC<{
 
 	const onSave = useCallback(
 		async (fastSave: boolean = false) => {
+			// 保存参数弹窗打开时忽略新的保存请求
+			if (saveImageDialogActionRef.current?.isOpen()) {
+				return;
+			}
+
 			if (getDrawState() === DrawState.ScrollScreenshot) {
 				const scrollScreenshotSize = await scrollScreenshotGetSize();
 				if (
@@ -1052,6 +1064,48 @@ const DrawPageCore: React.FC<{
 					captureResult,
 					CaptureHistorySource.ScrollScreenshotSave,
 				); // 保存滚动截图的完整图像数据
+
+				// 保存文件参数弹窗
+				if (
+					!fastSave &&
+					captureResult &&
+					getAppSettings()[AppSettingsGroup.FunctionScreenshot].saveFileDialog
+				) {
+					const dialogCanvas = document.createElement("canvas");
+					const imageBitmap = await createImageBitmap(
+						new Blob([captureResult], { type: "image/png" }),
+					);
+					dialogCanvas.width = imageBitmap.width;
+					dialogCanvas.height = imageBitmap.height;
+					dialogCanvas.getContext("2d")?.drawImage(imageBitmap, 0, 0);
+					imageBitmap.close();
+
+					const dialogImagePath =
+						await saveImageDialogActionRef.current?.show({
+							image: dialogCanvas,
+							prevImageFormat:
+								getAppSettings()[AppSettingsGroup.Cache].prevImageFormat,
+						});
+					if (!dialogImagePath) {
+						return;
+					}
+
+					updateAppSettings(
+						AppSettingsGroup.Cache,
+						{
+							prevImageFormat: dialogImagePath.imageFormat,
+						},
+						false,
+						true,
+						false,
+						true,
+						false,
+					);
+
+					scrollScreenshotClear();
+					finishCapture(false);
+					return;
+				}
 
 				const imagePath =
 					(await getImagePathFromSettings(
@@ -1109,6 +1163,40 @@ const DrawPageCore: React.FC<{
 					: undefined,
 				CaptureHistorySource.Save,
 			);
+
+			// 保存文件参数弹窗
+			if (
+				!fastSave &&
+				getAppSettings()[AppSettingsGroup.FunctionScreenshot].saveFileDialog
+			) {
+				if (!imageCanvas) {
+					return;
+				}
+
+				const dialogImagePath = await saveImageDialogActionRef.current?.show({
+					image: imageCanvas,
+					prevImageFormat:
+						getAppSettings()[AppSettingsGroup.Cache].prevImageFormat,
+				});
+				if (!dialogImagePath) {
+					return;
+				}
+
+				updateAppSettings(
+					AppSettingsGroup.Cache,
+					{
+						prevImageFormat: dialogImagePath.imageFormat,
+					},
+					false,
+					true,
+					false,
+					true,
+					false,
+				);
+
+				finishCapture();
+				return;
+			}
 
 			saveToFile(
 				getAppSettings(),
@@ -1872,6 +1960,17 @@ const DrawPageCore: React.FC<{
 	}, [unsetLatestExcalidrawNewElement]);
 	const onDoubleClick = useCallback<React.MouseEventHandler<HTMLDivElement>>(
 		(e) => {
+			// 忽略发生在浮层（弹窗、气泡、下拉等）内的双击：React portal 事件会沿
+			// React 树冒泡到画布根容器，导致如保存参数弹窗内双击误触发双击动作
+			if (
+				e.target instanceof Element &&
+				e.target.closest(
+					".ant-modal-root, .ant-popover, .ant-dropdown, .ant-select-dropdown",
+				)
+			) {
+				return;
+			}
+
 			const doubleClickAction =
 				getAppSettings()[AppSettingsGroup.FunctionScreenshot].doubleClickAction;
 			if (doubleClickAction === DoubleClickAction.None) {
@@ -1955,6 +2054,8 @@ const DrawPageCore: React.FC<{
 						actionRef={colorPickerActionRef}
 					/>
 					<StatusBar />
+
+					<SaveImageDialog actionRef={saveImageDialogActionRef} />
 
 					<div
 						ref={circleCursorRef}

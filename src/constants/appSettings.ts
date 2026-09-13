@@ -271,6 +271,8 @@ Priority order (highest to lowest):
 		s3ForcePathStyle: false,
 		saveFileDirectory: "",
 		saveFileFormat: ImageFormat.PNG,
+		saveFileDialog: false,
+		saveFileResizePercent: 100,
 		ocrAfterAction: OcrDetectAfterAction.None,
 		ocrCopyText: true,
 		longScreenshotAutoScroll: true,

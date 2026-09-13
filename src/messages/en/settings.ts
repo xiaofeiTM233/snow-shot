@@ -313,7 +313,7 @@ export const settings = {
 	"settings.functionSettings.screenshotSettings.saveFileDialog":
 		"Save File Dialog",
 	"settings.functionSettings.screenshotSettings.saveFileDialog.tip":
-		'When enabled, clicking "Save to File" opens a dialog to adjust the file name, save path, image format and size; when disabled, the system dialog is used',
+		"When enabled, clicking \"Save to File\" opens a dialog to adjust the file name, save path, image format and size; when disabled, the system dialog is used",
 	"settings.functionSettings.outputSettings": "Output Settings",
 	"settings.functionSettings.outputSettings.variables": "Supported Variables",
 	"settings.functionSettings.outputSettings.variables.focusedWindowAppName":
@@ -584,6 +584,14 @@ export const settings = {
 		"General Edition",
 	"settings.functionSettings.translationSettings.apiConfig.aliyunService.professional":
 		"Professional Edition",
+	"settings.functionSettings.translationSettings.apiConfig.serviceType":
+		"Service Type",
+	"settings.functionSettings.translationSettings.apiConfig.deepLService.text":
+		"Text Translation",
+	"settings.functionSettings.translationSettings.apiConfig.volcengineService.text":
+		"Text Translation",
+	"settings.functionSettings.translationSettings.apiConfig.baiduService.text":
+		"Text Translation",
 	"settings.functionSettings.translationSettings.apiConfig.accessKeyId":
 		"AccessKeyId",
 	"settings.functionSettings.translationSettings.apiConfig.accessKeyId.required":

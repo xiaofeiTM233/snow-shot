@@ -1205,6 +1205,25 @@ export const FunctionSettingsPage = () => {
 
 					<Row gutter={token.marginLG}>
 						<Col span={12}>
+							<ProFormSwitch
+								name="saveFileDialog"
+								layout="horizontal"
+								label={
+									<IconLabel
+										label={
+											<FormattedMessage id="settings.functionSettings.screenshotSettings.saveFileDialog" />
+										}
+										tooltipTitle={
+											<FormattedMessage id="settings.functionSettings.screenshotSettings.saveFileDialog.tip" />
+										}
+									/>
+								}
+							/>
+						</Col>
+					</Row>
+
+					<Row gutter={token.marginLG}>
+						<Col span={12}>
 							<ProForm.Item
 								name="saveFileDirectory"
 								label={
