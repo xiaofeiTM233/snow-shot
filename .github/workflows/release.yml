@@ -146,7 +146,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: excalidraw
-          key: excalidraw-build-${{ steps.excalidraw-info.outputs.hash }}
+          key: excalidraw-build-${{ runner.os }}-${{ runner.arch }}-${{ steps.excalidraw-info.outputs.hash }}
 
       # 准备 Excalidraw 依赖
       - name: Clone Excalidraw
@@ -172,7 +172,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: excalidraw
-          key: excalidraw-build-${{ steps.excalidraw-info.outputs.hash }}
+          key: excalidraw-build-${{ runner.os }}-${{ runner.arch }}-${{ steps.excalidraw-info.outputs.hash }}
 
       # 移动 Excalidraw 到上级目录（供 pnpm file: 依赖使用）
       - name: Move Excalidraw to Sibling Directory
