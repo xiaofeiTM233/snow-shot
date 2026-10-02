@@ -131,6 +131,16 @@ export const scrollScreenshotHandleImage = async (
 		}
 	}
 
+	if (result.byteLength < SCROLL_SCREENSHOT_CAPTURE_RESULT_EXTRA_DATA_SIZE) {
+		// 匹配成功但无新增区域，Rust 侧只回传 4 字节的 edge_position，不带尾部信息
+		return {
+			type: "no_change",
+			thumbnail_buffer: undefined,
+			edge_position: new DataView(result).getInt32(0, true),
+			overlay_size: undefined,
+		};
+	}
+
 	// 将屏幕信息和图像数据分离
 	const imageDataLength =
 		result.byteLength - SCROLL_SCREENSHOT_CAPTURE_RESULT_EXTRA_DATA_SIZE;
