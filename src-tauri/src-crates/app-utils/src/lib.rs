@@ -26,6 +26,10 @@ pub mod monitor_hdr_info;
 #[cfg(target_os = "windows")]
 pub mod windows_capture_image;
 
+/// pinray 单帧截图（Windows/macOS）
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+pub mod pinray_capture;
+
 /// 平台相关的底层工具（本地化定制能力，与 xcap 解耦）。
 pub mod sys;
 

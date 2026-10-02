@@ -377,9 +377,7 @@ fn process_captured_image(
 
             match image::RgbaImage::from_raw(image_width as u32, image_height as u32, image_pixels)
             {
-                Some(rgba8_image) => {
-                    Ok(image::DynamicImage::ImageRgba8(rgba8_image))
-                }
+                Some(rgba8_image) => Ok(image::DynamicImage::ImageRgba8(rgba8_image)),
                 None => Err(format!(
                     "[windows_capture_image::process_captured_image] Failed to create rgba8 image"
                 )),
@@ -470,7 +468,7 @@ pub fn capture_monitor_image(
 fn probe_winrt_thread_state(tag: &str) {
     #[cfg(target_os = "windows")]
     {
-        use windows::Win32::System::WinRT::{RoInitialize, RoUninitialize, RO_INIT_MULTITHREADED};
+        use windows::Win32::System::WinRT::{RO_INIT_MULTITHREADED, RoInitialize, RoUninitialize};
         let thread_id = std::thread::current().id();
         let hr = unsafe { RoInitialize(RO_INIT_MULTITHREADED) };
         let (hr_code, description) = match &hr {
@@ -481,7 +479,10 @@ fn probe_winrt_thread_state(tag: &str) {
                 let code_u32 = code as u32;
                 if code_u32 == 0x80010106 {
                     // RPC_E_CHANGED_MODE
-                    (code, "RPC_E_CHANGED_MODE: thread is STA, WGC will fail on this thread")
+                    (
+                        code,
+                        "RPC_E_CHANGED_MODE: thread is STA, WGC will fail on this thread",
+                    )
                 } else if code_u32 == 0x00000001 {
                     // S_FALSE：已初始化（RoInitialize 不会返回 S_FALSE，但保留判断）
                     (code, "S_FALSE/already initialized")
@@ -519,8 +520,8 @@ fn capture_monitor_image_impl(
     //   Rgba16F 截到黑帧，这是关闭系统 HDR 后黑屏的根因）。
     // 注意：不能用 sdr_white_level 判断，它返回的是面板硬件能力（与系统 HDR 开关无关，
     // 关掉 HDR 后仍为硬件固定值 > 0），无法反映"当前是否为 SDR 模式"。
-    let capture_is_rgba8 = !(algorithm != CorrectHdrColorAlgorithm::None
-        && monitor.monitor_hdr_info.hdr_enabled);
+    let capture_is_rgba8 =
+        !(algorithm != CorrectHdrColorAlgorithm::None && monitor.monitor_hdr_info.hdr_enabled);
     let capture_color_format = if capture_is_rgba8 {
         windows_capture::settings::ColorFormat::Rgba8
     } else {

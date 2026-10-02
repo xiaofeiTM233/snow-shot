@@ -14,10 +14,12 @@ tokio = { workspace = true }
 
 snow-shot-app-utils = { workspace = true }
 snow-shot-app-shared = { workspace = true }
+xcap = { workspace = true }
 
 paddle-ocr-rs = { workspace = true }
 num_cpus = "1.17.0"
 ffmpeg-sidecar = "2.2.0"
+pinray = { workspace = true }
 ort = { version = "2.0.0-rc.10", default-features = false }
 
 [target.'cfg(any(target_os = "macos"))'.dependencies]

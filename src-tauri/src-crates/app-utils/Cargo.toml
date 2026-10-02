@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 xcap = { workspace = true }
+pinray = { workspace = true }
 tauri = { workspace = true }
 zune-jpegxl = { workspace = true }
 zune-core = { workspace = true }

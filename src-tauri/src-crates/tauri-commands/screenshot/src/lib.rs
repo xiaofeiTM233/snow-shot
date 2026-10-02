@@ -234,14 +234,29 @@ pub async fn capture_focused_window(
     {
         let hwnd = snow_shot_app_os::utils::get_focused_window();
 
+        // Pinray 模式：优先用 pinray 窗口捕获（WGC 后端，源 ID 为 window:{hwnd}），
+        // 失败则继续走下方现有链路（WGC HDR 窗口捕获 → xcap → 显示器兜底）。
+        let pinray_image = if capture_method == CaptureMethod::Pinray {
+            snow_shot_app_utils::pinray_capture::capture_window_frame(hwnd.0 as isize)
+                .inspect_err(|e| {
+                    log::warn!(
+                        "[capture_focused_window] pinray window capture failed, falling back: {}",
+                        e
+                    )
+                })
+                .ok()
+        } else {
+            None
+        };
+
         // 非 Xcap 模式尝试 WGC 的 HDR 窗口捕获，失败则由下方回退到 xcap。
-        let hdr_image = if capture_method != CaptureMethod::Xcap {
+        let hdr_image = if pinray_image.is_none() && capture_method != CaptureMethod::Xcap {
             capture_window_hdr_image(hwnd, correct_hdr_color_algorithm)
         } else {
             None
         };
 
-        image = match hdr_image {
+        image = match pinray_image.or(hdr_image) {
             Some(image) => image,
             None => {
                 // 用原生 HWND 反查 xcap Window，以便调用其 capture_image() 回退。

@@ -210,7 +210,11 @@ pub static PROFILER: std::sync::LazyLock<Mutex<Option<dhat::Profiler>>> =
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let ocr_instance = Mutex::new(OcrService::new());
-    let video_record_service = Mutex::new(video_record_service::VideoRecordService::new());
+    // Arc 包裹：录制启动包含多个阻塞步骤，命令侧需要把状态句柄移入
+    // spawn_blocking（要求 'static），State 借用无法满足
+    let video_record_service = Arc::new(Mutex::new(
+        video_record_service::VideoRecordService::new(),
+    ));
     let hot_load_page_service = Arc::new(hot_load_page_service::HotLoadPageService::new());
     let enigo_instance = Mutex::new(EnigoManager::new());
 

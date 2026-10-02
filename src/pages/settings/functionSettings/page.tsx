@@ -81,8 +81,11 @@ import {
 	OcrModel,
 	OcrTextAutoWrapMode,
 	type OnlineOcrModelConfig,
+	RecordPixelFormat,
 	TranslationServiceType,
 	TrayIconClickAction,
+	VideoCaptureBackend,
+	VideoFormat,
 	VideoMaxSize,
 } from "@/types/appSettings";
 import { DrawState } from "@/types/draw";
@@ -2793,6 +2796,92 @@ export const FunctionSettingsPage = () => {
 						<Row gutter={token.marginLG}>
 							<Col span={12}>
 								<ProFormSelect
+									name="captureBackend"
+									layout="horizontal"
+									label={
+										<FormattedMessage id="settings.functionSettings.videoRecordSettings.captureBackend" />
+									}
+									options={[
+										{
+											label: intl.formatMessage({
+												id: "settings.functionSettings.videoRecordSettings.captureBackend.pinray",
+											}),
+											value: VideoCaptureBackend.Pinray,
+										},
+										{
+											label: intl.formatMessage({
+												id: "settings.functionSettings.videoRecordSettings.captureBackend.legacy",
+											}),
+											value: VideoCaptureBackend.Legacy,
+										},
+									]}
+								/>
+							</Col>
+							<Col span={12}>
+								<ProFormSelect
+									name="pixelFormat"
+									layout="horizontal"
+									label={
+										<FormattedMessage id="settings.functionSettings.videoRecordSettings.pixelFormat" />
+									}
+									options={[
+										{
+											label: "BGRA",
+											value: RecordPixelFormat.Bgra,
+										},
+										{
+											label: "RGBA",
+											value: RecordPixelFormat.Rgba,
+										},
+									]}
+								/>
+							</Col>
+						</Row>
+						<Row gutter={token.marginLG}>
+							<Col span={12}>
+								<ProFormSelect
+									name="videoFormat"
+									layout="horizontal"
+									label={
+										<FormattedMessage id="settings.functionSettings.videoRecordSettings.videoFormat" />
+									}
+									options={[
+										{
+											label: intl.formatMessage({
+												id: "settings.functionSettings.videoRecordSettings.videoFormat.mp4",
+											}),
+											value: VideoFormat.Mp4,
+										},
+										{
+											label: intl.formatMessage({
+												id: "settings.functionSettings.videoRecordSettings.videoFormat.mkv",
+											}),
+											value: VideoFormat.Mkv,
+										},
+										{
+											label: intl.formatMessage({
+												id: "settings.functionSettings.videoRecordSettings.videoFormat.mov",
+											}),
+											value: VideoFormat.Mov,
+										},
+									]}
+								/>
+							</Col>
+							<Col span={12}>
+								<ProFormSelect
+									name="gifFormat"
+									layout="horizontal"
+									label={
+										<FormattedMessage id="settings.functionSettings.videoRecordSettings.gifFormat" />
+									}
+									options={gifFormatOptions}
+								/>
+							</Col>
+						</Row>
+
+						<Row gutter={token.marginLG}>
+							<Col span={12}>
+								<ProFormSelect
 									name="videoMaxSize"
 									layout="horizontal"
 									label={
@@ -2801,7 +2890,19 @@ export const FunctionSettingsPage = () => {
 									options={videoMaxSizeOptions}
 								/>
 							</Col>
+							<Col span={12}>
+								<ProFormSelect
+									name="gifMaxSize"
+									layout="horizontal"
+									label={
+										<FormattedMessage id="settings.functionSettings.videoRecordSettings.gifMaxSize" />
+									}
+									options={gifMaxSizeOptions}
+								/>
+							</Col>
+						</Row>
 
+						<Row gutter={token.marginLG}>
 							<Col span={12}>
 								<ProFormSelect
 									name="frameRate"
@@ -2845,20 +2946,6 @@ export const FunctionSettingsPage = () => {
 									]}
 								/>
 							</Col>
-						</Row>
-
-						<Row gutter={token.marginLG}>
-							<Col span={12}>
-								<ProFormSelect
-									name="gifMaxSize"
-									layout="horizontal"
-									label={
-										<FormattedMessage id="settings.functionSettings.videoRecordSettings.gifMaxSize" />
-									}
-									options={gifMaxSizeOptions}
-								/>
-							</Col>
-
 							<Col span={12}>
 								<ProFormSelect
 									name="gifFrameRate"
@@ -2882,17 +2969,6 @@ export const FunctionSettingsPage = () => {
 									]}
 								/>
 							</Col>
-
-							<Col span={12}>
-								<ProFormSelect
-									name="gifFormat"
-									layout="horizontal"
-									label={
-										<FormattedMessage id="settings.functionSettings.videoRecordSettings.gifFormat" />
-									}
-									options={gifFormatOptions}
-								/>
-							</Col>
 						</Row>
 						<Row gutter={token.marginLG}>
 							<Col span={12}>
@@ -2903,6 +2979,15 @@ export const FunctionSettingsPage = () => {
 										<FormattedMessage id="settings.functionSettings.videoRecordSettings.microphoneDeviceName" />
 									}
 									options={microphoneDeviceNameOptions}
+								/>
+							</Col>
+							<Col span={12}>
+								<ProFormSwitch
+									name="enableSystemAudio"
+									layout="horizontal"
+									label={
+										<FormattedMessage id="settings.functionSettings.videoRecordSettings.enableSystemAudio" />
+									}
 								/>
 							</Col>
 						</Row>
