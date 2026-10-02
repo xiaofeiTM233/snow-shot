@@ -1,7 +1,8 @@
 //! 基于 pinray 的单帧截图（SDR RGBA8）。
 //!
-//! pinray 各平台原生后端：Windows 使用 WGC（持续出帧，避开 DXGI 桌面静止时
-//! next_event 返回 Timeout 的陷阱），macOS 使用 ScreenCaptureKit。
+//! pinray 各平台原生后端：Windows 可选 WGC（持续出帧，支持窗口捕获与指针合成）
+//! 或 DXGI Desktop Duplication（仅显示器，桌面变化时才出帧，不合成指针），
+//! macOS 使用 ScreenCaptureKit。
 //! pinray 仅输出 SDR 8bit 帧，HDR 显示器上无 HDR 色彩校正能力。
 
 use std::time::{Duration, Instant};
@@ -11,6 +12,18 @@ use pinray::{
     CaptureEvent, CaptureSession, CursorMode, PinrayError, PixelFormat, Rect, SourceId,
     VideoCaptureTarget,
 };
+
+/// pinray Windows 视频引擎（macOS 固定 ScreenCaptureKit，忽略此参数）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PinrayVideoEngine {
+    /// Windows Graphics Capture：持续出帧，支持窗口捕获、指针合成。
+    /// 冷启动首帧可能因 MPO 未重定向出现视频区域全黑，需丢弃。
+    Wgc,
+    /// DXGI Desktop Duplication：仅支持显示器捕获（窗口捕获 pinray 会直接报错），
+    /// 仅在桌面变化时出帧（静态桌面可能长时间无帧），且不合成鼠标指针。
+    /// 硬件视频叠加层（MPO）内容可能缺失，属驱动级行为，等待后续帧无法解决。
+    Dxgi,
+}
 
 /// 单帧等待超时（WGC 首帧可能需要数百毫秒，循环重试直至截止时间）
 const FIRST_FRAME_WAIT: Duration = Duration::from_millis(300);
@@ -38,12 +51,16 @@ fn frame_to_image(frame: CapturedFrame) -> Result<DynamicImage, String> {
 fn build_session(
     target: VideoCaptureTarget,
     crop: Option<Rect>,
+    #[cfg_attr(not(target_os = "windows"), allow(unused_variables))] engine: PinrayVideoEngine,
 ) -> Result<CaptureSession, String> {
     let mut builder = CaptureSession::builder().video_target(target);
 
     #[cfg(target_os = "windows")]
     {
-        builder = builder.backend_preference(pinray::BackendPreference::WindowsWgc);
+        builder = builder.backend_preference(match engine {
+            PinrayVideoEngine::Wgc => pinray::BackendPreference::WindowsWgc,
+            PinrayVideoEngine::Dxgi => pinray::BackendPreference::WindowsDxgi,
+        });
     }
     #[cfg(target_os = "macos")]
     {
@@ -79,11 +96,16 @@ fn build_session(
 
 /// 从会话中循环等待第一个可用视频帧（Timeout 属正常流，重试直至截止）。
 ///
-/// 丢弃冷启动首帧：WGC 会话刚建立时 DWM 尚未把硬件视频叠加层（MPO，
-/// 浏览器播放中的视频、部分播放器）重定向进合成 surface，首帧表现为
-/// "桌面正常、视频区域全黑"。与截图路径 windows_capture_image 丢弃首帧
-/// 的原因一致，同样取第二帧（约一个合成周期后，视频已合成进画面）。
-fn capture_first_frame(mut session: CaptureSession) -> Result<CapturedFrame, String> {
+/// `drop_first_frame`：是否丢弃冷启动首帧。WGC 会话刚建立时 DWM 尚未把硬件
+/// 视频叠加层（MPO，浏览器播放中的视频、部分播放器）重定向进合成 surface，
+/// 首帧表现为"桌面正常、视频区域全黑"，与截图路径 windows_capture_image
+/// 丢弃首帧的原因一致，取第二帧（约一个合成周期后，视频已合成进画面）。
+/// DXGI 桌面复制仅在桌面变化时出帧，静态桌面可能等不到第二帧，因此不丢弃
+/// 首帧（其 MPO 缺失属驱动级行为，等待也无法解决）。
+fn capture_first_frame(
+    mut session: CaptureSession,
+    drop_first_frame: bool,
+) -> Result<CapturedFrame, String> {
     if let Err(e) = session.start() {
         return Err(format!("pinray start session failed: {e}"));
     }
@@ -99,7 +121,7 @@ fn capture_first_frame(mut session: CaptureSession) -> Result<CapturedFrame, Str
         match session.next_event(Some(FIRST_FRAME_WAIT)) {
             Ok(CaptureEvent::Video(frame)) => {
                 video_frames_seen += 1;
-                if video_frames_seen == 1 {
+                if drop_first_frame && video_frames_seen == 1 {
                     continue;
                 }
 
@@ -135,27 +157,34 @@ fn capture_first_frame(mut session: CaptureSession) -> Result<CapturedFrame, Str
 ///   （与 `MonitorInfo::get_device_name()` 一致）；macOS 为 CGDirectDisplayID
 ///   十进制串（即 xcap `Monitor::id()`）。
 /// * `crop`：相对显示器原点的裁剪区域（物理像素），None 表示全屏。
+/// * `engine`：Windows 视频引擎（WGC/DXGI），macOS 忽略。
 pub fn capture_display_frame(
     source_id: String,
     crop: Option<Rect>,
+    engine: PinrayVideoEngine,
 ) -> Result<DynamicImage, String> {
     let session = build_session(
         VideoCaptureTarget::Display(SourceId::new(source_id)),
         crop,
+        engine,
     )?;
 
-    capture_first_frame(session).and_then(frame_to_image)
+    // WGC 丢弃冷启动首帧避开 MPO 全黑问题；DXGI 变化出帧，不丢弃（见函数注释）
+    let drop_first_frame = engine != PinrayVideoEngine::Dxgi;
+    capture_first_frame(session, drop_first_frame).and_then(frame_to_image)
 }
 
 /// 截取窗口单帧（仅 Windows；pinray 窗口源 ID 为 `window:{hwnd}`）。
 ///
+/// DXGI Desktop Duplication 不支持窗口捕获，窗口路径固定走 WGC。
 /// macOS 下 pinray 窗口捕获输出为显示器尺寸（letterbox 已知问题），不启用。
 #[cfg(target_os = "windows")]
 pub fn capture_window_frame(hwnd_isize: isize) -> Result<DynamicImage, String> {
     let session = build_session(
         VideoCaptureTarget::Window(SourceId::new(format!("window:{hwnd_isize}"))),
         None,
+        PinrayVideoEngine::Wgc,
     )?;
 
-    capture_first_frame(session).and_then(frame_to_image)
+    capture_first_frame(session, true).and_then(frame_to_image)
 }

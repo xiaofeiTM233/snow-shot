@@ -234,9 +234,11 @@ pub async fn capture_focused_window(
     {
         let hwnd = snow_shot_app_os::utils::get_focused_window();
 
-        // Pinray 模式：优先用 pinray 窗口捕获（WGC 后端，源 ID 为 window:{hwnd}），
+        // Pinray WGC 模式：优先用 pinray 窗口捕获（WGC 后端，源 ID 为 window:{hwnd}），
         // 失败则继续走下方现有链路（WGC HDR 窗口捕获 → xcap → 显示器兜底）。
-        let pinray_image = if capture_method == CaptureMethod::Pinray {
+        // Pinray DXGI 模式不支持窗口捕获（DXGI 桌面复制仅限显示器），
+        // 直接跳过 pinray，由下方 WGC HDR 链路接管。
+        let pinray_image = if capture_method == CaptureMethod::PinrayWgc {
             snow_shot_app_utils::pinray_capture::capture_window_frame(hwnd.0 as isize)
                 .inspect_err(|e| {
                     log::warn!(

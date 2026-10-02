@@ -6,6 +6,8 @@ export const videoRecord = {
 	"videoRecord.microphone": "Microphone",
 	"videoRecord.systemAudio": "System Audio",
 	"videoRecord.captureCursor": "Capture Mouse Cursor",
+	"videoRecord.captureCursor.dxgiUnsupported":
+		"pinray DXGI engine does not support cursor capture",
 	"videoRecord.close": "Close",
 	"videoRecord.copy": "Copy Video File",
 	"videoRecord.copyGif": "Copy GIF File",

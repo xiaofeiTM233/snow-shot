@@ -34,7 +34,10 @@ import { ContentWrap } from "@/components/contentWrap";
 import { GroupTitle } from "@/components/groupTitle";
 import { IconLabel } from "@/components/iconLable";
 import { ResetSettingsButton } from "@/components/resetSettingsButton";
-import { PLUGIN_ID_RAPID_OCR } from "@/constants/pluginService";
+import {
+	PLUGIN_ID_FFMPEG,
+	PLUGIN_ID_RAPID_OCR,
+} from "@/constants/pluginService";
 import { AntdContext } from "@/contexts/antdContext";
 import { AppSettingsActionContext } from "@/contexts/appSettingsActionContext";
 import { usePluginServiceContext } from "@/contexts/pluginServiceContext";
@@ -50,6 +53,7 @@ import {
 	LogRetentionDuration,
 	RenderBackend,
 	RunLogLevel,
+	VideoCaptureBackend,
 } from "@/types/appSettings";
 import { clearAllConfig } from "@/utils/appConfig";
 import { clearAllAppStore } from "@/utils/appStore";
@@ -68,8 +72,7 @@ export const SystemSettingsPage = () => {
 		Form.useForm<AppSettingsData[AppSettingsGroup.SystemCommon]>();
 	const [coreForm] =
 		Form.useForm<AppSettingsData[AppSettingsGroup.SystemCore]>();
-	const [renderForm] =
-		Form.useForm<AppSettingsData[AppSettingsGroup.Render]>();
+	const [renderForm] = Form.useForm<AppSettingsData[AppSettingsGroup.Render]>();
 	const [scrollScreenshotForm] =
 		Form.useForm<AppSettingsData[AppSettingsGroup.SystemScrollScreenshot]>();
 	const [chatForm] =
@@ -78,6 +81,9 @@ export const SystemSettingsPage = () => {
 		Form.useForm<AppSettingsData[AppSettingsGroup.SystemNetwork]>();
 	const [screenshotForm] =
 		Form.useForm<AppSettingsData[AppSettingsGroup.SystemScreenshot]>();
+	// 视频录制采集设置（后端与像素格式），随截图设置之后展示
+	const [videoRecordForm] =
+		Form.useForm<AppSettingsData[AppSettingsGroup.FunctionVideoRecord]>();
 
 	const [appSettingsLoading, setAppSettingsLoading] = useState(true);
 	useAppSettingsLoad(
@@ -143,6 +149,16 @@ export const SystemSettingsPage = () => {
 
 				if (
 					preSettings === undefined ||
+					preSettings[AppSettingsGroup.FunctionVideoRecord] !==
+						settings[AppSettingsGroup.FunctionVideoRecord]
+				) {
+					videoRecordForm.setFieldsValue(
+						settings[AppSettingsGroup.FunctionVideoRecord],
+					);
+				}
+
+				if (
+					preSettings === undefined ||
 					preSettings[AppSettingsGroup.SystemCore] !==
 						settings[AppSettingsGroup.SystemCore]
 				) {
@@ -155,6 +171,7 @@ export const SystemSettingsPage = () => {
 				networkForm,
 				scrollScreenshotForm,
 				screenshotForm,
+				videoRecordForm,
 				coreForm,
 				renderForm,
 			],
@@ -245,9 +262,38 @@ export const SystemSettingsPage = () => {
 			},
 			{
 				label: intl.formatMessage({
-					id: "settings.systemSettings.screenshotSettings.captureMethod.pinray",
+					id: "settings.systemSettings.screenshotSettings.captureMethod.pinrayWgc",
 				}),
-				value: CaptureMethod.Pinray,
+				value: CaptureMethod.PinrayWgc,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.screenshotSettings.captureMethod.pinrayDxgi",
+				}),
+				value: CaptureMethod.PinrayDxgi,
+			},
+		];
+	}, [intl]);
+
+	const videoCaptureBackendOptions = useMemo((): SelectProps["options"] => {
+		return [
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.videoRecordSettings.captureBackend.pinrayWgc",
+				}),
+				value: VideoCaptureBackend.PinrayWgc,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.videoRecordSettings.captureBackend.pinrayDxgi",
+				}),
+				value: VideoCaptureBackend.PinrayDxgi,
+			},
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.videoRecordSettings.captureBackend.legacy",
+				}),
+				value: VideoCaptureBackend.Legacy,
 			},
 		];
 	}, [intl]);
@@ -634,8 +680,8 @@ export const SystemSettingsPage = () => {
 										options={hdrColorCorrectionOptions}
 									/>
 								</Col>
-								</>
-								)}
+							</>
+						)}
 
 						<Col span={12}>
 							<ProFormSwitch
@@ -735,6 +781,56 @@ export const SystemSettingsPage = () => {
 				</ProForm>
 			</Spin>
 
+			<div hidden={!isReadyStatus?.(PLUGIN_ID_FFMPEG)}>
+				<Divider />
+
+				<GroupTitle
+					id="videoRecordSettings"
+					extra={
+						<ResetSettingsButton
+							title={
+								<FormattedMessage id="settings.systemSettings.videoRecordSettings" />
+							}
+							appSettingsGroup={AppSettingsGroup.FunctionVideoRecord}
+						/>
+					}
+				>
+					<FormattedMessage id="settings.systemSettings.videoRecordSettings" />
+				</GroupTitle>
+
+				<Spin spinning={appSettingsLoading}>
+					<ProForm
+						form={videoRecordForm}
+						onValuesChange={(_, values) => {
+							updateAppSettings(
+								AppSettingsGroup.FunctionVideoRecord,
+								values,
+								true,
+								true,
+								true,
+								true,
+								false,
+							);
+						}}
+						submitter={false}
+						layout="horizontal"
+					>
+						<Row gutter={token.marginLG}>
+							<Col span={12}>
+								<ProFormSelect
+									name="captureBackend"
+									layout="horizontal"
+									label={
+										<FormattedMessage id="settings.systemSettings.videoRecordSettings.captureBackend" />
+									}
+									options={videoCaptureBackendOptions}
+								/>
+							</Col>
+						</Row>
+					</ProForm>
+				</Spin>
+			</div>
+
 			<Divider />
 
 			<GroupTitle
@@ -742,7 +838,10 @@ export const SystemSettingsPage = () => {
 				extra={
 					<ResetSettingsButton
 						title={
-							<FormattedMessage id="settings.renderSettings" key="renderSettings" />
+							<FormattedMessage
+								id="settings.renderSettings"
+								key="renderSettings"
+							/>
 						}
 						appSettingsGroup={AppSettingsGroup.Render}
 					/>
@@ -755,7 +854,13 @@ export const SystemSettingsPage = () => {
 				<ProForm
 					form={renderForm}
 					onValuesChange={(_, values) => {
-						updateAppSettings(AppSettingsGroup.Render, values, true, true, true);
+						updateAppSettings(
+							AppSettingsGroup.Render,
+							values,
+							true,
+							true,
+							true,
+						);
 					}}
 					submitter={false}
 					layout="horizontal"

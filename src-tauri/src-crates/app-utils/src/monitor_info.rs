@@ -413,7 +413,10 @@ impl MonitorInfo {
         #[cfg(target_os = "macos")]
         {
             // Pinray：macOS 显示器源 ID 为 CGDirectDisplayID 十进制串（xcap Monitor::id()）
-            if capture_option.capture_method == CaptureMethod::Pinray {
+            if matches!(
+                capture_option.capture_method,
+                CaptureMethod::PinrayWgc | CaptureMethod::PinrayDxgi
+            ) {
                 let display_id = self.monitor.id().unwrap_or(0);
                 if display_id != 0 {
                     let crop = crop_area
@@ -422,6 +425,7 @@ impl MonitorInfo {
                     match super::pinray_capture::capture_display_frame(
                         display_id.to_string(),
                         crop,
+                        super::pinray_capture::PinrayVideoEngine::Wgc,
                     ) {
                         Ok(image) => return Some(image),
                         Err(e) => {
@@ -532,9 +536,16 @@ impl MonitorInfo {
                         }
                     }
                 }
-                CaptureMethod::Pinray => {
+                CaptureMethod::PinrayWgc | CaptureMethod::PinrayDxgi => {
                     // pinray 路径：显示器源 ID 为 `display:{设备名}`（与 get_device_name 一致）。
                     // 仅输出 SDR 8bit 帧；失败/黑帧回退 xcap（沿用现有兜底语义）。
+                    // DXGI 引擎不合成指针、仅在桌面变化时出帧（静态桌面可能变慢或超时），
+                    // MPO 硬件叠加层内容可能缺失（驱动级行为，等待无法解决）。
+                    let engine = if effective_method == CaptureMethod::PinrayDxgi {
+                        super::pinray_capture::PinrayVideoEngine::Dxgi
+                    } else {
+                        super::pinray_capture::PinrayVideoEngine::Wgc
+                    };
                     let device_name = Self::get_device_name(&self.monitor).unwrap_or_default();
                     let crop = crop_area
                         .map(|area| self.get_monitor_crop_region(area))
@@ -542,6 +553,7 @@ impl MonitorInfo {
                     match super::pinray_capture::capture_display_frame(
                         format!("display:{device_name}"),
                         crop,
+                        engine,
                     ) {
                         Ok(image) => {
                             if is_black_image(&image, 0.99) {
@@ -618,10 +630,15 @@ pub enum CaptureMethod {
     /// xcap（传统采集 API）
     #[serde(rename = "Xcap")]
     Xcap,
-    /// pinray（原生采集基础设施，Windows 走 WGC、macOS 走 ScreenCaptureKit，
-    /// 仅输出 SDR 8bit 帧，无 HDR 色彩校正能力）
-    #[serde(rename = "Pinray")]
-    Pinray,
+    /// pinray WGC 引擎（原生采集基础设施，支持窗口捕获、持续出帧；
+    /// 仅输出 SDR 8bit 帧，无 HDR 色彩校正能力）。
+    /// alias "Pinray" 兼容旧配置中的旧值
+    #[serde(rename = "Pinray-WGC", alias = "Pinray")]
+    PinrayWgc,
+    /// pinray DXGI 引擎（仅显示器截图，桌面变化时出帧，静态桌面可能变慢；
+    /// 不合成鼠标指针，MPO 硬件叠加层内容可能缺失）
+    #[serde(rename = "Pinray-DXGI")]
+    PinrayDxgi,
 }
 
 impl MonitorList {
@@ -826,7 +843,8 @@ impl MonitorList {
                 let capture_source = match capture_option.capture_method {
                     CaptureMethod::Wgc => "WGC",
                     CaptureMethod::Xcap => "xcap",
-                    CaptureMethod::Pinray => "pinray",
+                    CaptureMethod::PinrayWgc => "pinray-wgc",
+                    CaptureMethod::PinrayDxgi => "pinray-dxgi",
                     CaptureMethod::Auto => {
                         if monitor.monitor_hdr_info.hdr_enabled {
                             "Auto->WGC"
@@ -1308,12 +1326,14 @@ impl MonitorList {
             #[cfg(target_os = "windows")]
             {
                 // 排除窗口（WDA_EXCLUDEFROMCAPTURE）仅在 WGC/pinray 下有效（xcap 不支持）。
-                //   Wgc/Pinray -> 始终排除截图自身窗口
+                //   Wgc/PinrayWgc/PinrayDxgi -> 始终排除截图自身窗口
                 //   Auto -> 仅当存在系统 HDR 已开启的显示器（Auto 下这些屏会走 WGC）时排除
                 //   Xcap -> 不排除
                 // 排除可避免截太快把截图控件也截进去。
                 match capture_option.capture_method {
-                    CaptureMethod::Wgc | CaptureMethod::Pinray => true,
+                    CaptureMethod::Wgc
+                    | CaptureMethod::PinrayWgc
+                    | CaptureMethod::PinrayDxgi => true,
                     CaptureMethod::Auto => self
                         .0
                         .iter()

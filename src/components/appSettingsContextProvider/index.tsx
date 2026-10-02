@@ -69,6 +69,7 @@ import {
 	TranslationServiceType,
 	type TrayIconClickAction,
 	type TrayIconDefaultIcon,
+	VideoCaptureBackend,
 	type VideoMaxSize,
 } from "@/types/appSettings";
 import type {
@@ -1490,15 +1491,13 @@ const AppSettingsContextProviderCore: React.FC<{
 								defaultAppSettingsData[group].enableSystemAudio),
 					captureBackend:
 						typeof newSettings?.captureBackend === "string"
-							? newSettings.captureBackend
+							? // 旧值 "pinray" 归一化为 "pinray-wgc"（引擎行为一致）
+								(newSettings.captureBackend === VideoCaptureBackend.Pinray
+									? VideoCaptureBackend.PinrayWgc
+									: newSettings.captureBackend)
 							: (prevSettings?.captureBackend ??
 								defaultAppSettingsData[group].captureBackend),
-					pixelFormat:
-						typeof newSettings?.pixelFormat === "string"
-							? newSettings.pixelFormat
-							: (prevSettings?.pixelFormat ??
-								defaultAppSettingsData[group].pixelFormat),
-						captureCursor:
+					captureCursor:
 							typeof newSettings?.captureCursor === "boolean"
 								? newSettings.captureCursor
 								: (prevSettings?.captureCursor ??
@@ -1606,7 +1605,10 @@ const AppSettingsContextProviderCore: React.FC<{
 					captureMethod:
 						newSettings?.captureMethod != null &&
 						Object.values(CaptureMethod).includes(newSettings.captureMethod)
-							? newSettings.captureMethod
+							? // 旧值 "Pinray" 归一化为 "Pinray-WGC"（引擎行为一致）
+								(newSettings.captureMethod === CaptureMethod.Pinray
+									? CaptureMethod.PinrayWgc
+									: newSettings.captureMethod)
 							: (prevSettings?.captureMethod ??
 								defaultAppSettingsData[group].captureMethod),
 					hdrColorCorrection:

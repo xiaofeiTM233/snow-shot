@@ -373,14 +373,6 @@ export const settings = {
 	"settings.functionSettings.videoRecordSettings.encoderPreset.tip":
 		"編碼速率越快，計算資源消耗越低，但影片檔案越大",
 	"settings.functionSettings.videoRecordSettings.hwaccel": "啟用硬體加速",
-	"settings.functionSettings.videoRecordSettings.captureBackend":
-		"影片擷取後端",
-	"settings.functionSettings.videoRecordSettings.captureBackend.pinray":
-		"pinray（推薦）",
-	"settings.functionSettings.videoRecordSettings.captureBackend.legacy":
-		"傳統（gdigrab/avfoundation）",
-	"settings.functionSettings.videoRecordSettings.pixelFormat":
-		"擷取像素格式（僅 pinray）",
 	"settings.functionSettings.videoRecordSettings.enableSystemAudio":
 		"擷取系統聲音",
 	"settings.functionSettings.videoRecordSettings.saveDirectory": "儲存目錄",
@@ -626,6 +618,13 @@ export const settings = {
 	"settings.functionSettings.chatSettings.testPrompt":
 		'測試提示詞: "Say "Hello, world!""',
 	"settings.systemSettings.screenshotSettings": "截圖",
+	"settings.systemSettings.videoRecordSettings": "影片錄製",
+	"settings.systemSettings.videoRecordSettings.captureBackend": "影片擷取後端",
+	"settings.systemSettings.videoRecordSettings.captureBackend.pinrayWgc":
+		"pinray WGC（推薦）",
+	"settings.systemSettings.videoRecordSettings.captureBackend.pinrayDxgi":
+		"pinray DXGI（不支援錄製指標）",
+	"settings.systemSettings.videoRecordSettings.captureBackend.legacy": "FFmpeg",
 	"settings.systemSettings.screenshotSettings.tryGetElementByFocus":
 		"選取視窗元素增強",
 	"settings.systemSettings.screenshotSettings.tryGetElementByFocus.tip":
@@ -676,8 +675,10 @@ export const settings = {
 	"settings.systemSettings.screenshotSettings.captureMethod.auto": "自動",
 	"settings.systemSettings.screenshotSettings.captureMethod.wgc": "WGC",
 	"settings.systemSettings.screenshotSettings.captureMethod.xcap": "xcap",
-	"settings.systemSettings.screenshotSettings.captureMethod.pinray":
-		"pinray",
+	"settings.systemSettings.screenshotSettings.captureMethod.pinrayWgc":
+		"pinray（WGC）",
+	"settings.systemSettings.screenshotSettings.captureMethod.pinrayDxgi":
+		"pinray（DXGI）",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection":
 		"HDR 色彩校正",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection.linear":

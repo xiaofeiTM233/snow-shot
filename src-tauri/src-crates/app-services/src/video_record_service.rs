@@ -16,7 +16,7 @@ use std::{
 };
 
 use crate::video_record_capture::{
-    PinrayFeed, PinrayFeedParams, RecordPixelFormat, SystemAudioMeta, VideoCaptureBackend,
+    FFMPEG_PIX_FMT, PinrayFeed, PinrayFeedParams, SystemAudioMeta, VideoCaptureBackend,
 };
 
 /// 硬件编码器预热时长（秒）——传统(gdigrab/avfoundation)路径只能用这个固定值。
@@ -241,8 +241,6 @@ struct RecordingParams {
     video_max_height: i32,
     /// 视频采集后端（pinray / 传统 gdigrab/avfoundation）
     capture_backend: VideoCaptureBackend,
-    /// 采集像素格式（仅 pinray 后端生效）
-    pixel_format: RecordPixelFormat,
     /// 是否把鼠标指针合成进画面（三种后端均生效）
     capture_cursor: bool,
 }
@@ -461,7 +459,6 @@ impl VideoRecordService {
         video_max_width: i32,
         video_max_height: i32,
         capture_backend: VideoCaptureBackend,
-        pixel_format: RecordPixelFormat,
         capture_cursor: bool,
     ) -> Result<()> {
         if self.state == VideoRecordState::Recording {
@@ -489,7 +486,6 @@ impl VideoRecordService {
             video_max_width,
             video_max_height,
             capture_backend,
-            pixel_format,
             capture_cursor,
         });
 
@@ -895,7 +891,7 @@ impl VideoRecordService {
             .arg("-f")
             .arg("rawvideo")
             .arg("-pix_fmt")
-            .arg(params.pixel_format.ffmpeg_pix_fmt())
+            .arg(FFMPEG_PIX_FMT)
             .arg("-video_size")
             .arg(format!("{}x{}", width, height))
             .arg("-framerate")
@@ -1026,7 +1022,7 @@ impl VideoRecordService {
                 source_id,
                 crop,
                 frame_rate: params.frame_rate,
-                pixel_format: params.pixel_format,
+                engine: params.capture_backend.pinray_engine(),
                 capture_cursor: params.capture_cursor,
                 enable_system_audio,
                 audio_raw_path: PathBuf::from(&audio_raw_path),
