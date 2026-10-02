@@ -306,10 +306,7 @@ pub fn capture_target_monitor(
                     }
                 },
                 Err(e) => {
-                    log::error!(
-                        "[capture_target_monitor] failed to capture image: {:?}",
-                        e
-                    );
+                    log::error!("[capture_target_monitor] failed to capture image: {:?}", e);
                     return None;
                 }
             }
@@ -342,11 +339,7 @@ pub fn capture_target_monitor(
     #[cfg(target_os = "macos")]
     {
         // macOS 改用官方 xcap：权限由 xcap 隐式获取（失败转 None），且 xcap 不支持排除窗口故忽略。
-        if monitor
-            .name()
-            .unwrap_or_default()
-            .eq("DeskPad Display")
-        {
+        if monitor.name().unwrap_or_default().eq("DeskPad Display") {
             log::warn!("[capture_target_monitor] skip DeskPad Display");
             return Some(image::DynamicImage::ImageRgba8(image::RgbaImage::new(1, 1)));
         }
@@ -365,7 +358,10 @@ pub fn capture_target_monitor(
         match capture_result {
             Ok(rgba) => Some(image::DynamicImage::ImageRgba8(rgba)),
             Err(e) => {
-                log::error!("[capture_target_monitor] macOS xcap capture failed: {:?}", e);
+                log::error!(
+                    "[capture_target_monitor] macOS xcap capture failed: {:?}",
+                    e
+                );
                 None
             }
         }

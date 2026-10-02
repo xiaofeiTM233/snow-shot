@@ -6,7 +6,6 @@ import {
 	getCurrentWindow,
 } from "@tauri-apps/api/window";
 import { debounce } from "es-toolkit";
-import Flatbush from "flatbush";
 import React, {
 	useCallback,
 	useContext,
@@ -613,12 +612,6 @@ const DrawPageCore: React.FC<{
 				return [0, 0];
 			}),
 		]);
-
-		const rTree = new Flatbush(captureBoundingBox.monitor_rect_list.length);
-		captureBoundingBox.monitor_rect_list.forEach(({ rect }) => {
-			rTree.add(rect.min_x, rect.min_y, rect.max_x, rect.max_y);
-		});
-		rTree.finish();
 
 		captureBoundingBoxInfoRef.current = new CaptureBoundingBoxInfo(
 			captureBoundingBox.rect,
