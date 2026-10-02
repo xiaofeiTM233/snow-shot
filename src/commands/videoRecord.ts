@@ -94,6 +94,29 @@ export const videoRecordInit = async (ffmpegPluginDir: string) => {
 	return result;
 };
 
+/**
+ * 在用户点"开始录制"之前预热编码器（选区出现时调用）
+ *
+ * 让 ffmpeg/编码器的启动开销与硬件编码器的 GPU 启动停顿提前发生，
+ * 点击开始后即可立即进入录制。
+ */
+export const videoRecordWarmup = async (
+	encoder: string,
+	encoderPreset: string,
+	width: number,
+	height: number,
+	frameRate: number,
+) => {
+	const result = await invoke("video_record_warmup", {
+		encoder,
+		encoderPreset,
+		width,
+		height,
+		frameRate,
+	});
+	return result;
+};
+
 export const setExcludeFromCapture = async (enable: boolean) => {
 	if (getPlatform() === "macos") {
 		return;

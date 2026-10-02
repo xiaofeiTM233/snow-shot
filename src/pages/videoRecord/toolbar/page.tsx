@@ -55,6 +55,7 @@ import {
 	AppSettingsActionContext,
 	AppSettingsPublisher,
 } from "@/contexts/appSettingsActionContext";
+import { AntdContext } from "@/contexts/antdContext";
 import { usePluginServiceContext } from "@/contexts/pluginServiceContext";
 import { changeVideoRecordState } from "@/functions/videoRecord";
 import { useAppSettingsLoad } from "@/hooks/useAppSettingsLoad";
@@ -271,6 +272,7 @@ export const VideoRecordToolbarPage: React.FC = () => {
 
 	const [getAppSettings] = useStateSubscriber(AppSettingsPublisher, undefined);
 	const { updateAppSettings } = useContext(AppSettingsActionContext);
+	const { message } = useContext(AntdContext);
 	useAppSettingsLoad(
 		useCallback((appSettings: AppSettingsData) => {
 			setEnableMicrophone(appSettings[AppSettingsGroup.Cache].enableMicrophone);
@@ -394,6 +396,14 @@ export const VideoRecordToolbarPage: React.FC = () => {
 
 				startDurationTimer();
 			})
+			.catch((error) => {
+				// 失败一般来自后端（pinray 会话握手失败、ffmpeg 缺失等），
+				// 不提示的话界面只会静默停在 Idle，用户看到的是「点了没反应」
+				appError("[videoRecordToolbar] startRecord error", error);
+				message.error(
+					intl.formatMessage({ id: "videoRecord.startRecordFailed" }),
+				);
+			})
 			.finally(() => {
 				setStartRecordLoading(false);
 			});
@@ -404,6 +414,8 @@ export const VideoRecordToolbarPage: React.FC = () => {
 		stopDurationTimer,
 		updateDurationFormat,
 		startDurationTimer,
+		message,
+		intl,
 	]);
 
 	const copyVideo = useCallback(

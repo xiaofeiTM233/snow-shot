@@ -5,6 +5,7 @@ import { theme } from "antd";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { setCurrentWindowAlwaysOnTop } from "@/commands/core";
 import { listenKeyStart, listenKeyStop } from "@/commands/listenKey";
+import { videoRecordWarmup } from "@/commands/videoRecord";
 import { EventListenerContext } from "@/components/eventListener";
 import {
 	LISTEN_KEY_SERVICE_KEY_DOWN_EMIT_KEY,
@@ -143,9 +144,21 @@ export const VideoRecordPage: React.FC = () => {
 		direction: "horizontal" as "horizontal" | "vertical",
 	});
 
+	// 录制编码参数：选区出现时用它提前预热编码器（见 init）
+	const encoderSettingsRef = useRef({
+		encoder: "",
+		encoderPreset: "",
+		frameRate: 30,
+	});
+
 	// 加载配置
 	useAppSettingsLoad((settings) => {
 		const videoRecordSettings = settings[AppSettingsGroup.FunctionVideoRecord];
+		encoderSettingsRef.current = {
+			encoder: videoRecordSettings.encoder,
+			encoderPreset: videoRecordSettings.encoderPreset,
+			frameRate: videoRecordSettings.frameRate,
+		};
 		setKeyDisplayConfig({
 			enableKeyDisplay: videoRecordSettings.enableKeyDisplay,
 			fontSize: videoRecordSettings.keyDisplayFontSize,
@@ -189,6 +202,22 @@ export const VideoRecordPage: React.FC = () => {
 			}
 
 			selectRectRef.current = selectRect;
+
+			// 提前预热编码器：把"点击开始后的等待"和硬件编码器的 GPU 启动停顿
+			// （会冻结桌面合成，容易录进画面）都挪到用户点击之前。
+			// 一次性临时进程，失败不影响录制。
+			const { encoder, encoderPreset, frameRate } = encoderSettingsRef.current;
+			if (encoder) {
+				videoRecordWarmup(
+					encoder,
+					encoderPreset,
+					selectRect.max_x - selectRect.min_x,
+					selectRect.max_y - selectRect.min_y,
+					frameRate,
+				).catch((error) => {
+					appError("[VideoRecordPage] videoRecordWarmup error", error);
+				});
+			}
 
 			const appWindow = getCurrentWindow();
 

@@ -525,6 +525,7 @@ pub fn run() {
             video_record::video_record_kill,
             video_record::video_record_get_microphone_device_names,
             video_record::video_record_init,
+            video_record::video_record_warmup,
             listen_key::listen_key_start,
             listen_key::listen_key_stop,
             listen_key::listen_key_stop_by_window_label,

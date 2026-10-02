@@ -10,4 +10,5 @@ export const videoRecord = {
 	"videoRecord.copy": "Copy Video File",
 	"videoRecord.copyGif": "Copy GIF File",
 	"videoRecord.openFolder": "Open Output Directory",
+	"videoRecord.startRecordFailed": "Failed to start recording, check the log",
 };

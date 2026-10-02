@@ -77,13 +77,19 @@ fn build_session(
     Ok(session)
 }
 
-/// 从会话中循环等待第一个视频帧（Timeout 属正常流，重试直至截止）
+/// 从会话中循环等待第一个可用视频帧（Timeout 属正常流，重试直至截止）。
+///
+/// 丢弃冷启动首帧：WGC 会话刚建立时 DWM 尚未把硬件视频叠加层（MPO，
+/// 浏览器播放中的视频、部分播放器）重定向进合成 surface，首帧表现为
+/// "桌面正常、视频区域全黑"。与截图路径 windows_capture_image 丢弃首帧
+/// 的原因一致，同样取第二帧（约一个合成周期后，视频已合成进画面）。
 fn capture_first_frame(mut session: CaptureSession) -> Result<CapturedFrame, String> {
     if let Err(e) = session.start() {
         return Err(format!("pinray start session failed: {e}"));
     }
 
     let deadline = Instant::now() + FIRST_FRAME_DEADLINE;
+    let mut video_frames_seen: u32 = 0;
     loop {
         if Instant::now() > deadline {
             let _ = session.stop();
@@ -92,6 +98,11 @@ fn capture_first_frame(mut session: CaptureSession) -> Result<CapturedFrame, Str
 
         match session.next_event(Some(FIRST_FRAME_WAIT)) {
             Ok(CaptureEvent::Video(frame)) => {
+                video_frames_seen += 1;
+                if video_frames_seen == 1 {
+                    continue;
+                }
+
                 // to_tight_bytes 去除行填充（stride），rawvideo/图像编码都需要紧凑排布
                 let bytes = match frame.to_tight_bytes() {
                     Some(bytes) => bytes,

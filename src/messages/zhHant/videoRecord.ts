@@ -10,4 +10,5 @@ export const videoRecord = {
 	"videoRecord.copy": "複製影片檔",
 	"videoRecord.copyGif": "複製 GIF 檔",
 	"videoRecord.openFolder": "開啟輸出目錄",
+	"videoRecord.startRecordFailed": "開始錄製失敗，請查看日誌",
 };

@@ -8,12 +8,118 @@ use snow_shot_app_utils::monitor_info::MonitorList;
 use std::{
     io::Result,
     path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 
 use crate::video_record_capture::{
     PinrayFeed, PinrayFeedParams, RecordPixelFormat, SystemAudioMeta, VideoCaptureBackend,
 };
+
+/// 硬件编码器预热时长（秒）——传统(gdigrab/avfoundation)路径只能用这个固定值。
+///
+/// 硬件编码器（QSV/NVENC/AMF/VideoToolbox…）刚开始工作时会在 GPU 上占满一段
+/// 时间，把桌面合成（DWM）与 WGC 的帧拷贝饿死：现象是录制刚开始的数秒画面
+/// 完全静止（音频正常、采集仍在出帧但像素不变）。实测 av1_qsv 每次 2.8~3.4s，
+/// 换软件 H.264 则完全正常。
+///
+/// 传统路径由 ffmpeg 自己抓屏，没法先喂合成帧，画面是实时进来的，只能按停顿的
+/// 最坏值固定裁掉开头这么多秒。pinray 路径不依赖它，见 `EncoderWarmupPlan`。
+const ENCODER_WARMUP_SECONDS: u32 = 4;
+
+/// 是否为需要预热的硬件编码器（会与桌面合成争抢 GPU）
+fn needs_encoder_warmup(encoder: &str) -> bool {
+    encoder.contains("qsv")
+        || encoder.contains("nvenc")
+        || encoder.contains("amf")
+        || encoder.contains("videotoolbox")
+        || encoder.contains("vaapi")
+        || encoder.ends_with("_mf")
+}
+
+/// 传统路径本片段的编码器预热帧数与时长（秒）；不需要预热时返回 (0, 0.0)。
+///
+/// GIF 输出不走用户选择的编码器，软件编码器（libx264 等）不碰 GPU，都无需预热。
+fn encoder_warmup(params: &RecordingParams) -> (u32, f64) {
+    if params.format == VideoFormat::Gif || !needs_encoder_warmup(&params.encoder) {
+        return (0, 0.0);
+    }
+
+    let frame_rate = params.frame_rate.max(1);
+    let frames = frame_rate * ENCODER_WARMUP_SECONDS;
+    (frames, f64::from(frames) / f64::from(frame_rate))
+}
+
+/// 编码器"热好了"需要看到的编码输出帧数（跨过 `frame=0` 的初始化阶段）。
+///
+/// ffmpeg 会往 stderr 打 `frame=N ...` 统计（预热时把间隔压到 0.2s）。N 开始增长
+/// 意味着编码器初始化（QSV 建 VPL 会话、分配 surface、加载内核——那次 GPU 抢占
+/// 的正主）已经完成并在连续出帧，此时开始采集就不会把停顿录进去。
+const ENCODER_READY_OUTPUT_FRAMES: u32 = 3;
+
+/// pinray 预热帧数上限对应的秒数（成片开头最多裁掉这么多）
+const ENCODER_WARMUP_MAX_SECONDS: u32 = 3;
+
+/// pinray 录制前的编码器预热策略（判据驱动，取代按墙钟死等）。
+///
+/// 预热段本身会被写进成片开头，收工后再按同样时长裁掉，所以"喂了多少帧"必须
+/// 落在关键帧上：`-force_key_frames` 按 `keyframe_grid` 在整个预热窗口打网格，
+/// 写入循环收工时补齐到网格，裁剪点因此总是一个精确的关键帧，`-c copy` 就能
+/// 无损裁掉，不需要猜预热真实持续了多久。
+struct EncoderWarmupPlan {
+    /// 成片时间轴的标称帧率：预热帧数 ↔ 时长换算
+    frame_rate: u32,
+    /// 关键帧网格（帧数），约 0.5s
+    keyframe_grid: u32,
+    /// 预热帧数上限（网格的整数倍）：编码器一直不出帧时的兜底
+    max_frames: u32,
+    /// 墙钟上限：高分辨率 + 慢编码器连一帧都写不动时，不能让启动无限等下去
+    max_duration: Duration,
+}
+
+/// 本片段是否需要预热，以及预热策略。
+fn pinray_encoder_warmup(params: &RecordingParams) -> Option<EncoderWarmupPlan> {
+    if params.format == VideoFormat::Gif || !needs_encoder_warmup(&params.encoder) {
+        return None;
+    }
+
+    let frame_rate = params.frame_rate.max(1);
+    // 网格取 0.5s：收工最多为此多付半秒的预热帧，但关键帧密度只影响被裁掉的段落
+    let keyframe_grid = (frame_rate / 2).max(1);
+    Some(EncoderWarmupPlan {
+        frame_rate,
+        keyframe_grid,
+        // frame_rate * 秒 = keyframe_grid * 2 * 秒，天然对齐网格
+        max_frames: keyframe_grid * ENCODER_WARMUP_MAX_SECONDS * 2,
+        max_duration: Duration::from_secs(ENCODER_WARMUP_SECONDS as u64),
+    })
+}
+
+impl EncoderWarmupPlan {
+    /// 看到这些编码输出帧就说明可以结束预热、开始采集
+    fn is_ready(&self, encoded_frames: u32) -> bool {
+        encoded_frames >= ENCODER_READY_OUTPUT_FRAMES
+    }
+
+    /// `-force_key_frames` 表达式：预热窗口（含右端点）内每 `keyframe_grid` 帧
+    /// 一个关键帧，之后交还给编码器的自然 GOP。ffmpeg 表达式没有逻辑与，用乘法。
+    ///
+    /// ffmpeg 对 `expr:` 前缀会把后面整个字符串当作一个表达式，逗号无需转义。
+    fn key_frames_expr(&self) -> String {
+        format!(
+            "expr:lte(n,{})*not(mod(n,{}))",
+            self.max_frames, self.keyframe_grid
+        )
+    }
+
+    /// 预热帧数对应的成片时长（秒）——停止采集后按它裁掉开头
+    fn seconds(&self, frames: u32) -> f64 {
+        f64::from(frames) / f64::from(self.frame_rate)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Copy)]
 pub enum VideoRecordState {
@@ -157,6 +263,11 @@ pub struct VideoRecordService {
     sys_audio_segments: Vec<String>, // pinray 模式下各片段系统声音 raw PCM 文件
     sys_audio_meta: Option<SystemAudioMeta>, // 系统声音元信息（来自首个音频帧）
     mic_device_names_cache: Option<Vec<String>>, // 麦克风设备列表缓存（dshow 枚举耗时 1~3s，避免每次启动录制都枚举）
+    /// 本片段编码器预热时长（秒）；>0 表示片段收尾后要裁掉开头这一段。
+    /// pinray 路径是主动预热（先喂合成帧），legacy 路径是被动预热（先录进去再裁）
+    segment_warmup_seconds: f64,
+    /// 本片段的视频文件（用于裁掉编码器预热段）
+    segment_warmup_file: Option<String>,
 }
 
 #[cfg(target_os = "macos")]
@@ -190,6 +301,8 @@ impl VideoRecordService {
             sys_audio_segments: Vec::new(),
             sys_audio_meta: None,
             mic_device_names_cache: None,
+            segment_warmup_seconds: 0.0,
+            segment_warmup_file: None,
         }
     }
 
@@ -237,6 +350,63 @@ impl VideoRecordService {
                 .as_ref()
                 .expect("[VideoRecordService] valid ffmpeg path"),
         )
+    }
+
+    /// 在用户点"开始录制"之前预热编码器（由选区界面出现时调用）。
+    ///
+    /// 目的有两个：
+    /// * 把 ffmpeg 及其依赖（含 QSV/oneVPL 运行库）读进系统缓存，缩短点击后
+    ///   等待首帧的时间（冷启动时尤其明显）；
+    /// * 让硬件编码器提前建好会话、度过启动期——这段时间它会占满 GPU 并让
+    ///   桌面合成停住（实测 2.8~3.4s），提前发生就不会被录进画面。
+    ///
+    /// 一次性临时进程：编码 3 秒合成画面后输出丢弃（-f null），失败不影响录制。
+    pub fn warmup_encoder(
+        &self,
+        encoder: &str,
+        encoder_preset: &str,
+        width: i32,
+        height: i32,
+        frame_rate: u32,
+    ) {
+        let mut command = self.get_ffmpeg_command();
+        command
+            .arg("-hide_banner")
+            .arg("-nostats")
+            .arg("-v")
+            .arg("error")
+            .arg("-f")
+            .arg("lavfi")
+            .arg("-i")
+            .arg(format!(
+                "testsrc=size={}x{}:rate={}",
+                width.max(2),
+                height.max(2),
+                frame_rate.max(1)
+            ))
+            .arg("-t")
+            .arg("3");
+        Self::apply_encoder_preset(&mut command, encoder, encoder_preset);
+        command.arg("-f").arg("null").arg("-");
+
+        match command.spawn() {
+            Ok(mut child) => {
+                log::info!(
+                    "[warmup_encoder] warm-up started before recording: {} {}x{}@{}",
+                    encoder,
+                    width,
+                    height,
+                    frame_rate
+                );
+                // 后台等它自己退出：保持管道不被提前丢弃，也不留下句柄
+                let _ = std::thread::Builder::new()
+                    .name("ffmpeg-warmup-wait".into())
+                    .spawn(move || {
+                        let _ = child.wait();
+                    });
+            }
+            Err(e) => log::warn!("[warmup_encoder] failed to start warm-up: {e}"),
+        }
     }
 
     fn get_actual_video_size(
@@ -336,14 +506,21 @@ impl VideoRecordService {
     }
 
     fn start_segment(&mut self) -> Result<()> {
+        // 每个片段独立处理编码器预热段：默认没有，需要时由各分支设置
+        self.segment_warmup_seconds = 0.0;
+        self.segment_warmup_file = None;
+
         let params = self.recording_params.as_ref().unwrap();
 
         if params.capture_backend != VideoCaptureBackend::Legacy {
             return self.start_pinray_segment();
         }
 
-        // 克隆持有：函数体内需要 &mut self（麦克风设备枚举会刷新缓存）
+        // 克隆持有：函数体内需要 &mut Self（麦克风设备枚举会刷新缓存）
         let params = self.recording_params.clone().unwrap();
+
+        // 硬件编码器在传统路径下做"被动预热"（详见下方 spawn 分支）
+        let (warmup_frames, warmup_seconds) = encoder_warmup(&params);
 
         // 计算录制区域的宽度和高度
         let mut width = params.max_x - params.min_x;
@@ -547,6 +724,14 @@ impl VideoRecordService {
             VideoFormat::Mp4 | VideoFormat::Mkv | VideoFormat::Mov => {
                 Self::apply_encoder_preset(&mut command, &params.encoder, &params.encoder_preset);
 
+                // 被动预热：在预热结束处强制关键帧（按时间表达式，兼容 gdigrab
+                // 首帧时间戳不从 0 开始的情况），片段收尾即可 -ss + -c copy 精确裁掉
+                if warmup_frames > 0 {
+                    command
+                        .arg("-force_key_frames")
+                        .arg(format!("expr:gte(t,{warmup_seconds:.3})"));
+                }
+
                 #[cfg(target_os = "windows")]
                 {
                     if !video_filter.is_empty() {
@@ -627,10 +812,32 @@ impl VideoRecordService {
         // 启动ffmpeg进程
         match command.spawn() {
             Ok(mut child) => {
+                let spawned_at = std::time::Instant::now();
                 for event in child.iter().unwrap() {
                     if params.format == VideoFormat::Mp4 {
                         match event {
                             FfmpegEvent::Progress(_) => {
+                                // 被动预热：这条路径由 ffmpeg 自己抓屏，没法像 pinray
+                                // 那样先喂合成帧，只能让它照常录——GPU 编码器启动期的
+                                // 2~4 秒停顿会被录进去，片段收尾时再裁掉开头这一段。
+                                // 这里先等预热时长走完，保证前端计时与成片内容起点一致。
+                                if warmup_frames > 0 {
+                                    let deadline =
+                                        spawned_at + Duration::from_secs_f64(warmup_seconds);
+                                    let now = std::time::Instant::now();
+                                    if deadline > now {
+                                        std::thread::sleep(deadline - now);
+                                    }
+                                    self.segment_warmup_seconds = warmup_seconds;
+                                    self.segment_warmup_file = Some(segment_filename.clone());
+                                    log::info!(
+                                        "[start_segment] legacy encoder warm-up: {} for {:.1}s, will be trimmed on stop ({})",
+                                        params.encoder,
+                                        warmup_seconds,
+                                        segment_filename
+                                    );
+                                }
+
                                 self.child = Some(child);
                                 self.state = VideoRecordState::Recording;
                                 self.segments.push(segment_filename);
@@ -673,6 +880,15 @@ impl VideoRecordService {
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
 
         let mut command = self.get_ffmpeg_command();
+
+        // 硬件编码器需要先喂热再开始采集（见 EncoderWarmupPlan）
+        let warmup = pinray_encoder_warmup(&params);
+
+        // 预热的判据来自 ffmpeg 的统计行，默认约 1 秒才打一行，会把"已经热了"的
+        // 发现时间拖后同样这么久；提到 0.2s。全局选项，必须排在第一个输入之前。
+        if warmup.is_some() {
+            command.arg("-stats_period").arg("0.2");
+        }
 
         // rawvideo stdin 输入（采集线程写入，帧率节拍由采集线程保证）
         command
@@ -721,6 +937,11 @@ impl VideoRecordService {
         match params.format {
             VideoFormat::Mp4 | VideoFormat::Mkv | VideoFormat::Mov => {
                 Self::apply_encoder_preset(&mut command, &params.encoder, &params.encoder_preset);
+                // 预热窗口内按网格强制关键帧：收工点补齐到网格后，片段收尾即可用
+                // -ss + -c copy 精确裁掉预热，不必知道预热真实持续了多久
+                if let Some(plan) = warmup.as_ref() {
+                    command.arg("-force_key_frames").arg(plan.key_frames_expr());
+                }
                 if !video_filter.is_empty() {
                     command.arg("-vf").arg(&video_filter);
                 }
@@ -757,13 +978,44 @@ impl VideoRecordService {
             std::io::Error::new(std::io::ErrorKind::Other, "Failed to take ffmpeg stdin")
         })?;
 
-        // 3. 麦克风：独立 ffmpeg 进程录制 raw PCM（GIF 格式不含音频）
+        // stderr 要在预热开始之前就被读走：统计行里的编码输出帧数是预热的停止判据，
+        // 而无人读取的 stderr 管道写满后（约 64KB）会反过来阻塞 ffmpeg 自身
+        let encoded_frames = match child.take_stderr() {
+            Some(stderr) => Self::spawn_stderr_frame_counter(stderr),
+            None => Arc::new(AtomicU32::new(0)),
+        };
+
+        // 3. 编码器预热：先用合成画面把【同一个 ffmpeg 进程】里的编码器喂热，
+        //    此时尚未开始采集，桌面停顿不会被录进成片（见 EncoderWarmupPlan）。
+        //    喂到编码器连续出帧就收工，片段收尾时按实际写进去的帧数裁掉。
+        let mut stdin = stdin;
+        if let Some(plan) = warmup.as_ref() {
+            let warm_started = std::time::Instant::now();
+            match Self::write_encoder_warmup(&mut stdin, width, height, plan, &encoded_frames) {
+                Ok(frames) => {
+                    self.segment_warmup_seconds = plan.seconds(frames);
+                    self.segment_warmup_file = Some(segment_filename.clone());
+                    log::info!(
+                        "[start_pinray_segment] encoder {} warmed up: {:.2}s wall, {} 帧预热画面（成片开头裁掉 {:.2}s）",
+                        params.encoder,
+                        warm_started.elapsed().as_secs_f32(),
+                        frames,
+                        self.segment_warmup_seconds
+                    );
+                }
+                Err(e) => log::warn!("[start_pinray_segment] encoder warm-up failed: {e}"),
+            }
+        }
+
+        // 4. 麦克风：独立 ffmpeg 进程录制 raw PCM（GIF 格式不含音频）。
+        //    放在预热之后启动：否则麦克风会多录一段预热时长，与裁掉预热后的
+        //    视频/系统声音错位。
         let mut mic_started = false;
         if params.format == VideoFormat::Mp4 && params.enable_microphone {
             mic_started = self.spawn_pinray_mic_recorder(&params).is_ok();
         }
 
-        // 4. 启动采集线程（等待会话建立握手）
+        // 5. 启动采集线程（等待会话建立握手）
         let enable_system_audio = params.format == VideoFormat::Mp4 && params.enable_system_audio;
         let audio_raw_path = format!(
             "{}_segment_{:03}_sys.raw",
@@ -799,29 +1051,12 @@ impl VideoRecordService {
         };
         self.pinray_feed = Some(feed);
 
-        // 5. 握手（Started）意味着首个视频帧已成功写入 ffmpeg——录制内容起点
-        //    就是此刻，立即进入 Recording 状态并返回，让前端计时与内容对齐。
-        //    （不再阻塞等待 ffmpeg 的首个 Progress 统计，那会引入 1~4 秒的
-        //    计时偏差与启动期卡顿；ffmpeg 启动即失败由写入失败握手暴露。）
+        // 6. 握手（Started）意味着首帧已真正写进 ffmpeg：编码器初始化完成、
+        //    录制内容起点就是此刻，随后立即进入 Recording 状态并返回，让前端计时
+        //    与成片内容对齐。编码器初始化（QSV/NVENC 常需 1~3s）期间不产生内容，
+        //    因此不会像以前那样被写成一串重复帧、让成片开头卡住
+        //    （详见 video_record_capture 的时间轴锚点说明）。
         self.child = Some(child);
-
-        // ffmpeg 的 stderr 保持后台 drain：stderr 为管道且无人读取时会写满
-        // 缓冲区（约 64KB，几分钟的统计输出）进而阻塞 ffmpeg 自身
-        if let Some(stderr) = self.child.as_mut().unwrap().take_stderr() {
-            let _ = std::thread::Builder::new()
-                .name("ffmpeg-stderr-drain".into())
-                .spawn(move || {
-                    use std::io::Read;
-                    let mut reader = std::io::BufReader::new(stderr);
-                    let mut buf = [0u8; 4096];
-                    loop {
-                        match reader.read(&mut buf) {
-                            Ok(0) | Err(_) => break,
-                            Ok(_) => {}
-                        }
-                    }
-                });
-        }
 
         self.state = VideoRecordState::Recording;
         self.segments.push(segment_filename);
@@ -1062,7 +1297,249 @@ impl VideoRecordService {
             Self::wait_child_or_kill(&mut child, Duration::from_secs(15));
         }
 
+        // 4. 裁掉片段开头的编码器预热段（必须在 ffmpeg 写完 trailer 之后做）
+        if let Some(segment_file) = self.segment_warmup_file.take() {
+            if let Err(e) = self.trim_segment_warmup(&segment_file, self.segment_warmup_seconds) {
+                log::warn!("[stop_pinray_segment] failed to trim encoder warm-up: {e}");
+            }
+            self.segment_warmup_seconds = 0.0;
+        }
+
         sys_meta
+    }
+
+    /// 后台读取 ffmpeg 的 stderr：把统计行里的 `frame=` 编码输出帧数记进原子变量
+    /// 供预热判断，同时保证管道始终有人在读（无人读取时写满约 64KB 会反过来阻塞
+    /// ffmpeg 自身）。
+    fn spawn_stderr_frame_counter(stderr: std::process::ChildStderr) -> Arc<AtomicU32> {
+        let encoded_frames = Arc::new(AtomicU32::new(0));
+        let counter = encoded_frames.clone();
+        let _ = std::thread::Builder::new()
+            .name("ffmpeg-stderr-progress".into())
+            .spawn(move || {
+                use std::io::Read;
+
+                // 统计行形如 "frame= 123 fps= 30 ... size= ..."。分块读取时 "frame="
+                // 可能被切断，所以留末尾若干字节与下一块拼起来再匹配
+                let pattern = Regex::new(r"frame=\s*(\d+)").expect("invalid frame regex");
+                let mut reader = std::io::BufReader::new(stderr);
+                let mut buf = [0u8; 4096];
+                let mut carry: Vec<u8> = Vec::new();
+                loop {
+                    let size = match reader.read(&mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(size) => size,
+                    };
+                    let mut chunk = std::mem::take(&mut carry);
+                    chunk.extend_from_slice(&buf[..size]);
+                    let text = String::from_utf8_lossy(&chunk);
+                    for caps in pattern.captures_iter(&text) {
+                        if let Some(frames) = caps[1].parse::<u32>().ok() {
+                            counter.fetch_max(frames, Ordering::AcqRel);
+                        }
+                    }
+                    carry = chunk[chunk.len().saturating_sub(32)..].to_vec();
+                }
+            });
+        encoded_frames
+    }
+
+    /// 生成一帧棋盘模板（`toggle` 决定反相方向）。
+    fn warmup_checkerboard(width: usize, height: usize, toggle: usize) -> Vec<u8> {
+        let mut frame = vec![0u8; width * height * 4];
+        for y in 0..height {
+            let block_y = y / 16;
+            for x in 0..width {
+                let offset = (y * width + x) * 4;
+                let value = if ((x / 16) + block_y + toggle) & 1 == 0 {
+                    0x00
+                } else {
+                    0xFF
+                };
+                frame[offset..offset + 3].fill(value);
+                frame[offset + 3] = 0xFF;
+            }
+        }
+        frame
+    }
+
+    /// 用合成画面把编码器喂热，返回实际写入的预热帧数（换算成成片时长即为要裁掉的
+    /// 片头，见 `EncoderWarmupPlan`）。
+    ///
+    /// 判据来自 ffmpeg 自己报的编码输出帧数，所以这里不按帧率睡眠节流：一帧
+    /// rawvideo 有几十 MB，管道装不下一帧半，`write_all` 的阻塞本身就是编码器的
+    /// 吞吐节拍。看到连续出帧就收工，再多写几帧补齐到关键帧网格，裁剪点因此总是
+    /// 落在 `-force_key_frames` 打的那个关键帧上。
+    ///
+    /// 画面是逐帧反相的棋盘：静帧会让编码器几乎不做功，起不到预热作用。两帧模板
+    /// 预先算好交替复用——按帧重新逐像素生成的话，4K@60 光是生成 4 秒画面就要
+    /// 3.75s，那本身就是启动耗时的一大块。
+    fn write_encoder_warmup(
+        stdin: &mut std::process::ChildStdin,
+        width: i32,
+        height: i32,
+        plan: &EncoderWarmupPlan,
+        encoded_frames: &AtomicU32,
+    ) -> std::result::Result<u32, String> {
+        use std::io::Write as _;
+
+        let width = width.max(2) as usize;
+        let height = height.max(2) as usize;
+        let templates = [
+            Self::warmup_checkerboard(width, height, 0),
+            Self::warmup_checkerboard(width, height, 1),
+        ];
+
+        let started = std::time::Instant::now();
+        let mut written: u32 = 0;
+        loop {
+            stdin
+                .write_all(&templates[(written & 1) as usize])
+                .map_err(|e| format!("warm-up write failed: {e}"))?;
+            written += 1;
+
+            // 三个判据任一成立即收工。max_frames 是网格的整数倍，所以按帧兜底时
+            // 也正好停在网格上
+            let warmed_up = plan.is_ready(encoded_frames.load(Ordering::Acquire))
+                || written >= plan.max_frames
+                || started.elapsed() >= plan.max_duration;
+            if warmed_up && written % plan.keyframe_grid == 0 {
+                return Ok(written);
+            }
+        }
+    }
+
+    /// 裁掉片段开头的编码器预热画面。
+    ///
+    /// 预热结束点已补齐到关键帧网格，切口因此必然是一个关键帧，可以用 `-c copy`
+    /// 精确裁剪（无需重编码），裁剪后片段文件名保持不变。
+    fn trim_segment_warmup(
+        &self,
+        segment_file: &str,
+        warmup_seconds: f64,
+    ) -> std::result::Result<(), String> {
+        if warmup_seconds <= 0.0 || !Path::new(segment_file).exists() {
+            return Ok(());
+        }
+
+        let path = Path::new(segment_file);
+        let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("mp4");
+        let trimmed_file = format!(
+            "{}-warmup-trim.{}",
+            path.with_extension("").to_string_lossy(),
+            extension
+        );
+
+        let mut command = self.get_ffmpeg_command();
+        // 目标点从预热边界退半帧：流拷贝保留的是"第一个 pts 不早于目标点"的包，
+        // 退半帧让它正好取到边界那个关键帧。目标点只要晚于边界（哪怕 0.05s）就会
+        // 取到后面的 P 帧，没有参考帧的开头会花屏；退半帧又不会退过前一帧，同时
+        // 容得下容器时间戳取整（rawvideo 严格 CFR，边界帧 pts 就是 warmup_seconds）。
+        let frame_rate = self.recording_params.as_ref().unwrap().frame_rate.max(1);
+        let cut_seconds = warmup_seconds - 0.5 / f64::from(frame_rate);
+        command
+            .arg("-ss")
+            .arg(format!("{:.3}", cut_seconds.max(0.0)))
+            .arg("-i")
+            .arg(segment_file)
+            .arg("-c")
+            .arg("copy");
+        // 流拷贝会丢掉 faststart 标记，按原样补回（只对 mp4/mov 有效）
+        if matches!(extension, "mp4" | "mov") {
+            command.arg("-movflags").arg("+faststart");
+        }
+        command.arg("-y").arg(&trimmed_file);
+
+        let mut child = command
+            .spawn()
+            .map_err(|e| format!("failed to spawn trim process: {e}"))?;
+        let _ = child.wait();
+
+        if !Path::new(&trimmed_file).exists() {
+            log::warn!("[trim_segment_warmup] trim output missing, keeping the warm-up intro");
+            return Ok(());
+        }
+
+        std::fs::remove_file(segment_file).map_err(|e| e.to_string())?;
+        std::fs::rename(&trimmed_file, segment_file).map_err(|e| e.to_string())?;
+        log::info!(
+            "[trim_segment_warmup] trimmed encoder warm-up of {:.1}s from {}",
+            warmup_seconds,
+            segment_file
+        );
+        Ok(())
+    }
+
+    /// 裁掉传统(gdigrab/avfoundation)片段开头的被动预热段。
+    ///
+    /// 用输出侧 `-ss` + 流拷贝：gdigrab 的首帧时间戳未必从 0 开始，输出侧截断比
+    /// 输入侧定位更稳；预热边界已由 `-force_key_frames expr:gte(t,预热秒数)` 打上
+    /// 关键帧，切口因此落在关键帧上、不会花屏。裁剪后片段文件名保持不变。
+    /// 传统路径的音视频同在片段内，会被一起裁掉，保持同步。
+    fn trim_legacy_warmup(&self) {
+        let Some(segment_file) = self.segment_warmup_file.as_deref() else {
+            return;
+        };
+        let warmup_seconds = self.segment_warmup_seconds;
+        if warmup_seconds <= 0.0 || !Path::new(segment_file).exists() {
+            return;
+        }
+
+        let path = Path::new(segment_file);
+        let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("mp4");
+        let trimmed_file = format!(
+            "{}-warmup-trim.{}",
+            path.with_extension("").to_string_lossy(),
+            extension
+        );
+
+        let mut command = self.get_ffmpeg_command();
+        command
+            // 输入侧定位：落在"最后一个不晚于目标点的关键帧"上——正是预热边界那个
+            // 关键帧。相比输出侧截断，失败时只会退化成"没裁"而不会从非关键帧起播花屏。
+            // 目标点给 0.15s 余量，容忍 gdigrab 帧时间戳的抖动
+            .arg("-ss")
+            .arg(format!("{:.3}", warmup_seconds + 0.15))
+            .arg("-i")
+            .arg(segment_file)
+            .arg("-c")
+            .arg("copy");
+        // 流拷贝会丢掉 faststart 标记，按原样补回（只对 mp4/mov 有效）
+        if matches!(extension, "mp4" | "mov") {
+            command.arg("-movflags").arg("+faststart");
+        }
+        command.arg("-y").arg(&trimmed_file);
+
+        match command.spawn() {
+            Ok(mut child) => {
+                let _ = child.wait();
+            }
+            Err(e) => {
+                log::warn!("[trim_legacy_warmup] failed to spawn trim process: {e}");
+                return;
+            }
+        }
+
+        if !Path::new(&trimmed_file).exists() {
+            log::warn!(
+                "[trim_legacy_warmup] trim output missing, keeping the warm-up intro ({segment_file})"
+            );
+            return;
+        }
+
+        if let Err(e) = std::fs::remove_file(segment_file) {
+            log::warn!("[trim_legacy_warmup] failed to remove original segment: {e}");
+            return;
+        }
+        if let Err(e) = std::fs::rename(&trimmed_file, segment_file) {
+            log::warn!("[trim_legacy_warmup] failed to replace segment: {e}");
+            return;
+        }
+
+        log::info!(
+            "[trim_legacy_warmup] trimmed first {:.1}s from {segment_file}",
+            warmup_seconds
+        );
     }
 
     fn wait_child_or_kill(child: &mut FfmpegChild, timeout: Duration) {
@@ -1340,6 +1817,15 @@ impl VideoRecordService {
             // 其他编码器（如x264）使用原始预设值
             command.arg("-preset").arg(encoder_preset);
         }
+
+        // Intel QSV：把编码器的 GPU 并行深度压到 1。
+        // 默认 async_depth=4 会让编码器在 GPU 上同时排队多帧，桌面合成（DWM）
+        // 与 WGC 的帧拷贝被饿死——实测表现为录制刚开始的数秒内画面完全静止
+        // （音频正常、采集仍在出帧但像素不变），换软件 H.264 则完全正常。
+        // 串行编码牺牲一点吞吐，换取录制期间桌面不卡顿。
+        if encoder.contains("qsv") {
+            command.arg("-async_depth").arg("1");
+        }
     }
 
     #[cfg(target_os = "macos")]
@@ -1601,6 +2087,8 @@ impl VideoRecordService {
         } else if let Some(mut child) = self.child.take() {
             let _ = child.quit();
             let _ = child.wait();
+            // 裁掉传统路径的被动预热段（必须等 ffmpeg 写完 trailer）
+            self.trim_legacy_warmup();
         }
 
         // 如果只有一个片段，直接重命名
@@ -1873,6 +2361,8 @@ impl VideoRecordService {
         self.mic_audio_segments.clear();
         self.sys_audio_segments.clear();
         self.sys_audio_meta = None;
+        self.segment_warmup_seconds = 0.0;
+        self.segment_warmup_file = None;
     }
 
     pub fn pause(&mut self) -> Result<()> {
@@ -1897,6 +2387,8 @@ impl VideoRecordService {
         } else if let Some(mut child) = self.child.take() {
             let _ = child.quit();
             let _ = child.wait();
+            // 裁掉传统路径的被动预热段（必须等 ffmpeg 写完 trailer）
+            self.trim_legacy_warmup();
         }
 
         self.state = VideoRecordState::Paused;
