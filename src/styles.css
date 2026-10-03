@@ -50,19 +50,6 @@ body {
     align-items: center;
 }
 
-/*
- * 修复 macOS WKWebView 下图标不显示的问题：
- * 项目内的图标 SVG 均通过 width="1em" height="1em" 属性声明尺寸，
- * WKWebView（Safari 26 系列 SVG 引擎重构后）对 SVG 属性中的 em 相对单位
- * 解析异常，导致图标被渲染为 0 尺寸（工具栏框架正常但图标消失）。
- * SVG 的 width/height 作为 presentation attribute 参与级联且优先级最低，
- * 此处用 CSS 显式声明尺寸，走各引擎一致的 CSS 布局路径，行为跨平台一致。
- */
-.anticon > svg {
-    width: 1em;
-    height: 1em;
-}
-
 .draw-core-layer .excalidraw .Island.App-toolbar {
     opacity: 0;
     display: none !important;
