@@ -180,6 +180,22 @@ export class CaptureBoundingBoxInfo {
 			mousePosition.mouseX - rect.min_x,
 			mousePosition.mouseY - rect.min_y,
 		);
+		// Flatbush 不接受 numItems=0（会抛 "Unexpected numItems value: 0"）。
+		// 显示器列表为空时退化为「整窗即唯一显示器」：既让树可构建，又保证
+		// getActiveMonitor 返回合法 MonitorRect 而不是 undefined。
+		if (monitorRectList.length === 0) {
+			this.monitorRectList = [{ rect: { ...this.rect }, scale_factor: 1 }];
+			this.monitorRTree = new Flatbush(1);
+			this.monitorRTree.add(
+				this.rect.min_x,
+				this.rect.min_y,
+				this.rect.max_x,
+				this.rect.max_y,
+			);
+			this.monitorRTree.finish();
+			return;
+		}
+
 		this.monitorRectList = monitorRectList;
 		this.monitorRTree = new Flatbush(monitorRectList.length);
 		monitorRectList.forEach(({ rect }) => {

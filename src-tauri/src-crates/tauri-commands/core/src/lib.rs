@@ -4,8 +4,8 @@ use serde::Serialize;
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
 };
 use tauri::Emitter;
@@ -175,7 +175,10 @@ pub async fn create_fixed_content_window(
         #[cfg(not(target_os = "macos"))]
         {
             let monitor_scale_factor = monitor.scale_factor().unwrap() as f64;
-            (monitor_x / monitor_scale_factor, monitor_y / monitor_scale_factor)
+            (
+                monitor_x / monitor_scale_factor,
+                monitor_y / monitor_scale_factor,
+            )
         }
     };
 
@@ -247,7 +250,10 @@ pub async fn create_fixed_content_window(
     {
         Ok(window) => window,
         Err(e) => {
-            log::error!("[create_fixed_content_window] Failed to build window: {}", e);
+            log::error!(
+                "[create_fixed_content_window] Failed to build window: {}",
+                e
+            );
             return Err(format!(
                 "[create_fixed_content_window] Failed to build window: {}",
                 e
@@ -336,9 +342,9 @@ pub async fn create_full_screen_draw_window(
                     window
                 }
                 None => tauri::WebviewWindowBuilder::new(
-                &app,
-                format!("full-screen-draw"),
-                tauri::WebviewUrl::App(PathBuf::from(format!("/#{}", main_window_url.clone()))),
+                    &app,
+                    format!("full-screen-draw"),
+                    tauri::WebviewUrl::App(PathBuf::from(format!("/#{}", main_window_url.clone()))),
                 )
                 .always_on_top(true)
                 .resizable(false)
@@ -385,9 +391,12 @@ pub async fn create_full_screen_draw_window(
                     window
                 }
                 None => tauri::WebviewWindowBuilder::new(
-                &app,
-                format!("full-screen-draw-switch-mouse-through"),
-                tauri::WebviewUrl::App(PathBuf::from(format!("/#{}", switch_mouse_through_window_url.clone()))),
+                    &app,
+                    format!("full-screen-draw-switch-mouse-through"),
+                    tauri::WebviewUrl::App(PathBuf::from(format!(
+                        "/#{}",
+                        switch_mouse_through_window_url.clone()
+                    ))),
                 )
                 .always_on_top(true)
                 .resizable(false)
@@ -538,11 +547,21 @@ pub async fn get_monitors_bounding_box(
     let monitors =
         snow_shot_app_utils::get_capture_monitor_list(app, region, enable_multiple_monitor, true)?;
 
+    // 空列表必须报错而不是返回 Ok：前端拿到空的 monitor_rect_list 会在
+    // `new Flatbush(0)` 处抛 "Unexpected numItems value: 0"，把真实原因掩盖掉。
+    let monitor_rect_list = monitors.monitor_rect_list();
+    if monitor_rect_list.is_empty() {
+        return Err(
+            "[get_monitors_bounding_box] monitor list is empty, cannot build bounding box"
+                .to_string(),
+        );
+    }
+
     let monitors_bounding_box = monitors.get_monitors_bounding_box();
 
     Ok(MonitorsBoundingBox {
         rect: monitors_bounding_box,
-        monitor_rect_list: monitors.monitor_rect_list(),
+        monitor_rect_list,
     })
 }
 
@@ -694,7 +713,10 @@ pub async fn create_video_record_window(
                 None => tauri::WebviewWindowBuilder::new(
                     &app,
                     "video-recording-toolbar",
-                    tauri::WebviewUrl::App(PathBuf::from(format!("/#{}", toolbar_window_url.clone()))),
+                    tauri::WebviewUrl::App(PathBuf::from(format!(
+                        "/#{}",
+                        toolbar_window_url.clone()
+                    ))),
                 )
                 .always_on_top(true)
                 .resizable(false)
@@ -1135,9 +1157,7 @@ pub async fn has_focused_full_screen_window() -> Result<bool, String> {
             tokio::task::spawn_blocking(|| {
                 snow_shot_app_utils::monitor_info::MonitorList::all(true)
             }),
-            tokio::task::spawn_blocking(|| {
-                xcap::Window::all().unwrap_or_default()
-            })
+            tokio::task::spawn_blocking(|| { xcap::Window::all().unwrap_or_default() })
         );
 
         let monitor_list = match monitor_list {

@@ -157,8 +157,21 @@ impl MonitorInfo {
             // EnumDisplayMonitors/GetMonitorInfoW/EnumDisplaySettingsW 反查构建矩形。
             let name = monitor.name().unwrap_or_default();
             let hmonitor = Self::get_monitor_handle_by_name(&name);
-            let device_name = Self::get_device_name_by_handle(hmonitor).unwrap_or(name);
-            let rect = Self::get_dev_mode(&device_name).unwrap_or_default();
+            let device_name =
+                Self::get_device_name_by_handle(hmonitor).unwrap_or_else(|| name.clone());
+            // 解析失败会让 rect 退化成 0,0,0,0。单屏路径（未开启多显示器）按鼠标点
+            // 过滤显示器时该矩形必然 overlaps 判定失败，这块屏幕会被整块丢弃，
+            // 最终得到空列表，所以失败必须留日志而不是静默兜底。
+            let rect = match Self::get_dev_mode(&device_name) {
+                Some(rect) => rect,
+                None => {
+                    log::warn!(
+                        "[MonitorInfo::new] EnumDisplaySettingsW failed for device {:?}, rect falls back to 0,0,0,0",
+                        device_name
+                    );
+                    unsafe { std::mem::zeroed() }
+                }
+            };
             // DEVMODEW 含匿名 union 字段，读取需 unsafe（Rust 2024）。
             let (pos_x, pos_y, pels_w, pels_h) = unsafe {
                 (
@@ -168,6 +181,16 @@ impl MonitorInfo {
                     rect.dmPelsHeight as i32,
                 )
             };
+            if pels_w <= 0 || pels_h <= 0 {
+                log::warn!(
+                    "[MonitorInfo::new] monitor {:?} has degenerate size {}x{} at ({},{})",
+                    name,
+                    pels_w,
+                    pels_h,
+                    pos_x,
+                    pos_y
+                );
+            }
             monitor_rect = ElementRect {
                 min_x: pos_x,
                 min_y: pos_y,
@@ -301,12 +324,8 @@ impl MonitorInfo {
             szDevice: [0; 32],
         };
 
-        let result = unsafe {
-            GetMonitorInfoW(
-                hmonitor,
-                std::ptr::addr_of_mut!(monitor_info).cast(),
-            )
-        };
+        let result =
+            unsafe { GetMonitorInfoW(hmonitor, std::ptr::addr_of_mut!(monitor_info).cast()) };
 
         if !result.as_bool() {
             return None;
@@ -524,15 +543,14 @@ impl MonitorInfo {
                                 "[MonitorInfo::capture] xcap returned black frame, falling back to WGC, monitor: {:?}",
                                 self.monitor.name()
                             );
-                            capture_hdr_image =
-                                windows_capture_image::capture_monitor_image(
-                                    &self,
-                                    None,
-                                    crop_area,
-                                    capture_option.color_format,
-                                    capture_option.correct_hdr_color_algorithm,
-                                )
-                                .ok();
+                            capture_hdr_image = windows_capture_image::capture_monitor_image(
+                                &self,
+                                None,
+                                crop_area,
+                                capture_option.color_format,
+                                capture_option.correct_hdr_color_algorithm,
+                            )
+                            .ok();
                         }
                     }
                 }
@@ -646,6 +664,49 @@ pub enum CaptureMethod {
     PinrayDxgi,
 }
 
+/// 枚举系统显示器，失败/为空时有限次重试。
+///
+/// `Monitor::all()` 底层是 `EnumDisplayMonitors`，在显示拓扑变化（切分辨率、
+/// 开关 HDR、显示器热插拔）或会话锁定/切换的瞬间会返回空列表或 Err。
+/// 原实现用 `unwrap_or_default()` 把错误静默吞成空列表，既没有日志也没有重试，
+/// 一次瞬时抖动就会让整次截图失败，且现场日志无法区分是枚举失败还是过滤清空。
+fn enumerate_all_monitors() -> Vec<Monitor> {
+    const ENUM_RETRY_TIMES: u32 = 3;
+    const ENUM_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
+
+    for attempt in 1..=ENUM_RETRY_TIMES {
+        match Monitor::all() {
+            Ok(monitors) if !monitors.is_empty() => return monitors,
+            Ok(_) => {
+                log::warn!(
+                    "[MonitorList::enumerate_all_monitors] Monitor::all() returned empty list (attempt {}/{})",
+                    attempt,
+                    ENUM_RETRY_TIMES
+                );
+            }
+            Err(e) => {
+                log::warn!(
+                    "[MonitorList::enumerate_all_monitors] Monitor::all() failed: {} (attempt {}/{})",
+                    e,
+                    attempt,
+                    ENUM_RETRY_TIMES
+                );
+            }
+        }
+
+        if attempt < ENUM_RETRY_TIMES {
+            std::thread::sleep(ENUM_RETRY_INTERVAL);
+        }
+    }
+
+    log::error!(
+        "[MonitorList::enumerate_all_monitors] Monitor::all() still unavailable after {} attempts",
+        ENUM_RETRY_TIMES
+    );
+
+    Vec::new()
+}
+
 impl MonitorList {
     // ignore_sdr_info 仅作保留参数（历史语义为"是否跳过 HDR 信息读取"），
     // 现在 HDR 显示器识别始终进行，是否做亮度校正改由 CaptureOption 中的 algorithm 控制，
@@ -654,7 +715,7 @@ impl MonitorList {
         region: Option<ElementRect>,
         #[allow(unused_variables)] ignore_sdr_info: bool,
     ) -> MonitorList {
-        let monitors = Monitor::all().unwrap_or_default();
+        let monitors = enumerate_all_monitors();
 
         let region = match region {
             Some(region) => region,
@@ -772,6 +833,16 @@ impl MonitorList {
     ) -> Result<image::DynamicImage, String> {
         let monitors = &self.0;
 
+        // 枚举或过滤阶段就可能得到空列表（详见 MonitorList::enumerate_all_monitors
+        // 与 get_dev_mode 失败日志）。必须在这里早退：len() == 0 不匹配下面的单屏
+        // 分支，会掉进拼接分支并打出与实际不符的 "multi-monitor ... monitors=0"。
+        if monitors.is_empty() {
+            return Err(format!(
+                "[MonitorInfoList::capture] monitor list is empty before capture, crop_region: {:?}",
+                crop_region
+            ));
+        }
+
         // 特殊情况，只有一个显示器，直接返回
         if monitors.len() == 1 {
             let first_monitor = monitors.first().unwrap();
@@ -820,7 +891,7 @@ impl MonitorList {
         // 这里同时把原始 monitor 引用一起携带，避免后续用过滤后 Vec 的 index 反查原始列表导致 offset 错位。
         // 诊断日志：输出参与捕获的显示器数量、裁剪区域、目标色彩格式
         log::info!(
-            "[MonitorInfoList::capture] multi-monitor capture start: monitors={}, color_format={:?}, crop_region={:?}",
+            "[MonitorInfoList::capture] composite capture start: monitors={}, color_format={:?}, crop_region={:?}",
             monitors.len(),
             capture_option.color_format,
             crop_region
@@ -1336,9 +1407,9 @@ impl MonitorList {
                 //   Xcap -> 不排除
                 // 排除可避免截太快把截图控件也截进去。
                 match capture_option.capture_method {
-                    CaptureMethod::Wgc
-                    | CaptureMethod::PinrayWgc
-                    | CaptureMethod::PinrayDxgi => true,
+                    CaptureMethod::Wgc | CaptureMethod::PinrayWgc | CaptureMethod::PinrayDxgi => {
+                        true
+                    }
                     CaptureMethod::Auto => self
                         .0
                         .iter()
