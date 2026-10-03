@@ -1483,6 +1483,31 @@ const AppSettingsContextProviderCore: React.FC<{
 							? newSettings.keyDisplayDirection
 							: (prevSettings?.keyDisplayDirection ??
 								defaultAppSettingsData[group].keyDisplayDirection),
+					enableSystemAudio:
+						typeof newSettings?.enableSystemAudio === "boolean"
+							? newSettings.enableSystemAudio
+							: (prevSettings?.enableSystemAudio ??
+								defaultAppSettingsData[group].enableSystemAudio),
+					captureBackend:
+						typeof newSettings?.captureBackend === "string"
+							? newSettings.captureBackend
+							: (prevSettings?.captureBackend ??
+								defaultAppSettingsData[group].captureBackend),
+					pixelFormat:
+						typeof newSettings?.pixelFormat === "string"
+							? newSettings.pixelFormat
+							: (prevSettings?.pixelFormat ??
+								defaultAppSettingsData[group].pixelFormat),
+						captureCursor:
+							typeof newSettings?.captureCursor === "boolean"
+								? newSettings.captureCursor
+								: (prevSettings?.captureCursor ??
+									defaultAppSettingsData[group].captureCursor),
+					videoFormat:
+						typeof newSettings?.videoFormat === "string"
+							? newSettings.videoFormat
+							: (prevSettings?.videoFormat ??
+								defaultAppSettingsData[group].videoFormat),
 				};
 			} else if (group === AppSettingsGroup.FunctionFixedContent) {
 				newSettings = newSettings as AppSettingsData[typeof group];

@@ -44,15 +44,18 @@ import { EventListenerContext } from "@/components/eventListener";
 import {
 	FolderIcon,
 	MicrophoneIcon,
+	MouseIcon,
 	ResumeRecordIcon,
 	StartRecordIcon,
 	StopRecordIcon,
+	SystemAudioIcon,
 } from "@/components/icons";
 import { PLUGIN_ID_FFMPEG } from "@/constants/pluginService";
 import {
 	AppSettingsActionContext,
 	AppSettingsPublisher,
 } from "@/contexts/appSettingsActionContext";
+import { AntdContext } from "@/contexts/antdContext";
 import { usePluginServiceContext } from "@/contexts/pluginServiceContext";
 import { changeVideoRecordState } from "@/functions/videoRecord";
 import { useAppSettingsLoad } from "@/hooks/useAppSettingsLoad";
@@ -215,7 +218,8 @@ export const VideoRecordToolbarPage: React.FC = () => {
 	}, [intl]);
 
 	const [enableMicrophone, setEnableMicrophone] = useState(false);
-	// const [enableSystemAudio, setEnableSystemAudio] = useState(true);
+	const [enableSystemAudio, setEnableSystemAudio] = useState(false);
+	const [captureCursor, setCaptureCursor] = useState(false);
 	const durationRef = useRef(0);
 
 	const durationTimer = useRef<NodeJS.Timeout | null>(null);
@@ -268,9 +272,16 @@ export const VideoRecordToolbarPage: React.FC = () => {
 
 	const [getAppSettings] = useStateSubscriber(AppSettingsPublisher, undefined);
 	const { updateAppSettings } = useContext(AppSettingsActionContext);
+	const { message } = useContext(AntdContext);
 	useAppSettingsLoad(
 		useCallback((appSettings: AppSettingsData) => {
 			setEnableMicrophone(appSettings[AppSettingsGroup.Cache].enableMicrophone);
+			setEnableSystemAudio(
+				appSettings[AppSettingsGroup.FunctionVideoRecord].enableSystemAudio,
+			);
+			setCaptureCursor(
+				appSettings[AppSettingsGroup.FunctionVideoRecord].captureCursor,
+			);
 			setSettingLoading(false);
 
 			setExcludeFromCapture(
@@ -346,6 +357,9 @@ export const VideoRecordToolbarPage: React.FC = () => {
 				appSettings[AppSettingsGroup.FunctionVideoRecord].videoMaxSize,
 			);
 
+		const enableSystemAudio =
+			appSettings[AppSettingsGroup.FunctionVideoRecord].enableSystemAudio;
+
 		videoRecordStart(
 			selectRectRef.current?.min_x ?? 0,
 			selectRectRef.current?.min_y ?? 0,
@@ -358,16 +372,19 @@ export const VideoRecordToolbarPage: React.FC = () => {
 						.videoRecordFileNameFormat,
 				),
 			),
-			VideoFormat.Mp4,
+			appSettings[AppSettingsGroup.FunctionVideoRecord].videoFormat,
 			appSettings[AppSettingsGroup.FunctionVideoRecord].frameRate,
 			enableMicrophone,
-			false,
+			enableSystemAudio,
 			appSettings[AppSettingsGroup.FunctionVideoRecord].microphoneDeviceName,
 			appSettings[AppSettingsGroup.FunctionVideoRecord].hwaccel,
 			appSettings[AppSettingsGroup.FunctionVideoRecord].encoder,
 			appSettings[AppSettingsGroup.FunctionVideoRecord].encoderPreset,
 			videoMaxWidth,
 			videoMaxHeight,
+			appSettings[AppSettingsGroup.FunctionVideoRecord].captureBackend,
+			appSettings[AppSettingsGroup.FunctionVideoRecord].pixelFormat,
+			appSettings[AppSettingsGroup.FunctionVideoRecord].captureCursor,
 		)
 			.then(() => {
 				setVideoRecordState(VideoRecordState.Recording);
@@ -379,6 +396,14 @@ export const VideoRecordToolbarPage: React.FC = () => {
 
 				startDurationTimer();
 			})
+			.catch((error) => {
+				// 失败一般来自后端（pinray 会话握手失败、ffmpeg 缺失等），
+				// 不提示的话界面只会静默停在 Idle，用户看到的是「点了没反应」
+				appError("[videoRecordToolbar] startRecord error", error);
+				message.error(
+					intl.formatMessage({ id: "videoRecord.startRecordFailed" }),
+				);
+			})
 			.finally(() => {
 				setStartRecordLoading(false);
 			});
@@ -389,6 +414,8 @@ export const VideoRecordToolbarPage: React.FC = () => {
 		stopDurationTimer,
 		updateDurationFormat,
 		startDurationTimer,
+		message,
+		intl,
 	]);
 
 	const copyVideo = useCallback(
@@ -402,15 +429,23 @@ export const VideoRecordToolbarPage: React.FC = () => {
 		[stopRecord],
 	);
 
+	// 用 ref 间接引用最新的开始/停止回调，使下方 kill 相关 effect 的依赖
+	// 只保留稳定项——否则 startRecord/copyVideo（依赖 enableMicrophone 等
+	// 会变化的状态）每次重建都会触发 effect cleanup，导致录制中途被 kill。
+	const startOrCopyVideoRef = useRef<() => void>(() => {});
+	startOrCopyVideoRef.current = () => {
+		if (videoRecordStateRef.current === VideoRecordState.Idle) {
+			startRecord();
+		} else {
+			copyVideo(false);
+		}
+	};
+
 	useEffect(() => {
 		const startOrCopyVideoListenerId = addListener(
 			"start-or-copy-video",
 			() => {
-				if (videoRecordStateRef.current === VideoRecordState.Idle) {
-					startRecord();
-				} else {
-					copyVideo(false);
-				}
+				startOrCopyVideoRef.current();
 			},
 		);
 
@@ -425,13 +460,7 @@ export const VideoRecordToolbarPage: React.FC = () => {
 			removeListener(startOrCopyVideoListenerId);
 			closeUnlisten.then((fn) => fn());
 		};
-	}, [
-		addListener,
-		removeListener,
-		copyVideo,
-		startRecord,
-		videoRecordStateRef,
-	]);
+	}, [addListener, removeListener]);
 
 	useEffect(() => {
 		const { selectRect } = getVideoRecordParams();
@@ -608,21 +637,61 @@ export const VideoRecordToolbarPage: React.FC = () => {
 							key="microphone"
 						/>
 
-						{/* <Button
-                        onClick={() => {
-                            setEnableSystemAudio((prev) => !prev);
-                        }}
-                        icon={
-                            <SystemAudioIcon
-                                style={{
-                                    color: getButtonIconColorByState(enableSystemAudio, token),
-                                }}
-                            />
-                        }
-                        title={intl.formatMessage({ id: 'videoRecord.systemAudio' })}
-                        type={'text'}
-                        key="system-audio"
-                    /> */}
+						<Button
+							onClick={() => {
+								updateAppSettings(
+									AppSettingsGroup.FunctionVideoRecord,
+									{
+										enableSystemAudio:
+											!getAppSettings()[AppSettingsGroup.FunctionVideoRecord]
+												.enableSystemAudio,
+									},
+									true,
+									true,
+									true,
+									true,
+									false,
+								);
+							}}
+							icon={
+								<SystemAudioIcon
+									style={{
+										color: getButtonIconColorByState(enableSystemAudio, token),
+									}}
+								/>
+							}
+							title={intl.formatMessage({ id: "videoRecord.systemAudio" })}
+							type={"text"}
+							key="system-audio"
+						/>
+
+						<Button
+							onClick={() => {
+								updateAppSettings(
+									AppSettingsGroup.FunctionVideoRecord,
+									{
+										captureCursor:
+											!getAppSettings()[AppSettingsGroup.FunctionVideoRecord]
+												.captureCursor,
+									},
+									true,
+									true,
+									true,
+									true,
+									false,
+								);
+							}}
+							icon={
+								<MouseIcon
+									style={{
+										color: getButtonIconColorByState(captureCursor, token),
+									}}
+								/>
+							}
+							title={intl.formatMessage({ id: "videoRecord.captureCursor" })}
+							type={"text"}
+							key="capture-cursor"
+						/>
 
 						<div className="video-record-toolbar-splitter" />
 

@@ -5,8 +5,10 @@ export const videoRecord = {
 	"videoRecord.resumeRecord": "繼續錄製",
 	"videoRecord.microphone": "麥克風",
 	"videoRecord.systemAudio": "系統音訊",
+	"videoRecord.captureCursor": "錄製滑鼠指標",
 	"videoRecord.close": "關閉",
 	"videoRecord.copy": "複製影片檔",
 	"videoRecord.copyGif": "複製 GIF 檔",
 	"videoRecord.openFolder": "開啟輸出目錄",
+	"videoRecord.startRecordFailed": "開始錄製失敗，請查看日誌",
 };

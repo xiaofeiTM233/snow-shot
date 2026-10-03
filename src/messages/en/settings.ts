@@ -366,6 +366,10 @@ export const settings = {
 	"settings.functionSettings.videoRecordSettings.enableApngFormat":
 		"Enable APNG Format",
 	"settings.functionSettings.videoRecordSettings.gifFormat": "GIF Format",
+	"settings.functionSettings.videoRecordSettings.videoFormat": "Video Format",
+	"settings.functionSettings.videoRecordSettings.videoFormat.mp4": "MP4",
+	"settings.functionSettings.videoRecordSettings.videoFormat.mkv": "MKV",
+	"settings.functionSettings.videoRecordSettings.videoFormat.mov": "MOV",
 	"settings.functionSettings.videoRecordSettings.gifFormat.gif": "GIF",
 	"settings.functionSettings.videoRecordSettings.gifFormat.apng": "APNG",
 	"settings.functionSettings.videoRecordSettings.gifFormat.webp": "WebP",
@@ -392,6 +396,16 @@ export const settings = {
 		"Faster preset consumes less CPU but produces larger files",
 	"settings.functionSettings.videoRecordSettings.hwaccel":
 		"Enable Hardware Acceleration",
+	"settings.functionSettings.videoRecordSettings.captureBackend":
+		"Video Capture Backend",
+	"settings.functionSettings.videoRecordSettings.captureBackend.pinray":
+		"pinray (Recommended)",
+	"settings.functionSettings.videoRecordSettings.captureBackend.legacy":
+		"Legacy (gdigrab/avfoundation)",
+	"settings.functionSettings.videoRecordSettings.pixelFormat":
+		"Capture Pixel Format (pinray only)",
+	"settings.functionSettings.videoRecordSettings.enableSystemAudio":
+		"Capture System Audio",
 	"settings.functionSettings.videoRecordSettings.saveDirectory":
 		"Save Directory",
 	"settings.functionSettings.videoRecordSettings.videoMaxSize": "Video Quality",
@@ -692,6 +706,8 @@ export const settings = {
 	"settings.systemSettings.screenshotSettings.captureMethod.auto": "Auto",
 	"settings.systemSettings.screenshotSettings.captureMethod.wgc": "WGC",
 	"settings.systemSettings.screenshotSettings.captureMethod.xcap": "xcap",
+	"settings.systemSettings.screenshotSettings.captureMethod.pinray":
+		"pinray",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection":
 		"HDR Color Correction",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection.linear":

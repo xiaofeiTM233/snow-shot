@@ -24,6 +24,8 @@ export enum HistoryValidDuration {
 
 export enum VideoFormat {
 	Mp4 = "Mp4",
+	Mkv = "Mkv",
+	Mov = "Mov",
 	Gif = "Gif",
 }
 
@@ -67,6 +69,24 @@ export enum CaptureMethod {
 	Wgc = "WGC",
 	/** xcap（传统采集 API） */
 	Xcap = "Xcap",
+	/** pinray（原生采集基础设施，Windows 走 WGC、macOS 走 ScreenCaptureKit；HDR 桌面自动切换 WGC 引擎做色彩校正） */
+	Pinray = "Pinray",
+}
+
+/** 录屏视频采集后端 */
+export enum VideoCaptureBackend {
+	/** pinray 原生采集（Windows WGC / macOS ScreenCaptureKit） */
+	Pinray = "pinray",
+	/** 传统采集（Windows gdigrab / macOS avfoundation） */
+	Legacy = "legacy",
+}
+
+/** 录屏采集像素格式 */
+export enum RecordPixelFormat {
+	/** pinray 原生 BGRA，零转换（推荐） */
+	Bgra = "bgra",
+	/** RGBA，每帧多一次 CPU swizzle */
+	Rgba = "rgba",
 }
 
 /** HDR 颜色校正 */
@@ -844,6 +864,16 @@ export type AppSettingsData = {
 		keyDisplayMergeDuration: number;
 		/** 按键显示方向 */
 		keyDisplayDirection: KeyDisplayDirection;
+		/** 采集系统声音（pinray 后端） */
+		enableSystemAudio: boolean;
+		/** 视频采集后端：pinray / HDR / 传统 */
+		captureBackend: VideoCaptureBackend;
+		/** 采集像素格式（仅 pinray 后端生效） */
+		pixelFormat: RecordPixelFormat;
+		/** 视频格式 */
+		videoFormat: VideoFormat;
+		/** 是否把鼠标指针录进画面 */
+		captureCursor: boolean;
 	};
 	[AppSettingsGroup.SystemScreenshot]: {
 		historyValidDuration: HistoryValidDuration;

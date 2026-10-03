@@ -1,12 +1,125 @@
 use ffmpeg_sidecar::{child::FfmpegChild, command::FfmpegCommand, event::FfmpegEvent};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "windows")]
+use snow_shot_app_utils::monitor_info::MonitorInfo;
 #[cfg(target_os = "macos")]
 use snow_shot_app_utils::monitor_info::MonitorList;
 use std::{
     io::Result,
     path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
+    time::Duration,
 };
+
+use crate::video_record_capture::{
+    PinrayFeed, PinrayFeedParams, RecordPixelFormat, SystemAudioMeta, VideoCaptureBackend,
+};
+
+/// 硬件编码器预热时长（秒）——传统(gdigrab/avfoundation)路径只能用这个固定值。
+///
+/// 硬件编码器（QSV/NVENC/AMF/VideoToolbox…）刚开始工作时会在 GPU 上占满一段
+/// 时间，把桌面合成（DWM）与 WGC 的帧拷贝饿死：现象是录制刚开始的数秒画面
+/// 完全静止（音频正常、采集仍在出帧但像素不变）。实测 av1_qsv 每次 2.8~3.4s，
+/// 换软件 H.264 则完全正常。
+///
+/// 传统路径由 ffmpeg 自己抓屏，没法先喂合成帧，画面是实时进来的，只能按停顿的
+/// 最坏值固定裁掉开头这么多秒。pinray 路径不依赖它，见 `EncoderWarmupPlan`。
+const ENCODER_WARMUP_SECONDS: u32 = 4;
+
+/// 是否为需要预热的硬件编码器（会与桌面合成争抢 GPU）
+fn needs_encoder_warmup(encoder: &str) -> bool {
+    encoder.contains("qsv")
+        || encoder.contains("nvenc")
+        || encoder.contains("amf")
+        || encoder.contains("videotoolbox")
+        || encoder.contains("vaapi")
+        || encoder.ends_with("_mf")
+}
+
+/// 传统路径本片段的编码器预热帧数与时长（秒）；不需要预热时返回 (0, 0.0)。
+///
+/// GIF 输出不走用户选择的编码器，软件编码器（libx264 等）不碰 GPU，都无需预热。
+fn encoder_warmup(params: &RecordingParams) -> (u32, f64) {
+    if params.format == VideoFormat::Gif || !needs_encoder_warmup(&params.encoder) {
+        return (0, 0.0);
+    }
+
+    let frame_rate = params.frame_rate.max(1);
+    let frames = frame_rate * ENCODER_WARMUP_SECONDS;
+    (frames, f64::from(frames) / f64::from(frame_rate))
+}
+
+/// 编码器"热好了"需要看到的编码输出帧数（跨过 `frame=0` 的初始化阶段）。
+///
+/// ffmpeg 会往 stderr 打 `frame=N ...` 统计（预热时把间隔压到 0.2s）。N 开始增长
+/// 意味着编码器初始化（QSV 建 VPL 会话、分配 surface、加载内核——那次 GPU 抢占
+/// 的正主）已经完成并在连续出帧，此时开始采集就不会把停顿录进去。
+const ENCODER_READY_OUTPUT_FRAMES: u32 = 3;
+
+/// pinray 预热帧数上限对应的秒数（成片开头最多裁掉这么多）
+const ENCODER_WARMUP_MAX_SECONDS: u32 = 3;
+
+/// pinray 录制前的编码器预热策略（判据驱动，取代按墙钟死等）。
+///
+/// 预热段本身会被写进成片开头，收工后再按同样时长裁掉，所以"喂了多少帧"必须
+/// 落在关键帧上：`-force_key_frames` 按 `keyframe_grid` 在整个预热窗口打网格，
+/// 写入循环收工时补齐到网格，裁剪点因此总是一个精确的关键帧，`-c copy` 就能
+/// 无损裁掉，不需要猜预热真实持续了多久。
+struct EncoderWarmupPlan {
+    /// 成片时间轴的标称帧率：预热帧数 ↔ 时长换算
+    frame_rate: u32,
+    /// 关键帧网格（帧数），约 0.5s
+    keyframe_grid: u32,
+    /// 预热帧数上限（网格的整数倍）：编码器一直不出帧时的兜底
+    max_frames: u32,
+    /// 墙钟上限：高分辨率 + 慢编码器连一帧都写不动时，不能让启动无限等下去
+    max_duration: Duration,
+}
+
+/// 本片段是否需要预热，以及预热策略。
+fn pinray_encoder_warmup(params: &RecordingParams) -> Option<EncoderWarmupPlan> {
+    if params.format == VideoFormat::Gif || !needs_encoder_warmup(&params.encoder) {
+        return None;
+    }
+
+    let frame_rate = params.frame_rate.max(1);
+    // 网格取 0.5s：收工最多为此多付半秒的预热帧，但关键帧密度只影响被裁掉的段落
+    let keyframe_grid = (frame_rate / 2).max(1);
+    Some(EncoderWarmupPlan {
+        frame_rate,
+        keyframe_grid,
+        // frame_rate * 秒 = keyframe_grid * 2 * 秒，天然对齐网格
+        max_frames: keyframe_grid * ENCODER_WARMUP_MAX_SECONDS * 2,
+        max_duration: Duration::from_secs(ENCODER_WARMUP_SECONDS as u64),
+    })
+}
+
+impl EncoderWarmupPlan {
+    /// 看到这些编码输出帧就说明可以结束预热、开始采集
+    fn is_ready(&self, encoded_frames: u32) -> bool {
+        encoded_frames >= ENCODER_READY_OUTPUT_FRAMES
+    }
+
+    /// `-force_key_frames` 表达式：预热窗口（含右端点）内每 `keyframe_grid` 帧
+    /// 一个关键帧，之后交还给编码器的自然 GOP。ffmpeg 表达式没有逻辑与，用乘法。
+    ///
+    /// ffmpeg 对 `expr:` 前缀会把后面整个字符串当作一个表达式，逗号无需转义。
+    fn key_frames_expr(&self) -> String {
+        format!(
+            "expr:lte(n,{})*not(mod(n,{}))",
+            self.max_frames, self.keyframe_grid
+        )
+    }
+
+    /// 预热帧数对应的成片时长（秒）——停止采集后按它裁掉开头
+    fn seconds(&self, frames: u32) -> f64 {
+        f64::from(frames) / f64::from(self.frame_rate)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Copy)]
 pub enum VideoRecordState {
@@ -87,6 +200,8 @@ fn get_prores_quality(preset: &str) -> i32 {
 #[derive(PartialEq, Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum VideoFormat {
     Mp4,
+    Mkv,
+    Mov,
     Gif,
 }
 
@@ -94,8 +209,15 @@ impl VideoFormat {
     pub fn extension(&self) -> &str {
         match self {
             VideoFormat::Mp4 => "mp4",
+            VideoFormat::Mkv => "mkv",
+            VideoFormat::Mov => "mov",
             VideoFormat::Gif => "gif",
         }
+    }
+
+    /// `-movflags +faststart` 仅对 MP4/MOV 容器有意义（MKV 无此选项）
+    pub fn supports_faststart(&self) -> bool {
+        matches!(self, VideoFormat::Mp4 | VideoFormat::Mov)
     }
 }
 
@@ -110,7 +232,6 @@ struct RecordingParams {
     format: VideoFormat,
     frame_rate: u32,
     enable_microphone: bool,
-    #[allow(unused)]
     enable_system_audio: bool,
     microphone_device_name: String,
     hwaccel: bool,
@@ -118,6 +239,12 @@ struct RecordingParams {
     encoder_preset: String,
     video_max_width: i32,
     video_max_height: i32,
+    /// 视频采集后端（pinray / 传统 gdigrab/avfoundation）
+    capture_backend: VideoCaptureBackend,
+    /// 采集像素格式（仅 pinray 后端生效）
+    pixel_format: RecordPixelFormat,
+    /// 是否把鼠标指针合成进画面（三种后端均生效）
+    capture_cursor: bool,
 }
 
 pub struct VideoRecordService {
@@ -129,6 +256,18 @@ pub struct VideoRecordService {
     recording_params: Option<RecordingParams>, // 录制参数，用于恢复录制
     record_video_size: Option<(i32, i32)>,     // 录制视频大小
     ffmpeg_path: Option<PathBuf>,
+    // pinray 采集后端相关字段
+    pinray_feed: Option<PinrayFeed>, // pinray 采集会话（每片段一个）
+    mic_child: Option<FfmpegChild>,  // pinray 模式下独立采集麦克风的 ffmpeg 子进程
+    mic_audio_segments: Vec<String>, // pinray 模式下各片段麦克风 raw PCM 文件
+    sys_audio_segments: Vec<String>, // pinray 模式下各片段系统声音 raw PCM 文件
+    sys_audio_meta: Option<SystemAudioMeta>, // 系统声音元信息（来自首个音频帧）
+    mic_device_names_cache: Option<Vec<String>>, // 麦克风设备列表缓存（dshow 枚举耗时 1~3s，避免每次启动录制都枚举）
+    /// 本片段编码器预热时长（秒）；>0 表示片段收尾后要裁掉开头这一段。
+    /// pinray 路径是主动预热（先喂合成帧），legacy 路径是被动预热（先录进去再裁）
+    segment_warmup_seconds: f64,
+    /// 本片段的视频文件（用于裁掉编码器预热段）
+    segment_warmup_file: Option<String>,
 }
 
 #[cfg(target_os = "macos")]
@@ -156,6 +295,14 @@ impl VideoRecordService {
             recording_params: None,
             record_video_size: None,
             ffmpeg_path: None,
+            pinray_feed: None,
+            mic_child: None,
+            mic_audio_segments: Vec::new(),
+            sys_audio_segments: Vec::new(),
+            sys_audio_meta: None,
+            mic_device_names_cache: None,
+            segment_warmup_seconds: 0.0,
+            segment_warmup_file: None,
         }
     }
 
@@ -205,6 +352,63 @@ impl VideoRecordService {
         )
     }
 
+    /// 在用户点"开始录制"之前预热编码器（由选区界面出现时调用）。
+    ///
+    /// 目的有两个：
+    /// * 把 ffmpeg 及其依赖（含 QSV/oneVPL 运行库）读进系统缓存，缩短点击后
+    ///   等待首帧的时间（冷启动时尤其明显）；
+    /// * 让硬件编码器提前建好会话、度过启动期——这段时间它会占满 GPU 并让
+    ///   桌面合成停住（实测 2.8~3.4s），提前发生就不会被录进画面。
+    ///
+    /// 一次性临时进程：编码 3 秒合成画面后输出丢弃（-f null），失败不影响录制。
+    pub fn warmup_encoder(
+        &self,
+        encoder: &str,
+        encoder_preset: &str,
+        width: i32,
+        height: i32,
+        frame_rate: u32,
+    ) {
+        let mut command = self.get_ffmpeg_command();
+        command
+            .arg("-hide_banner")
+            .arg("-nostats")
+            .arg("-v")
+            .arg("error")
+            .arg("-f")
+            .arg("lavfi")
+            .arg("-i")
+            .arg(format!(
+                "testsrc=size={}x{}:rate={}",
+                width.max(2),
+                height.max(2),
+                frame_rate.max(1)
+            ))
+            .arg("-t")
+            .arg("3");
+        Self::apply_encoder_preset(&mut command, encoder, encoder_preset);
+        command.arg("-f").arg("null").arg("-");
+
+        match command.spawn() {
+            Ok(mut child) => {
+                log::info!(
+                    "[warmup_encoder] warm-up started before recording: {} {}x{}@{}",
+                    encoder,
+                    width,
+                    height,
+                    frame_rate
+                );
+                // 后台等它自己退出：保持管道不被提前丢弃，也不留下句柄
+                let _ = std::thread::Builder::new()
+                    .name("ffmpeg-warmup-wait".into())
+                    .spawn(move || {
+                        let _ = child.wait();
+                    });
+            }
+            Err(e) => log::warn!("[warmup_encoder] failed to start warm-up: {e}"),
+        }
+    }
+
     fn get_actual_video_size(
         &self,
         width: i32,
@@ -238,6 +442,7 @@ impl VideoRecordService {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn start(
         &mut self,
         min_x: i32,
@@ -255,6 +460,9 @@ impl VideoRecordService {
         encoder_preset: String,
         video_max_width: i32,
         video_max_height: i32,
+        capture_backend: VideoCaptureBackend,
+        pixel_format: RecordPixelFormat,
+        capture_cursor: bool,
     ) -> Result<()> {
         if self.state == VideoRecordState::Recording {
             return Err(std::io::Error::new(
@@ -280,19 +488,39 @@ impl VideoRecordService {
             encoder_preset,
             video_max_width,
             video_max_height,
+            capture_backend,
+            pixel_format,
+            capture_cursor,
         });
 
         // 重置片段相关状态
         self.segments.clear();
         self.segment_counter = 0;
         self.record_video_size = None;
+        self.mic_audio_segments.clear();
+        self.sys_audio_segments.clear();
+        self.sys_audio_meta = None;
 
         // 开始第一个片段的录制
         self.start_segment()
     }
 
     fn start_segment(&mut self) -> Result<()> {
+        // 每个片段独立处理编码器预热段：默认没有，需要时由各分支设置
+        self.segment_warmup_seconds = 0.0;
+        self.segment_warmup_file = None;
+
         let params = self.recording_params.as_ref().unwrap();
+
+        if params.capture_backend != VideoCaptureBackend::Legacy {
+            return self.start_pinray_segment();
+        }
+
+        // 克隆持有：函数体内需要 &mut Self（麦克风设备枚举会刷新缓存）
+        let params = self.recording_params.clone().unwrap();
+
+        // 硬件编码器在传统路径下做"被动预热"（详见下方 spawn 分支）
+        let (warmup_frames, warmup_seconds) = encoder_warmup(&params);
 
         // 计算录制区域的宽度和高度
         let mut width = params.max_x - params.min_x;
@@ -346,6 +574,9 @@ impl VideoRecordService {
                 // 设置录制区域大小
                 .arg("-video_size")
                 .arg(format!("{}x{}", width, height))
+                // 鼠标指针按用户设置绘制（gdigrab 默认绘制）
+                .arg("-draw_mouse")
+                .arg(if params.capture_cursor { "1" } else { "0" })
                 // 输入源为桌面
                 .arg("-i")
                 .arg("desktop");
@@ -358,7 +589,10 @@ impl VideoRecordService {
                 .arg("-f")
                 .arg("avfoundation")
                 .arg("-framerate")
-                .arg(params.frame_rate.to_string());
+                .arg(params.frame_rate.to_string())
+                // 鼠标指针按用户设置采集
+                .arg("-capture_cursor")
+                .arg(if params.capture_cursor { "1" } else { "0" });
         }
 
         let mut audio_input = String::new();
@@ -487,67 +721,15 @@ impl VideoRecordService {
 
         // 根据格式设置不同的参数
         match params.format {
-            VideoFormat::Mp4 => {
-                command.arg("-c:v").arg(&params.encoder);
+            VideoFormat::Mp4 | VideoFormat::Mkv | VideoFormat::Mov => {
+                Self::apply_encoder_preset(&mut command, &params.encoder, &params.encoder_preset);
 
-                // 根据编码器类型设置预设值
-                // 注意: 检查顺序很重要,必须先检查特定编码器,最后才检查通用编码器
-                if params.encoder.contains("amf") {
-                    // AMD AMF编码器只支持特定的预设值
-                    let amf_preset = match params.encoder_preset.as_str() {
-                        "ultrafast" | "superfast" | "veryfast" | "faster" | "fast" => "speed",
-                        "medium" | "slow" => "balanced",
-                        "slower" | "veryslow" | "placebo" => "quality",
-                        // 如果已经是AMF支持的预设值，直接使用
-                        "speed" | "balanced" | "quality" => &params.encoder_preset,
-                        _ => "balanced", // 默认使用balanced
-                    };
-                    command.arg("-preset").arg(amf_preset);
-                } else if params.encoder.starts_with("libaom") || params.encoder.starts_with("av1_") {
-                    // AV1编码器使用global_quality参数 (详见 get_global_quality 函数注释)
-                    let quality = get_global_quality(&params.encoder_preset);
-                    command.arg("-global_quality").arg(quality.to_string());
-                } else if params.encoder.starts_with("libvpx") {
-                    // VP9编码器使用global_quality参数 (详见 get_global_quality 函数注释)
-                    let quality = get_global_quality(&params.encoder_preset);
-                    command.arg("-global_quality").arg(quality.to_string());
-                } else if params.encoder.starts_with("mpeg4") {
-                    // MPEG4编码器使用qscale参数
-                    // qscale值 (1-31, **值越小质量越高**)
-                    // 4: 高质量（压缩率低），慢速编码
-                    // 5: 平衡质量
-                    // 7: 低质量（压缩率高），快速编码
-                    let quality = get_mpeg4_quality(&params.encoder_preset);
-                    command.arg("-qscale").arg(quality.to_string());
-                } else if params.encoder.starts_with("prores") {
-                    // ProRes编码器使用profile参数 (详见 get_prores_quality 函数注释)
-                    let quality = get_prores_quality(&params.encoder_preset);
-                    command.arg("-profile").arg(quality.to_string());
-                } else if params.encoder.starts_with("h264_qsv") {
-                    // Intel H264_QSV编码器使用global_quality参数 (详见 get_global_quality 函数注释)
-                    let quality = get_global_quality(&params.encoder_preset);
-                    command.arg("-global_quality").arg(quality.to_string());
-                } else if params.encoder.contains("nvenc") {
-                    // NVIDIA NVENC编码器支持的预设值
-                    let nvenc_preset = match params.encoder_preset.as_str() {
-                        "ultrafast" => "p1",              // 最快
-                        "superfast" | "veryfast" => "p2", // 更快
-                        "faster" | "fast" => "p3",        // 快
-                        "medium" => "p4",                 // 中等（默认）
-                        "slow" => "p5",                   // 慢
-                        "slower" => "p6",                 // 更慢
-                        "veryslow" | "placebo" => "p7",   // 最慢
-                        // 如果已经是NVENC支持的预设值，直接使用
-                        "p1" | "p2" | "p3" | "p4" | "p5" | "p6" | "p7" | "hq" | "hp" | "ll"
-                        | "llhq" | "llhp" | "default" | "bd" | "lossless" | "losslesshp" => {
-                            &params.encoder_preset
-                        }
-                        _ => "p4", // 默认使用p4（中等）
-                    };
-                    command.arg("-preset").arg(nvenc_preset);
-                } else {
-                    // 其他编码器（如x264）使用原始预设值
-                    command.arg("-preset").arg(&params.encoder_preset);
+                // 被动预热：在预热结束处强制关键帧（按时间表达式，兼容 gdigrab
+                // 首帧时间戳不从 0 开始的情况），片段收尾即可 -ss + -c copy 精确裁掉
+                if warmup_frames > 0 {
+                    command
+                        .arg("-force_key_frames")
+                        .arg(format!("expr:gte(t,{warmup_seconds:.3})"));
                 }
 
                 #[cfg(target_os = "windows")]
@@ -606,7 +788,9 @@ impl VideoRecordService {
                     command.arg("-map").arg("0:v");
                 }
 
-                command.arg("-movflags").arg("+faststart"); // 优化MP4文件结构
+                if params.format.supports_faststart() {
+                    command.arg("-movflags").arg("+faststart"); // 优化MP4文件结构
+                }
             }
             VideoFormat::Gif => {
                 // GIF格式不包含音频
@@ -628,10 +812,32 @@ impl VideoRecordService {
         // 启动ffmpeg进程
         match command.spawn() {
             Ok(mut child) => {
+                let spawned_at = std::time::Instant::now();
                 for event in child.iter().unwrap() {
                     if params.format == VideoFormat::Mp4 {
                         match event {
                             FfmpegEvent::Progress(_) => {
+                                // 被动预热：这条路径由 ffmpeg 自己抓屏，没法像 pinray
+                                // 那样先喂合成帧，只能让它照常录——GPU 编码器启动期的
+                                // 2~4 秒停顿会被录进去，片段收尾时再裁掉开头这一段。
+                                // 这里先等预热时长走完，保证前端计时与成片内容起点一致。
+                                if warmup_frames > 0 {
+                                    let deadline =
+                                        spawned_at + Duration::from_secs_f64(warmup_seconds);
+                                    let now = std::time::Instant::now();
+                                    if deadline > now {
+                                        std::thread::sleep(deadline - now);
+                                    }
+                                    self.segment_warmup_seconds = warmup_seconds;
+                                    self.segment_warmup_file = Some(segment_filename.clone());
+                                    log::info!(
+                                        "[start_segment] legacy encoder warm-up: {} for {:.1}s, will be trimmed on stop ({})",
+                                        params.encoder,
+                                        warmup_seconds,
+                                        segment_filename
+                                    );
+                                }
+
                                 self.child = Some(child);
                                 self.state = VideoRecordState::Recording;
                                 self.segments.push(segment_filename);
@@ -656,6 +862,969 @@ impl VideoRecordService {
                     format!("Failed to start recording segment: {}", e),
                 ))
             }
+        }
+    }
+
+    /// pinray 采集后端的片段录制：
+    /// ffmpeg 主进程仅接收 rawvideo stdin 视频（编码参数与 legacy 一致）；
+    /// 视频帧由 pinray 采集线程写入；系统声音由采集线程写 raw PCM、
+    /// 麦克风由独立 ffmpeg 进程写 raw PCM，停止时统一 mux（见 mux_pinray_audio）。
+    /// 不使用 in-process dshow/avfoundation 音频输入——否则视频 stdin EOF 后
+    /// ffmpeg 会因音频输入仍在直播而无法退出。
+    fn start_pinray_segment(&mut self) -> Result<()> {
+        let params = self.recording_params.clone().unwrap();
+
+        // 1. 解析采集目标显示器与裁剪区域
+        let (source_id, crop, width, height, _monitor_info) =
+            Self::resolve_pinray_target(&params)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+
+        let mut command = self.get_ffmpeg_command();
+
+        // 硬件编码器需要先喂热再开始采集（见 EncoderWarmupPlan）
+        let warmup = pinray_encoder_warmup(&params);
+
+        // 预热的判据来自 ffmpeg 的统计行，默认约 1 秒才打一行，会把"已经热了"的
+        // 发现时间拖后同样这么久；提到 0.2s。全局选项，必须排在第一个输入之前。
+        if warmup.is_some() {
+            command.arg("-stats_period").arg("0.2");
+        }
+
+        // rawvideo stdin 输入（采集线程写入，帧率节拍由采集线程保证）
+        command
+            .arg("-f")
+            .arg("rawvideo")
+            .arg("-pix_fmt")
+            .arg(params.pixel_format.ffmpeg_pix_fmt())
+            .arg("-video_size")
+            .arg(format!("{}x{}", width, height))
+            .arg("-framerate")
+            .arg(params.frame_rate.to_string())
+            .arg("-i")
+            .arg("pipe:0");
+
+        // 生成当前片段的文件名
+        let segment_filename = format!(
+            "{}_segment_{:03}.{}",
+            params.output_file,
+            self.segment_counter,
+            params.format.extension()
+        );
+
+        // 确保输出文件的目录存在
+        if let Some(parent_dir) = std::path::Path::new(&segment_filename).parent() {
+            if let Err(e) = std::fs::create_dir_all(parent_dir) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to create output directory: {}", e),
+                ));
+            }
+        }
+
+        let mut video_filter = String::new();
+        let (target_width, target_height) = self.get_actual_video_size(
+            width,
+            height,
+            params.video_max_width,
+            params.video_max_height,
+        );
+        if target_width != width || target_height != height {
+            video_filter = format!("scale={}:{}:flags=lanczos", target_width, target_height);
+        }
+        self.record_video_size = Some((target_width, target_height));
+
+        // 根据格式设置输出参数（音频由停止时 mux，不在本进程内）
+        match params.format {
+            VideoFormat::Mp4 | VideoFormat::Mkv | VideoFormat::Mov => {
+                Self::apply_encoder_preset(&mut command, &params.encoder, &params.encoder_preset);
+                // 预热窗口内按网格强制关键帧：收工点补齐到网格后，片段收尾即可用
+                // -ss + -c copy 精确裁掉预热，不必知道预热真实持续了多久
+                if let Some(plan) = warmup.as_ref() {
+                    command.arg("-force_key_frames").arg(plan.key_frames_expr());
+                }
+                if !video_filter.is_empty() {
+                    command.arg("-vf").arg(&video_filter);
+                }
+                command.arg("-crf").arg("23").arg("-pix_fmt").arg("yuv420p");
+                if params.format.supports_faststart() {
+                    command.arg("-movflags").arg("+faststart");
+                }
+            }
+            VideoFormat::Gif => {
+                command
+                    .arg("-vf")
+                    .arg("fps=10,scale=-1:-1:flags=lanczos,palettegen=reserve_transparent=0")
+                    .arg("-loop")
+                    .arg("0");
+            }
+        }
+
+        command.arg("-y");
+        command.arg(&segment_filename);
+
+        println!("FFmpeg pinray segment command args: {:?}", command);
+
+        // 2. 启动 ffmpeg
+        let mut child = command.spawn().map_err(|e| {
+            self.state = VideoRecordState::Idle;
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Failed to start recording segment: {}", e),
+            )
+        })?;
+
+        let stdin = child.take_stdin().ok_or_else(|| {
+            self.state = VideoRecordState::Idle;
+            std::io::Error::new(std::io::ErrorKind::Other, "Failed to take ffmpeg stdin")
+        })?;
+
+        // stderr 要在预热开始之前就被读走：统计行里的编码输出帧数是预热的停止判据，
+        // 而无人读取的 stderr 管道写满后（约 64KB）会反过来阻塞 ffmpeg 自身
+        let encoded_frames = match child.take_stderr() {
+            Some(stderr) => Self::spawn_stderr_frame_counter(stderr),
+            None => Arc::new(AtomicU32::new(0)),
+        };
+
+        // 3. 编码器预热：先用合成画面把【同一个 ffmpeg 进程】里的编码器喂热，
+        //    此时尚未开始采集，桌面停顿不会被录进成片（见 EncoderWarmupPlan）。
+        //    喂到编码器连续出帧就收工，片段收尾时按实际写进去的帧数裁掉。
+        let mut stdin = stdin;
+        if let Some(plan) = warmup.as_ref() {
+            let warm_started = std::time::Instant::now();
+            match Self::write_encoder_warmup(&mut stdin, width, height, plan, &encoded_frames) {
+                Ok(frames) => {
+                    self.segment_warmup_seconds = plan.seconds(frames);
+                    self.segment_warmup_file = Some(segment_filename.clone());
+                    log::info!(
+                        "[start_pinray_segment] encoder {} warmed up: {:.2}s wall, {} 帧预热画面（成片开头裁掉 {:.2}s）",
+                        params.encoder,
+                        warm_started.elapsed().as_secs_f32(),
+                        frames,
+                        self.segment_warmup_seconds
+                    );
+                }
+                Err(e) => log::warn!("[start_pinray_segment] encoder warm-up failed: {e}"),
+            }
+        }
+
+        // 4. 麦克风：独立 ffmpeg 进程录制 raw PCM（GIF 格式不含音频）。
+        //    放在预热之后启动：否则麦克风会多录一段预热时长，与裁掉预热后的
+        //    视频/系统声音错位。
+        let mut mic_started = false;
+        if params.format == VideoFormat::Mp4 && params.enable_microphone {
+            mic_started = self.spawn_pinray_mic_recorder(&params).is_ok();
+        }
+
+        // 5. 启动采集线程（等待会话建立握手）
+        let enable_system_audio = params.format == VideoFormat::Mp4 && params.enable_system_audio;
+        let audio_raw_path = format!(
+            "{}_segment_{:03}_sys.raw",
+            params.output_file, self.segment_counter
+        );
+        let feed = match PinrayFeed::start(
+            PinrayFeedParams {
+                source_id,
+                crop,
+                frame_rate: params.frame_rate,
+                pixel_format: params.pixel_format,
+                capture_cursor: params.capture_cursor,
+                enable_system_audio,
+                audio_raw_path: PathBuf::from(&audio_raw_path),
+            },
+            stdin,
+        ) {
+            Ok(feed) => feed,
+            Err(e) => {
+                if mic_started {
+                    if let Some(mut mic_child) = self.mic_child.take() {
+                        let _ = mic_child.kill();
+                    }
+                    self.mic_audio_segments.clear();
+                }
+                let _ = child.kill();
+                self.state = VideoRecordState::Idle;
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to start pinray feed: {}", e),
+                ));
+            }
+        };
+        self.pinray_feed = Some(feed);
+
+        // 6. 握手（Started）意味着首帧已真正写进 ffmpeg：编码器初始化完成、
+        //    录制内容起点就是此刻，随后立即进入 Recording 状态并返回，让前端计时
+        //    与成片内容对齐。编码器初始化（QSV/NVENC 常需 1~3s）期间不产生内容，
+        //    因此不会像以前那样被写成一串重复帧、让成片开头卡住
+        //    （详见 video_record_capture 的时间轴锚点说明）。
+        self.child = Some(child);
+
+        self.state = VideoRecordState::Recording;
+        self.segments.push(segment_filename);
+        if enable_system_audio {
+            self.sys_audio_segments.push(audio_raw_path);
+        }
+        self.segment_counter += 1;
+        Ok(())
+    }
+
+    /// 解析 pinray 采集目标：录制区域中心所在的显示器。
+    /// 返回 (显示器源 ID, 相对显示器原点的裁剪区域, 区域宽, 区域高)。
+    /// 跨屏区域会夹取到该显示器范围（与 legacy macOS 行为一致）。
+    #[allow(unused_variables)]
+    fn resolve_pinray_target(
+        params: &RecordingParams,
+    ) -> std::result::Result<(String, Option<pinray::Rect>, i32, i32, MonitorInfo), String> {
+        let center_x = (params.min_x + params.max_x) / 2;
+        let center_y = (params.min_y + params.max_y) / 2;
+
+        #[cfg(target_os = "windows")]
+        {
+            let monitors = xcap::Monitor::all().unwrap_or_default();
+            let target = monitors
+                .iter()
+                .find(|monitor| {
+                    let (mx, my) = (monitor.x().unwrap_or(0), monitor.y().unwrap_or(0));
+                    let (mw, mh) = (
+                        monitor.width().unwrap_or(0) as i32,
+                        monitor.height().unwrap_or(0) as i32,
+                    );
+                    center_x >= mx && center_x < mx + mw && center_y >= my && center_y < my + mh
+                })
+                .or_else(|| monitors.first());
+
+            let monitor =
+                target.ok_or_else(|| "No monitor found for recording area".to_string())?;
+
+            // 显示器物理矩形（EnumDisplaySettingsW），与 pinray DXGI 枚举坐标系一致
+            let monitor_info = MonitorInfo::new(monitor, None);
+            let device_name = MonitorInfo::get_device_name(monitor)?;
+
+            let min_x = params.min_x.max(monitor_info.rect.min_x);
+            let min_y = params.min_y.max(monitor_info.rect.min_y);
+            let max_x = params.max_x.min(monitor_info.rect.max_x);
+            let max_y = params.max_y.min(monitor_info.rect.max_y);
+
+            let mut width = max_x - min_x;
+            let mut height = max_y - min_y;
+            if width <= 0 || height <= 0 {
+                return Err("Recording area is outside the target monitor".to_string());
+            }
+            if width % 2 == 1 {
+                width -= 1;
+            }
+            if height % 2 == 1 {
+                height -= 1;
+            }
+
+            return Ok((
+                format!("display:{}", device_name),
+                Some(pinray::Rect {
+                    x: min_x - monitor_info.rect.min_x,
+                    y: min_y - monitor_info.rect.min_y,
+                    width: width as u32,
+                    height: height as u32,
+                }),
+                width,
+                height,
+                monitor_info,
+            ));
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            let monitor_list = MonitorList::all(true);
+            let mut target_monitor_index = 0;
+            for (monitor_index, monitor) in monitor_list.iter().enumerate() {
+                use snow_shot_app_shared::ElementRect;
+
+                if monitor.rect.overlaps(&ElementRect {
+                    min_x: params.min_x,
+                    min_y: params.min_y,
+                    max_x: params.max_x,
+                    max_y: params.max_y,
+                }) {
+                    target_monitor_index = monitor_index;
+                    break;
+                }
+            }
+
+            let monitor_info = monitor_list
+                .iter()
+                .nth(target_monitor_index)
+                .ok_or_else(|| "No monitor found for recording area".to_string())?
+                .clone();
+            // macOS 显示器源 ID 为 CGDirectDisplayID 十进制串（xcap Monitor::id()）
+            let display_id = monitor_info
+                .monitor
+                .id()
+                .map_err(|e| format!("Failed to get monitor id: {e:?}"))?;
+
+            let min_x = params.min_x.max(monitor_info.rect.min_x);
+            let min_y = params.min_y.max(monitor_info.rect.min_y);
+            let max_x = params.max_x.min(monitor_info.rect.max_x);
+            let max_y = params.max_y.min(monitor_info.rect.max_y);
+
+            let mut width = max_x - min_x;
+            let mut height = max_y - min_y;
+            if width <= 0 || height <= 0 {
+                return Err("Recording area is outside the target monitor".to_string());
+            }
+            if width % 2 == 1 {
+                width -= 1;
+            }
+            if height % 2 == 1 {
+                height -= 1;
+            }
+
+            Ok((
+                display_id.to_string(),
+                Some(pinray::Rect {
+                    x: min_x - monitor_info.rect.min_x,
+                    y: min_y - monitor_info.rect.min_y,
+                    width: width as u32,
+                    height: height as u32,
+                }),
+                width,
+                height,
+                monitor_info,
+            ))
+        }
+    }
+
+    /// 启动独立 ffmpeg 进程把麦克风录制为 raw PCM（s16le 48kHz 双声道）。
+    /// 成功时文件路径已记录到 mic_audio_segments；失败时调用方降级为无声录制。
+    #[allow(unused_variables)]
+    fn spawn_pinray_mic_recorder(
+        &mut self,
+        params: &RecordingParams,
+    ) -> std::result::Result<(), String> {
+        let mic_filename = format!(
+            "{}_segment_{:03}_mic.raw",
+            params.output_file, self.segment_counter
+        );
+
+        let mut command = self.get_ffmpeg_command();
+
+        #[cfg(target_os = "windows")]
+        {
+            // dshow 设备枚举要拉起 ffmpeg 子进程（1~3s），使用缓存避免每次
+            // 开始录制/恢复录制都枚举；设备热插拔后列表可能过期，但"匹配不到
+            // 就用第一个设备"的降级逻辑与实时枚举时一致
+            if self.mic_device_names_cache.is_none() {
+                self.mic_device_names_cache = Some(self.get_microphone_device_names());
+            }
+            let device_names = self.mic_device_names_cache.as_ref().unwrap().clone();
+            if device_names.is_empty() {
+                return Err("No microphone device found".to_string());
+            }
+            let device_name = if device_names.contains(&params.microphone_device_name) {
+                params.microphone_device_name.clone()
+            } else {
+                device_names[0].clone()
+            };
+            command
+                .arg("-f")
+                .arg("dshow")
+                .arg("-i")
+                .arg(format!("audio={}", device_name));
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            let device_info_list = self.get_device_info_list();
+            let audio_device = device_info_list.iter().find(|d| {
+                d.device_type == DeviceType::Audio
+                    && Self::format_device_name(d) == params.microphone_device_name
+            });
+            let device_index = match audio_device {
+                Some(device) => device.index,
+                None => {
+                    return Err(format!(
+                        "Microphone device not found: {}",
+                        params.microphone_device_name
+                    ));
+                }
+            };
+            command
+                .arg("-f")
+                .arg("avfoundation")
+                .arg("-i")
+                .arg(format!(":{}", device_index));
+        }
+
+        // 麦克风不经过 pinray（其 Microphone 后端未实现，build 即返回 Unsupported），
+        // 由独立 ffmpeg 进程采集。下面的 -f s16le -ar 48000 -ac 2 是【输出端】强制归一化：
+        // 无论设备原生采样率/声道数如何，ffmpeg 都会自动重采样到该格式，raw 文件格式恒定。
+        // mux_pinray_audio 的读取端参数必须与此约定保持一致。
+        command
+            .arg("-f")
+            .arg("s16le")
+            .arg("-ar")
+            .arg("48000")
+            .arg("-ac")
+            .arg("2")
+            .arg("-y")
+            .arg(&mic_filename);
+
+        let child = command
+            .spawn()
+            .map_err(|e| format!("Failed to spawn mic recorder: {e}"))?;
+        self.mic_child = Some(child);
+        self.mic_audio_segments.push(mic_filename);
+        Ok(())
+    }
+
+    /// 停止 pinray 采集与相关子进程（暂停/停止共用）。
+    /// 返回本片段的系统声音元信息。
+    fn stop_pinray_segment(&mut self) -> Option<SystemAudioMeta> {
+        // 1. 停止采集线程（关闭 stdin → ffmpeg 收到 EOF 自然收尾）
+        let mut sys_meta = None;
+        if let Some(mut feed) = self.pinray_feed.take() {
+            sys_meta = feed.stop();
+        }
+        if sys_meta.is_some() {
+            self.sys_audio_meta = sys_meta;
+        }
+
+        // 2. 停止麦克风录制进程
+        if let Some(mut mic_child) = self.mic_child.take() {
+            let _ = mic_child.quit();
+            let _ = mic_child.wait();
+        }
+
+        // 3. 等待 ffmpeg 完成写 trailer（stdin EOF 后应自然退出；超时兜底 kill）
+        if let Some(mut child) = self.child.take() {
+            Self::wait_child_or_kill(&mut child, Duration::from_secs(15));
+        }
+
+        // 4. 裁掉片段开头的编码器预热段（必须在 ffmpeg 写完 trailer 之后做）
+        if let Some(segment_file) = self.segment_warmup_file.take() {
+            if let Err(e) = self.trim_segment_warmup(&segment_file, self.segment_warmup_seconds) {
+                log::warn!("[stop_pinray_segment] failed to trim encoder warm-up: {e}");
+            }
+            self.segment_warmup_seconds = 0.0;
+        }
+
+        sys_meta
+    }
+
+    /// 后台读取 ffmpeg 的 stderr：把统计行里的 `frame=` 编码输出帧数记进原子变量
+    /// 供预热判断，同时保证管道始终有人在读（无人读取时写满约 64KB 会反过来阻塞
+    /// ffmpeg 自身）。
+    fn spawn_stderr_frame_counter(stderr: std::process::ChildStderr) -> Arc<AtomicU32> {
+        let encoded_frames = Arc::new(AtomicU32::new(0));
+        let counter = encoded_frames.clone();
+        let _ = std::thread::Builder::new()
+            .name("ffmpeg-stderr-progress".into())
+            .spawn(move || {
+                use std::io::Read;
+
+                // 统计行形如 "frame= 123 fps= 30 ... size= ..."。分块读取时 "frame="
+                // 可能被切断，所以留末尾若干字节与下一块拼起来再匹配
+                let pattern = Regex::new(r"frame=\s*(\d+)").expect("invalid frame regex");
+                let mut reader = std::io::BufReader::new(stderr);
+                let mut buf = [0u8; 4096];
+                let mut carry: Vec<u8> = Vec::new();
+                loop {
+                    let size = match reader.read(&mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(size) => size,
+                    };
+                    let mut chunk = std::mem::take(&mut carry);
+                    chunk.extend_from_slice(&buf[..size]);
+                    let text = String::from_utf8_lossy(&chunk);
+                    for caps in pattern.captures_iter(&text) {
+                        if let Some(frames) = caps[1].parse::<u32>().ok() {
+                            counter.fetch_max(frames, Ordering::AcqRel);
+                        }
+                    }
+                    carry = chunk[chunk.len().saturating_sub(32)..].to_vec();
+                }
+            });
+        encoded_frames
+    }
+
+    /// 生成一帧棋盘模板（`toggle` 决定反相方向）。
+    fn warmup_checkerboard(width: usize, height: usize, toggle: usize) -> Vec<u8> {
+        let mut frame = vec![0u8; width * height * 4];
+        for y in 0..height {
+            let block_y = y / 16;
+            for x in 0..width {
+                let offset = (y * width + x) * 4;
+                let value = if ((x / 16) + block_y + toggle) & 1 == 0 {
+                    0x00
+                } else {
+                    0xFF
+                };
+                frame[offset..offset + 3].fill(value);
+                frame[offset + 3] = 0xFF;
+            }
+        }
+        frame
+    }
+
+    /// 用合成画面把编码器喂热，返回实际写入的预热帧数（换算成成片时长即为要裁掉的
+    /// 片头，见 `EncoderWarmupPlan`）。
+    ///
+    /// 判据来自 ffmpeg 自己报的编码输出帧数，所以这里不按帧率睡眠节流：一帧
+    /// rawvideo 有几十 MB，管道装不下一帧半，`write_all` 的阻塞本身就是编码器的
+    /// 吞吐节拍。看到连续出帧就收工，再多写几帧补齐到关键帧网格，裁剪点因此总是
+    /// 落在 `-force_key_frames` 打的那个关键帧上。
+    ///
+    /// 画面是逐帧反相的棋盘：静帧会让编码器几乎不做功，起不到预热作用。两帧模板
+    /// 预先算好交替复用——按帧重新逐像素生成的话，4K@60 光是生成 4 秒画面就要
+    /// 3.75s，那本身就是启动耗时的一大块。
+    fn write_encoder_warmup(
+        stdin: &mut std::process::ChildStdin,
+        width: i32,
+        height: i32,
+        plan: &EncoderWarmupPlan,
+        encoded_frames: &AtomicU32,
+    ) -> std::result::Result<u32, String> {
+        use std::io::Write as _;
+
+        let width = width.max(2) as usize;
+        let height = height.max(2) as usize;
+        let templates = [
+            Self::warmup_checkerboard(width, height, 0),
+            Self::warmup_checkerboard(width, height, 1),
+        ];
+
+        let started = std::time::Instant::now();
+        let mut written: u32 = 0;
+        loop {
+            stdin
+                .write_all(&templates[(written & 1) as usize])
+                .map_err(|e| format!("warm-up write failed: {e}"))?;
+            written += 1;
+
+            // 三个判据任一成立即收工。max_frames 是网格的整数倍，所以按帧兜底时
+            // 也正好停在网格上
+            let warmed_up = plan.is_ready(encoded_frames.load(Ordering::Acquire))
+                || written >= plan.max_frames
+                || started.elapsed() >= plan.max_duration;
+            if warmed_up && written % plan.keyframe_grid == 0 {
+                return Ok(written);
+            }
+        }
+    }
+
+    /// 裁掉片段开头的编码器预热画面。
+    ///
+    /// 预热结束点已补齐到关键帧网格，切口因此必然是一个关键帧，可以用 `-c copy`
+    /// 精确裁剪（无需重编码），裁剪后片段文件名保持不变。
+    fn trim_segment_warmup(
+        &self,
+        segment_file: &str,
+        warmup_seconds: f64,
+    ) -> std::result::Result<(), String> {
+        if warmup_seconds <= 0.0 || !Path::new(segment_file).exists() {
+            return Ok(());
+        }
+
+        let path = Path::new(segment_file);
+        let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("mp4");
+        let trimmed_file = format!(
+            "{}-warmup-trim.{}",
+            path.with_extension("").to_string_lossy(),
+            extension
+        );
+
+        let mut command = self.get_ffmpeg_command();
+        // 目标点从预热边界退半帧：流拷贝保留的是"第一个 pts 不早于目标点"的包，
+        // 退半帧让它正好取到边界那个关键帧。目标点只要晚于边界（哪怕 0.05s）就会
+        // 取到后面的 P 帧，没有参考帧的开头会花屏；退半帧又不会退过前一帧，同时
+        // 容得下容器时间戳取整（rawvideo 严格 CFR，边界帧 pts 就是 warmup_seconds）。
+        let frame_rate = self.recording_params.as_ref().unwrap().frame_rate.max(1);
+        let cut_seconds = warmup_seconds - 0.5 / f64::from(frame_rate);
+        command
+            .arg("-ss")
+            .arg(format!("{:.3}", cut_seconds.max(0.0)))
+            .arg("-i")
+            .arg(segment_file)
+            .arg("-c")
+            .arg("copy");
+        // 流拷贝会丢掉 faststart 标记，按原样补回（只对 mp4/mov 有效）
+        if matches!(extension, "mp4" | "mov") {
+            command.arg("-movflags").arg("+faststart");
+        }
+        command.arg("-y").arg(&trimmed_file);
+
+        let mut child = command
+            .spawn()
+            .map_err(|e| format!("failed to spawn trim process: {e}"))?;
+        let _ = child.wait();
+
+        if !Path::new(&trimmed_file).exists() {
+            log::warn!("[trim_segment_warmup] trim output missing, keeping the warm-up intro");
+            return Ok(());
+        }
+
+        std::fs::remove_file(segment_file).map_err(|e| e.to_string())?;
+        std::fs::rename(&trimmed_file, segment_file).map_err(|e| e.to_string())?;
+        log::info!(
+            "[trim_segment_warmup] trimmed encoder warm-up of {:.1}s from {}",
+            warmup_seconds,
+            segment_file
+        );
+        Ok(())
+    }
+
+    /// 裁掉传统(gdigrab/avfoundation)片段开头的被动预热段。
+    ///
+    /// 用输出侧 `-ss` + 流拷贝：gdigrab 的首帧时间戳未必从 0 开始，输出侧截断比
+    /// 输入侧定位更稳；预热边界已由 `-force_key_frames expr:gte(t,预热秒数)` 打上
+    /// 关键帧，切口因此落在关键帧上、不会花屏。裁剪后片段文件名保持不变。
+    /// 传统路径的音视频同在片段内，会被一起裁掉，保持同步。
+    fn trim_legacy_warmup(&self) {
+        let Some(segment_file) = self.segment_warmup_file.as_deref() else {
+            return;
+        };
+        let warmup_seconds = self.segment_warmup_seconds;
+        if warmup_seconds <= 0.0 || !Path::new(segment_file).exists() {
+            return;
+        }
+
+        let path = Path::new(segment_file);
+        let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("mp4");
+        let trimmed_file = format!(
+            "{}-warmup-trim.{}",
+            path.with_extension("").to_string_lossy(),
+            extension
+        );
+
+        let mut command = self.get_ffmpeg_command();
+        command
+            // 输入侧定位：落在"最后一个不晚于目标点的关键帧"上——正是预热边界那个
+            // 关键帧。相比输出侧截断，失败时只会退化成"没裁"而不会从非关键帧起播花屏。
+            // 目标点给 0.15s 余量，容忍 gdigrab 帧时间戳的抖动
+            .arg("-ss")
+            .arg(format!("{:.3}", warmup_seconds + 0.15))
+            .arg("-i")
+            .arg(segment_file)
+            .arg("-c")
+            .arg("copy");
+        // 流拷贝会丢掉 faststart 标记，按原样补回（只对 mp4/mov 有效）
+        if matches!(extension, "mp4" | "mov") {
+            command.arg("-movflags").arg("+faststart");
+        }
+        command.arg("-y").arg(&trimmed_file);
+
+        match command.spawn() {
+            Ok(mut child) => {
+                let _ = child.wait();
+            }
+            Err(e) => {
+                log::warn!("[trim_legacy_warmup] failed to spawn trim process: {e}");
+                return;
+            }
+        }
+
+        if !Path::new(&trimmed_file).exists() {
+            log::warn!(
+                "[trim_legacy_warmup] trim output missing, keeping the warm-up intro ({segment_file})"
+            );
+            return;
+        }
+
+        if let Err(e) = std::fs::remove_file(segment_file) {
+            log::warn!("[trim_legacy_warmup] failed to remove original segment: {e}");
+            return;
+        }
+        if let Err(e) = std::fs::rename(&trimmed_file, segment_file) {
+            log::warn!("[trim_legacy_warmup] failed to replace segment: {e}");
+            return;
+        }
+
+        log::info!(
+            "[trim_legacy_warmup] trimmed first {:.1}s from {segment_file}",
+            warmup_seconds
+        );
+    }
+
+    fn wait_child_or_kill(child: &mut FfmpegChild, timeout: Duration) {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            match child.as_inner_mut().try_wait() {
+                Ok(Some(_)) => return,
+                Ok(None) => {
+                    if std::time::Instant::now() > deadline {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                Err(_) => return,
+            }
+        }
+    }
+
+    /// 将各片段 raw PCM 文件字节级合并为单个文件（成功后删除片段文件）。
+    fn concat_raw_files(
+        &self,
+        files: &[String],
+        output_path: String,
+    ) -> std::result::Result<String, String> {
+        use std::io::Write as IoWrite;
+
+        if files.is_empty() {
+            return Err("no raw files to concat".to_string());
+        }
+
+        let mut out = std::fs::File::create(&output_path).map_err(|e| e.to_string())?;
+        let mut total_size = 0usize;
+        for file in files {
+            let data = std::fs::read(file).map_err(|e| e.to_string())?;
+            total_size += data.len();
+            out.write_all(&data).map_err(|e| e.to_string())?;
+        }
+        drop(out);
+
+        // 所有片段均为空（如设备打开后立即失败）时视为无有效音频，
+        // 避免把空 raw 文件交给 ffmpeg 导致 mux 失败并残留垃圾文件
+        if total_size == 0 {
+            let _ = std::fs::remove_file(&output_path);
+            return Err("all audio segment files are empty".to_string());
+        }
+
+        for file in files {
+            let _ = std::fs::remove_file(file);
+        }
+        Ok(output_path)
+    }
+
+    /// pinray 模式录制结束后的音频合成：
+    /// 视频流 copy，麦克风（含降噪，与 legacy 行为一致）与系统声音（可混音）重编码为 aac。
+    fn mux_pinray_audio(&self, final_filename: &str) -> Result<()> {
+        let params = self.recording_params.as_ref().unwrap();
+        // GIF 片段不含音轨，无需 mux；MP4/MKV/MOV 均兼容 AAC 音轨
+        if params.format == VideoFormat::Gif {
+            return Ok(());
+        }
+
+        let mic_raw_path = if self.mic_audio_segments.is_empty() {
+            None
+        } else {
+            match self.concat_raw_files(
+                &self.mic_audio_segments,
+                format!("{}_mic.raw", params.output_file),
+            ) {
+                Ok(path) => Some(path),
+                Err(e) => {
+                    log::warn!("[mux_pinray_audio] failed to concat mic raw: {e}");
+                    None
+                }
+            }
+        };
+
+        let sys_raw_path = match self.sys_audio_meta {
+            Some(meta) => self
+                .concat_raw_files(
+                    &self.sys_audio_segments,
+                    format!("{}_sys.raw", params.output_file),
+                )
+                .ok()
+                .map(|path| (path, meta)),
+            None => None,
+        };
+
+        if mic_raw_path.is_none() && sys_raw_path.is_none() {
+            return Ok(());
+        }
+
+        let tmp_filename = format!(
+            "{}_mux_tmp.{}",
+            params.output_file,
+            params.format.extension()
+        );
+
+        let mut command = self.get_ffmpeg_command();
+        command.arg("-i").arg(final_filename);
+
+        // 麦克风 raw 读取参数（s16le/48k/2ch）与 spawn_pinray_mic_recorder 写入端的
+        // 强制归一化约定一致（见其注释）；系统声音 raw 读取参数来自 pinray 音频帧的
+        // 动态元信息（sys_audio_meta），二者不可能与实际写入格式不符。
+        match (&mic_raw_path, &sys_raw_path) {
+            (Some(mic_path), None) => {
+                command
+                    .arg("-f")
+                    .arg("s16le")
+                    .arg("-ar")
+                    .arg("48000")
+                    .arg("-ac")
+                    .arg("2")
+                    .arg("-i")
+                    .arg(mic_path);
+                command
+                    .arg("-filter_complex")
+                    .arg("[1:a]anlmdn=s=10:p=0.001:r=0.005[aout]")
+                    .arg("-map")
+                    .arg("0:v")
+                    .arg("-map")
+                    .arg("[aout]");
+            }
+            (None, Some((sys_path, meta))) => {
+                command
+                    .arg("-f")
+                    .arg(meta.ffmpeg_format())
+                    .arg("-ar")
+                    .arg(meta.sample_rate.to_string())
+                    .arg("-ac")
+                    .arg(meta.channels.to_string())
+                    .arg("-i")
+                    .arg(sys_path);
+                command.arg("-map").arg("0:v").arg("-map").arg("1:a");
+            }
+            (Some(mic_path), Some((sys_path, meta))) => {
+                command
+                    .arg("-f")
+                    .arg("s16le")
+                    .arg("-ar")
+                    .arg("48000")
+                    .arg("-ac")
+                    .arg("2")
+                    .arg("-i")
+                    .arg(mic_path);
+                command
+                    .arg("-f")
+                    .arg(meta.ffmpeg_format())
+                    .arg("-ar")
+                    .arg(meta.sample_rate.to_string())
+                    .arg("-ac")
+                    .arg(meta.channels.to_string())
+                    .arg("-i")
+                    .arg(sys_path);
+                command
+                    .arg("-filter_complex")
+                    .arg("[1:a]anlmdn=s=10:p=0.001:r=0.005[mic];[mic][2:a]amix=inputs=2:duration=longest[aout]")
+                    .arg("-map")
+                    .arg("0:v")
+                    .arg("-map")
+                    .arg("[aout]");
+            }
+            (None, None) => return Ok(()),
+        }
+
+        command
+            .arg("-c:v")
+            .arg("copy")
+            .arg("-c:a")
+            .arg("aac")
+            .arg("-b:a")
+            .arg("128k")
+            .arg("-movflags")
+            .arg("+faststart")
+            .arg("-y")
+            .arg(&tmp_filename);
+
+        println!("FFmpeg mux audio command args: {:?}", command);
+
+        let mut child = command.spawn().map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Failed to spawn mux process: {e}"),
+            )
+        })?;
+        let _ = child.wait();
+
+        if !std::path::Path::new(&tmp_filename).exists() {
+            // mux 失败：保留无音频视频，并清理已合并的 raw 文件
+            log::warn!("[mux_pinray_audio] mux output not found, keeping video without audio");
+            if let Some(path) = &mic_raw_path {
+                let _ = std::fs::remove_file(path);
+            }
+            if let Some((path, _)) = &sys_raw_path {
+                let _ = std::fs::remove_file(path);
+            }
+            return Ok(());
+        }
+
+        // 用 mux 结果替换最终文件
+        std::fs::remove_file(final_filename).ok();
+        std::fs::rename(&tmp_filename, final_filename).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Failed to rename muxed file: {e}"),
+            )
+        })?;
+
+        // 清理合并后的 raw 文件
+        if let Some(path) = &mic_raw_path {
+            let _ = std::fs::remove_file(path);
+        }
+        if let Some((path, _)) = &sys_raw_path {
+            let _ = std::fs::remove_file(path);
+        }
+
+        Ok(())
+    }
+
+    /// 根据编码器类型设置编码器与预设参数（legacy 与 pinray 管线共用）
+    fn apply_encoder_preset(command: &mut FfmpegCommand, encoder: &str, encoder_preset: &str) {
+        command.arg("-c:v").arg(encoder);
+
+        // 根据编码器类型设置预设值
+        // 注意: 检查顺序很重要,必须先检查特定编码器,最后才检查通用编码器
+        if encoder.contains("amf") {
+            // AMD AMF编码器只支持特定的预设值
+            let amf_preset = match encoder_preset {
+                "ultrafast" | "superfast" | "veryfast" | "faster" | "fast" => "speed",
+                "medium" | "slow" => "balanced",
+                "slower" | "veryslow" | "placebo" => "quality",
+                // 如果已经是AMF支持的预设值，直接使用
+                "speed" | "balanced" | "quality" => encoder_preset,
+                _ => "balanced", // 默认使用balanced
+            };
+            command.arg("-preset").arg(amf_preset);
+        } else if encoder.starts_with("libaom") || encoder.starts_with("av1_") {
+            // AV1编码器使用global_quality参数 (详见 get_global_quality 函数注释)
+            let quality = get_global_quality(encoder_preset);
+            command.arg("-global_quality").arg(quality.to_string());
+        } else if encoder.starts_with("libvpx") {
+            // VP9编码器使用global_quality参数 (详见 get_global_quality 函数注释)
+            let quality = get_global_quality(encoder_preset);
+            command.arg("-global_quality").arg(quality.to_string());
+        } else if encoder.starts_with("mpeg4") {
+            // MPEG4编码器使用qscale参数
+            let quality = get_mpeg4_quality(encoder_preset);
+            command.arg("-qscale").arg(quality.to_string());
+        } else if encoder.starts_with("prores") {
+            // ProRes编码器使用profile参数
+            let quality = get_prores_quality(encoder_preset);
+            command.arg("-profile").arg(quality.to_string());
+        } else if encoder.starts_with("h264_qsv") {
+            // Intel H264_QSV编码器使用global_quality参数
+            let quality = get_global_quality(encoder_preset);
+            command.arg("-global_quality").arg(quality.to_string());
+        } else if encoder.contains("nvenc") {
+            // NVIDIA NVENC编码器支持的预设值
+            let nvenc_preset = match encoder_preset {
+                "ultrafast" => "p1",              // 最快
+                "superfast" | "veryfast" => "p2", // 更快
+                "faster" | "fast" => "p3",        // 快
+                "medium" => "p4",                 // 中等（默认）
+                "slow" => "p5",                   // 慢
+                "slower" => "p6",                 // 更慢
+                "veryslow" | "placebo" => "p7",   // 最慢
+                // 如果已经是NVENC支持的预设值，直接使用
+                "p1" | "p2" | "p3" | "p4" | "p5" | "p6" | "p7" | "hq" | "hp" | "ll" | "llhq"
+                | "llhp" | "default" | "bd" | "lossless" | "losslesshp" => encoder_preset,
+                _ => "p4", // 默认使用p4（中等）
+            };
+            command.arg("-preset").arg(nvenc_preset);
+        } else {
+            // 其他编码器（如x264）使用原始预设值
+            command.arg("-preset").arg(encoder_preset);
+        }
+
+        // Intel QSV：把编码器的 GPU 并行深度压到 1。
+        // 默认 async_depth=4 会让编码器在 GPU 上同时排队多帧，桌面合成（DWM）
+        // 与 WGC 的帧拷贝被饿死——实测表现为录制刚开始的数秒内画面完全静止
+        // （音频正常、采集仍在出帧但像素不变），换软件 H.264 则完全正常。
+        // 串行编码牺牲一点吞吐，换取录制期间桌面不卡顿。
+        if encoder.contains("qsv") {
+            command.arg("-async_depth").arg("1");
         }
     }
 
@@ -692,14 +1861,14 @@ impl VideoRecordService {
 
         // macOS avfoundation 格式的正则表达式
         // 格式: [AVFoundation indev @ 0x...] [info] [0] 设备名称
-        let device_regex = match Regex::new(r#"\[AVFoundation indev @ [^\]]+\]\s+\[info\]\s+\[(\d+)\]\s+(.+)"#)
-        {
-            Ok(regex) => regex,
-            Err(e) => {
-                log::error!("[get_device_info_list] Failed to create regex: {}", e);
-                return device_info_list;
-            }
-        };
+        let device_regex =
+            match Regex::new(r#"\[AVFoundation indev @ [^\]]+\]\s+\[info\]\s+\[(\d+)\]\s+(.+)"#) {
+                Ok(regex) => regex,
+                Err(e) => {
+                    log::error!("[get_device_info_list] Failed to create regex: {}", e);
+                    return device_info_list;
+                }
+            };
 
         // 检测当前正在解析的设备类型
         let mut current_device_type = DeviceType::Video;
@@ -753,7 +1922,7 @@ impl VideoRecordService {
         format!("[{}] {}", device_info.index, device_info.name)
     }
 
-    pub fn get_microphone_device_names(&self) -> Vec<String> {
+    pub fn get_microphone_device_names(&mut self) -> Vec<String> {
         let mut device_names = Vec::new();
 
         #[cfg(target_os = "windows")]
@@ -835,6 +2004,10 @@ impl VideoRecordService {
             "[get_microphone_device_names] Total found devices: {}",
             device_names.len()
         );
+        // 供录制启动路径复用（设置页查询后缓存即刷新）
+        if !device_names.is_empty() {
+            self.mic_device_names_cache = Some(device_names.clone());
+        }
         device_names
     }
 
@@ -865,8 +2038,18 @@ impl VideoRecordService {
     }
 
     pub fn kill(&mut self) -> Result<()> {
+        // 尽量优雅地终止：先关 stdin（EOF）让 ffmpeg 写完 trailer（moov），
+        // 有界等待，超时才强杀——否则产物 MP4 缺 moov 无法播放。
+        // 该路径由前端"关闭录制窗口/卸载工具栏"触发，属正常用户操作。
+        if let Some(mut feed) = self.pinray_feed.take() {
+            feed.stop();
+        }
+        if let Some(mut mic_child) = self.mic_child.take() {
+            let _ = mic_child.quit();
+            let _ = mic_child.wait();
+        }
         if let Some(mut child) = self.child.take() {
-            let _ = child.kill();
+            Self::wait_child_or_kill(&mut child, Duration::from_secs(5));
         }
 
         self.cleanup();
@@ -892,10 +2075,20 @@ impl VideoRecordService {
 
         println!("[FFmpeg] Stopping and merging segments");
 
-        // 停止当前录制
-        if let Some(mut child) = self.child.take() {
+        // 停止当前录制：pinray 路径停采集线程（stdin EOF 让 ffmpeg 收尾），
+        // legacy 路径向 ffmpeg stdin 写 "q"（其 stdin 为控制通道，无数据流）
+        let capture_backend = self
+            .recording_params
+            .as_ref()
+            .map(|p| p.capture_backend)
+            .unwrap_or_default();
+        if capture_backend != VideoCaptureBackend::Legacy {
+            self.stop_pinray_segment();
+        } else if let Some(mut child) = self.child.take() {
             let _ = child.quit();
             let _ = child.wait();
+            // 裁掉传统路径的被动预热段（必须等 ffmpeg 写完 trailer）
+            self.trim_legacy_warmup();
         }
 
         // 如果只有一个片段，直接重命名
@@ -911,6 +2104,11 @@ impl VideoRecordService {
         } else if self.segments.len() > 1 {
             // 多个片段需要合并
             self.merge_segments(final_filename.clone())?;
+        }
+
+        // pinray 模式：合成麦克风/系统声音音轨
+        if capture_backend != VideoCaptureBackend::Legacy {
+            self.mux_pinray_audio(&final_filename)?;
         }
 
         // 如果需要转换为GIF格式
@@ -1158,6 +2356,13 @@ impl VideoRecordService {
         self.segments.clear();
         self.segment_counter = 0;
         self.recording_params = None;
+        self.pinray_feed = None;
+        self.mic_child = None;
+        self.mic_audio_segments.clear();
+        self.sys_audio_segments.clear();
+        self.sys_audio_meta = None;
+        self.segment_warmup_seconds = 0.0;
+        self.segment_warmup_file = None;
     }
 
     pub fn pause(&mut self) -> Result<()> {
@@ -1170,10 +2375,20 @@ impl VideoRecordService {
 
         println!("[FFmpeg] Pausing recording - stopping current segment");
 
-        // 停止当前片段的录制
-        if let Some(mut child) = self.child.take() {
+        // 停止当前片段的录制：pinray 路径停采集线程（stdin EOF），
+        // legacy 路径向 ffmpeg stdin 写 "q"
+        let capture_backend = self
+            .recording_params
+            .as_ref()
+            .map(|p| p.capture_backend)
+            .unwrap_or_default();
+        if capture_backend != VideoCaptureBackend::Legacy {
+            self.stop_pinray_segment();
+        } else if let Some(mut child) = self.child.take() {
             let _ = child.quit();
             let _ = child.wait();
+            // 裁掉传统路径的被动预热段（必须等 ffmpeg 写完 trailer）
+            self.trim_legacy_warmup();
         }
 
         self.state = VideoRecordState::Paused;

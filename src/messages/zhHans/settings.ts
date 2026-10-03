@@ -348,6 +348,10 @@ export const settings = {
 	"settings.functionSettings.videoRecordSettings.enableApngFormat":
 		"启用 APNG 格式",
 	"settings.functionSettings.videoRecordSettings.gifFormat": "动图格式",
+	"settings.functionSettings.videoRecordSettings.videoFormat": "视频格式",
+	"settings.functionSettings.videoRecordSettings.videoFormat.mp4": "MP4",
+	"settings.functionSettings.videoRecordSettings.videoFormat.mkv": "MKV",
+	"settings.functionSettings.videoRecordSettings.videoFormat.mov": "MOV",
 	"settings.functionSettings.videoRecordSettings.gifFormat.gif": "GIF",
 	"settings.functionSettings.videoRecordSettings.gifFormat.apng": "APNG",
 	"settings.functionSettings.videoRecordSettings.gifFormat.webp": "WebP",
@@ -369,6 +373,16 @@ export const settings = {
 	"settings.functionSettings.videoRecordSettings.encoderPreset.tip":
 		"编码速率越快，计算资源消耗越低，但视频文件越大",
 	"settings.functionSettings.videoRecordSettings.hwaccel": "启用硬件加速",
+	"settings.functionSettings.videoRecordSettings.captureBackend":
+		"视频采集后端",
+	"settings.functionSettings.videoRecordSettings.captureBackend.pinray":
+		"pinray（推荐）",
+	"settings.functionSettings.videoRecordSettings.captureBackend.legacy":
+		"传统（gdigrab/avfoundation）",
+	"settings.functionSettings.videoRecordSettings.pixelFormat":
+		"采集像素格式（仅 pinray）",
+	"settings.functionSettings.videoRecordSettings.enableSystemAudio":
+		"采集系统声音",
 	"settings.functionSettings.videoRecordSettings.saveDirectory": "保存目录",
 	"settings.functionSettings.videoRecordSettings.videoMaxSize": "视频清晰度",
 	"settings.functionSettings.videoRecordSettings.gifMaxSize": "动图清晰度",
@@ -662,6 +676,8 @@ export const settings = {
 	"settings.systemSettings.screenshotSettings.captureMethod.auto": "自动",
 	"settings.systemSettings.screenshotSettings.captureMethod.wgc": "WGC",
 	"settings.systemSettings.screenshotSettings.captureMethod.xcap": "xcap",
+	"settings.systemSettings.screenshotSettings.captureMethod.pinray":
+		"pinray",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection":
 		"HDR 颜色校正",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection.linear":

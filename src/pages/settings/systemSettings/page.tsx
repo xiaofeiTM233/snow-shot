@@ -243,6 +243,12 @@ export const SystemSettingsPage = () => {
 				}),
 				value: CaptureMethod.Xcap,
 			},
+			{
+				label: intl.formatMessage({
+					id: "settings.systemSettings.screenshotSettings.captureMethod.pinray",
+				}),
+				value: CaptureMethod.Pinray,
+			},
 		];
 	}, [intl]);
 

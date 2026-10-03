@@ -21,10 +21,13 @@ import {
 	OcrDetectAfterAction,
 	OcrModel,
 	OcrTextAutoWrapMode,
+	RecordPixelFormat,
 	RenderBackend,
 	RunLogLevel,
 	TrayIconClickAction,
 	TrayIconDefaultIcon,
+	VideoCaptureBackend,
+	VideoFormat,
 	VideoMaxSize,
 } from "@/types/appSettings";
 import { DrawState } from "@/types/draw";
@@ -326,7 +329,9 @@ Priority order (highest to lowest):
 		encoderPreset: "ultrafast",
 		videoMaxSize: VideoMaxSize.P1080,
 		gifMaxSize: VideoMaxSize.P1080,
+		videoFormat: VideoFormat.Mp4,
 		gifFormat: GifFormat.Gif,
+		captureCursor: false,
 		enableKeyDisplay: true,
 		keyDisplayFontSize: 16,
 		keyDisplayBackgroundColor: "rgba(0, 0, 0, 0.42)",
@@ -334,6 +339,9 @@ Priority order (highest to lowest):
 		keyDisplayDuration: 3000,
 		keyDisplayMergeDuration: 256,
 		keyDisplayDirection: KeyDisplayDirection.Vertical,
+		enableSystemAudio: false,
+		captureBackend: VideoCaptureBackend.Pinray,
+		pixelFormat: RecordPixelFormat.Bgra,
 	},
 	[AppSettingsGroup.SystemScreenshot]: {
 		ocrHotStart: true,

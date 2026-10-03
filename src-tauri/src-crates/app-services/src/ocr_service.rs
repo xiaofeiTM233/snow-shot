@@ -134,7 +134,8 @@ impl OcrService {
         ocr_model_write_to_memory: bool,
     ) -> Result<(), String> {
         let det_file = det_model_name.unwrap_or_else(|| "ch_PP-OCRv4_det_infer.onnx".to_string());
-        let cls_file = cls_model_name.unwrap_or_else(|| "ch_ppocr_mobile_v2.0_cls_infer.onnx".to_string());
+        let cls_file =
+            cls_model_name.unwrap_or_else(|| "ch_ppocr_mobile_v2.0_cls_infer.onnx".to_string());
         let rec_file = rec_model_name.unwrap_or_else(|| "ch_PP-OCRv4_rec_infer.onnx".to_string());
 
         log::info!(

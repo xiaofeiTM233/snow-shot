@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { GifFormat, VideoFormat } from "@/types/appSettings";
+import type {
+	GifFormat,
+	RecordPixelFormat,
+	VideoCaptureBackend,
+	VideoFormat,
+} from "@/types/appSettings";
 import { getPlatform } from "@/utils/platform";
 
 export const videoRecordStart = async (
@@ -18,6 +23,9 @@ export const videoRecordStart = async (
 	encoderPreset: string,
 	videoMaxWidth: number,
 	videoMaxHeight: number,
+	captureBackend?: VideoCaptureBackend,
+	pixelFormat?: RecordPixelFormat,
+	captureCursor?: boolean,
 ) => {
 	const result = await invoke("video_record_start", {
 		minX,
@@ -35,6 +43,9 @@ export const videoRecordStart = async (
 		encoderPreset,
 		videoMaxWidth,
 		videoMaxHeight,
+		captureBackend,
+		pixelFormat,
+		captureCursor,
 	});
 	return result;
 };
@@ -80,6 +91,29 @@ export const videoRecordGetMicrophoneDeviceNames = async () => {
 
 export const videoRecordInit = async (ffmpegPluginDir: string) => {
 	const result = await invoke("video_record_init", { ffmpegPluginDir });
+	return result;
+};
+
+/**
+ * 在用户点"开始录制"之前预热编码器（选区出现时调用）
+ *
+ * 让 ffmpeg/编码器的启动开销与硬件编码器的 GPU 启动停顿提前发生，
+ * 点击开始后即可立即进入录制。
+ */
+export const videoRecordWarmup = async (
+	encoder: string,
+	encoderPreset: string,
+	width: number,
+	height: number,
+	frameRate: number,
+) => {
+	const result = await invoke("video_record_warmup", {
+		encoder,
+		encoderPreset,
+		width,
+		height,
+		frameRate,
+	});
 	return result;
 };
 
