@@ -1698,7 +1698,12 @@ const DrawPageCore: React.FC<{
 			}
 
 			if (payload.type === ScreenshotType.CaptureFullScreen) {
-				captureHistoryActionRef.current?.captureFullScreen();
+				// 不能裸调用：captureFullScreenAction 返回的 Promise 若 reject
+				// （如 save_file 无权限），无人 await/catch 会导致整条链静默失败，
+				// 表现为只有快门声、既无文件也无日志。
+				captureHistoryActionRef.current?.captureFullScreen().catch((error) => {
+					appError("[DrawPageCore] captureFullScreen unhandled error", error);
+				});
 				return;
 			}
 

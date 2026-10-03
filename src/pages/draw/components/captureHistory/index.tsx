@@ -407,20 +407,43 @@ const CaptureHistoryControllerCore: React.FC<{
 
 		// 复制到剪贴板
 		if (enableFullAutoSave) {
-			await copyToClipboard(imageBuffer.buffer, appSettings, undefined);
+			// 同样补 try：copyToClipboard 的兜底分支失败时不会抛错，
+			// 但异常路径（如 getImagePathFromSettings 之前抛错）会静默中断后续保存。
+			try {
+				await copyToClipboard(imageBuffer.buffer, appSettings, undefined);
+			} catch (error) {
+				appError(
+					"[CaptureHistoryController] captureFullScreenAction failed to copy to clipboard",
+					error,
+				);
+			}
 		}
 
 		// 保存到文件
 		if (enableAutoSave) {
-			const imagePath = await getImagePathFromSettings(
-				appSettings,
-				"full-screen",
-			);
-			if (imagePath) {
-				await saveFile(
-					imagePath.filePath,
-					imageBuffer.buffer,
-					imagePath.imageFormat,
+			// 这段原本不在上面的 try 内，且调用方 page.tsx 未 await/catch，
+			// 失败时整条 Promise 静默变 rejected：快门声已响、截图历史也有记录，
+			// 但文件没落盘且日志里看不到任何线索。复制失败同理。
+			try {
+				const imagePath = await getImagePathFromSettings(
+					appSettings,
+					"full-screen",
+				);
+				if (imagePath) {
+					await saveFile(
+						imagePath.filePath,
+						imageBuffer.buffer,
+						imagePath.imageFormat,
+					);
+				} else {
+					appError(
+						"[CaptureHistoryController] captureFullScreenAction save skipped, imagePath is undefined",
+					);
+				}
+			} catch (error) {
+				appError(
+					"[CaptureHistoryController] captureFullScreenAction failed to save file",
+					error,
 				);
 			}
 		}

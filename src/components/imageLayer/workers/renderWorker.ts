@@ -13,6 +13,7 @@ import type { ImageSharedBufferData } from "@/pages/draw/tools";
 import {
 	type BlurSprite,
 	type HighlightElement,
+	INIT_CONTAINER_KEY,
 	renderAddImageToContainerAction,
 	renderApplyProcessImageConfigToCanvasAction,
 	renderCanvasRenderAction,
@@ -23,9 +24,11 @@ import {
 	renderCreateNewCanvasContainerAction,
 	renderDeleteBlurSpriteAction,
 	renderDisposeCanvasAction,
+	renderEnsureImageRenderedAction,
 	renderGetImageBitmapAction,
 	renderInitBaseImageTextureAction,
 	renderInitCanvasAction,
+	renderLog,
 	renderRenderToCanvasAction,
 	renderRenderToPngAction,
 	renderResizeCanvasAction,
@@ -34,21 +37,18 @@ import {
 	renderUpdateHighlightAction,
 	renderUpdateHighlightElementPropsAction,
 	renderUpdateWatermarkSpriteAction,
-	renderEnsureImageRenderedAction,
-	INIT_CONTAINER_KEY,
-	renderLog,
 	setForwardLog,
 	type WatermarkProps,
 } from "../baseLayerRenderActions";
 import {
 	type BaseLayerRenderAddImageToContainerData,
 	type BaseLayerRenderApplyProcessImageConfigToCanvasData,
-	type BaseLayerRenderEnsureImageRenderedData,
 	type BaseLayerRenderClearContainerData,
 	type BaseLayerRenderCreateBlurSpriteData,
 	type BaseLayerRenderCreateNewCanvasContainerData,
 	type BaseLayerRenderData,
 	type BaseLayerRenderDeleteBlurSpriteData,
+	type BaseLayerRenderEnsureImageRenderedData,
 	type BaseLayerRenderGetImageBitmapData,
 	type BaseLayerRenderInitBaseImageTextureData,
 	type BaseLayerRenderInitData,
@@ -561,18 +561,27 @@ const dispatchRenderMessage = async ({
 	self.postMessage(message);
 };
 
-self.onmessage = async (event: MessageEvent<BaseLayerRenderData>) => {
-	try {
-		await dispatchRenderMessage(event);
-	} catch (error) {
-		renderLog(
-			"error",
-			`[ImageLayer][renderWorker] handle ${event.data.type} failed: ${String(error)}`,
-		);
-		// 回传空结果：让主线程的等待 resolve，避免永久挂起
-		self.postMessage({
-			type: event.data.type,
-			payload: undefined,
-		} as unknown as RenderResult);
-	}
+// Worker 不会因为 onmessage 是 async 就串行派发：引擎把下一条消息交给 handler 时，
+// 不会等待上一条 handler 的 await 完成。于是 AddImageToContainer 在 await 纹理上传期间，
+// GetImageBitmap 会并发进来读到尚未 addChild 的空容器（childrenCount: 0），
+// 导致预览与保存/复制全黑。这里用 Promise 链把消息派发显式串行化。
+// 注意 catch 必须挂在每一条消息自己的链上，否则一次失败会毒化整个队列。
+let dispatchQueue: Promise<void> = Promise.resolve();
+
+self.onmessage = (event: MessageEvent<BaseLayerRenderData>) => {
+	dispatchQueue = dispatchQueue.then(async () => {
+		try {
+			await dispatchRenderMessage(event);
+		} catch (error) {
+			renderLog(
+				"error",
+				`[ImageLayer][renderWorker] handle ${event.data.type} failed: ${String(error)}`,
+			);
+			// 回传空结果：让主线程的等待 resolve，避免永久挂起
+			self.postMessage({
+				type: event.data.type,
+				payload: undefined,
+			} as unknown as RenderResult);
+		}
+	});
 };
