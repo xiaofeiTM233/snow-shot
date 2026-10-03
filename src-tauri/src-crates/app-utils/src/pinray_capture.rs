@@ -5,16 +5,18 @@
 //! macOS 使用 ScreenCaptureKit。
 //! pinray 仅输出 SDR 8bit 帧，HDR 显示器上无 HDR 色彩校正能力。
 
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use image::DynamicImage;
+use image::{DynamicImage, GenericImageView};
 use pinray::{
     CaptureEvent, CaptureSession, CursorMode, PinrayError, PixelFormat, Rect, SourceId,
     VideoCaptureTarget,
 };
 
 /// pinray Windows 视频引擎（macOS 固定 ScreenCaptureKit，忽略此参数）
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum PinrayVideoEngine {
     /// Windows Graphics Capture：持续出帧，支持窗口捕获、指针合成。
     /// 冷启动首帧可能因 MPO 未重定向出现视频区域全黑，需丢弃。
@@ -96,20 +98,40 @@ fn build_session(
 
 /// 从会话中循环等待第一个可用视频帧（Timeout 属正常流，重试直至截止）。
 ///
+/// 传入 `&mut CaptureSession` 而非按值消费，使调用方可以把同一个常驻 session
+/// 留在池中复用（见 `capture_display_frame`）。`start()` 幂等：已运行的 session
+/// 直接返回 `Ok`，因此复用的 session 再次取帧不会重建捕获目标。
+///
 /// `drop_first_frame`：是否丢弃冷启动首帧。WGC 会话刚建立时 DWM 尚未把硬件
 /// 视频叠加层（MPO，浏览器播放中的视频、部分播放器）重定向进合成 surface，
 /// 首帧表现为"桌面正常、视频区域全黑"，与截图路径 windows_capture_image
 /// 丢弃首帧的原因一致，取第二帧（约一个合成周期后，视频已合成进画面）。
 /// DXGI 桌面复制仅在桌面变化时出帧，静态桌面可能等不到第二帧，因此不丢弃
 /// 首帧（其 MPO 缺失属驱动级行为，等待也无法解决）。
+///
+/// 复用的 session 不再丢弃首帧：首帧丢弃只针对冷启动，会话已在运行说明 DWM
+/// 早已完成 MPO 重定向，此时丢帧反而会多等一个合成周期。
 fn capture_first_frame(
-    mut session: CaptureSession,
+    session: &mut CaptureSession,
     drop_first_frame: bool,
 ) -> Result<CapturedFrame, String> {
+    if session.is_running() {
+        // 复用路径：session 已在运行，直接取下一帧
+        return capture_next_frame(session, None);
+    }
+
     if let Err(e) = session.start() {
         return Err(format!("pinray start session failed: {e}"));
     }
 
+    capture_next_frame(session, Some(drop_first_frame))
+}
+
+/// 在已运行的 session 上取一帧；`drop_first_frame` 为 `Some(true)` 时跳过冷启动首帧。
+fn capture_next_frame(
+    session: &mut CaptureSession,
+    drop_first_frame: Option<bool>,
+) -> Result<CapturedFrame, String> {
     let deadline = Instant::now() + FIRST_FRAME_DEADLINE;
     let mut video_frames_seen: u32 = 0;
     loop {
@@ -121,7 +143,7 @@ fn capture_first_frame(
         match session.next_event(Some(FIRST_FRAME_WAIT)) {
             Ok(CaptureEvent::Video(frame)) => {
                 video_frames_seen += 1;
-                if drop_first_frame && video_frames_seen == 1 {
+                if drop_first_frame == Some(true) && video_frames_seen == 1 {
                     continue;
                 }
 
@@ -138,7 +160,6 @@ fn capture_first_frame(
                     height: frame.height,
                     rgba: bytes,
                 };
-                let _ = session.stop();
                 return Ok(captured);
             }
             Ok(_) => continue,
@@ -158,20 +179,211 @@ fn capture_first_frame(
 ///   十进制串（即 xcap `Monitor::id()`）。
 /// * `crop`：相对显示器原点的裁剪区域（物理像素），None 表示全屏。
 /// * `engine`：Windows 视频引擎（WGC/DXGI），macOS 忽略。
+/// * `expect_width` / `expect_height`：期望的帧尺寸，None 表示不校验（首次
+///   建池时调用方还拿不到显示器尺寸）。
+///
+/// 复用常驻 session：每次重建 session 都要 `D3D11CreateDevice` +
+/// `CreateFreeThreaded` + 在 DWM 注册捕获目标，是单次耗时的主要来源；
+/// 并发时更会各自持有独立 GPU 纹理（`queue_depth=2` 时每 session 约 16MB），
+/// 实测 33 并发会耗尽资源导致进程在后续内存分配中被终止。
+/// 录屏同样走 WGC 但只用一个 session，因此 60fps 稳定。
+///
+/// 帧尺寸在 `session.start()` 时由 frame pool 固定，改变分辨率会让已缓存的
+/// session 返回过期尺寸。这里拿到帧后校验尺寸，不符即丢弃重建（配置变化的
+/// 结果就是尺寸，校验结果即可，无需监听配置变更）。
 pub fn capture_display_frame(
     source_id: String,
     crop: Option<Rect>,
     engine: PinrayVideoEngine,
+    expect_width: Option<u32>,
+    expect_height: Option<u32>,
 ) -> Result<DynamicImage, String> {
-    let session = build_session(
-        VideoCaptureTarget::Display(SourceId::new(source_id)),
-        crop,
+    let key = SessionKey {
+        source_id: source_id.clone(),
+        crop: crop.map(|r| RectKey {
+            x: r.x,
+            y: r.y,
+            w: r.width,
+            h: r.height,
+        }),
         engine,
-    )?;
+    };
 
+    // 启动空闲回收线程：运行中的 WGC session 会持续占用 GPU，必须在不再截图时
+    // 也能自动回收。放在锁外避免持锁期间阻塞清理线程。
+    ensure_pool_cleaner();
+
+    // 第一段临界区：只做「取出 session / 空闲回收」，取帧过程不持锁，
+    // 否则建 session 与等首帧的数百毫秒会把全局池锁住，退化成全流程串行。
+    let pool = {
+        let mut guard = SESSION_POOL
+            .lock()
+            .map_err(|_| "pinray session pool lock poisoned")?;
+        match guard.as_ref() {
+            Some(existing) => Arc::clone(existing),
+            None => {
+                let created = Arc::new(Mutex::new(HashMap::new()));
+                *guard = Some(Arc::clone(&created));
+                created
+            }
+        }
+    };
+
+    let cached = {
+        let mut entries = pool
+            .lock()
+            .map_err(|_| "pinray session entries lock poisoned")?;
+        // 顺带回收空闲超时的 session：drop 时会 stop 并释放 GPU 资源
+        entries.retain(|_, pooled| pooled.last_used.elapsed() < SESSION_IDLE_TIMEOUT);
+        // 取池中已有 session；已停止（失效）则丢弃重建
+        entries
+            .remove(&key)
+            .filter(|cached| cached.session.is_running())
+            .map(|cached| cached.session)
+    };
+
+    let mut session = match cached {
+        Some(cached) => cached,
+        None => {
+            log::debug!("[pinray_capture] creating new session: {:?}", key);
+            build_session(
+                VideoCaptureTarget::Display(SourceId::new(source_id)),
+                crop,
+                engine,
+            )?
+        }
+    };
+
+    // 无锁区：建 session 与等首帧，允许不同source 并发
     // WGC 丢弃冷启动首帧避开 MPO 全黑问题；DXGI 变化出帧，不丢弃（见函数注释）
     let drop_first_frame = engine != PinrayVideoEngine::Dxgi;
-    capture_first_frame(session, drop_first_frame).and_then(frame_to_image)
+    let image = match capture_first_frame(&mut session, drop_first_frame).and_then(frame_to_image) {
+        Ok(image) => image,
+        Err(e) => {
+            // 出错时不放回池：session 状态不可信，下次访问会重建
+            return Err(e);
+        }
+    };
+
+    // 尺寸不符说明显示配置已变（frame pool 在 start 时固定尺寸），
+    // 该 session 后续都会返回过期尺寸，直接丢弃不放回池中。
+    if image_size_matches(&image, expect_width, expect_height) {
+        if let Ok(mut entries) = pool.lock() {
+            entries.insert(
+                key,
+                PooledSession {
+                    session,
+                    last_used: Instant::now(),
+                },
+            );
+        }
+    }
+
+    Ok(image)
+}
+
+fn image_size_matches(image: &DynamicImage, w: Option<u32>, h: Option<u32>) -> bool {
+    match (w, h) {
+        (Some(w), Some(h)) => {
+            let (iw, ih) = image.dimensions();
+            iw == w && ih == h
+        }
+        _ => true,
+    }
+}
+
+/// session 池条目：常驻 session 及其最后使用时刻。
+struct PooledSession {
+    session: CaptureSession,
+    last_used: Instant,
+}
+
+/// session 池键：不同源/裁剪/引擎不能共用同一 session。
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+struct SessionKey {
+    source_id: String,
+    crop: Option<RectKey>,
+    engine: PinrayVideoEngine,
+}
+
+/// `Rect` 未实现 Hash，池键用等价标量元组代替。
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+struct RectKey {
+    x: i32,
+    y: i32,
+    w: u32,
+    h: u32,
+}
+
+/// 常驻 session 的空闲回收阈值。
+///
+/// 复用 session 只为避开连续截图时反复 `D3D11CreateDevice` + DWM 注册的开销；
+/// 而运行中的 WGC session 会让 DWM 持续做合成计算（任务管理器可见 GPU 占用，
+/// 画面静止时也不归零）。截图是低频操作，空闲 2 秒即回收，兼顾连按时的复用
+/// 与空闲后的资源归还。
+const SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// session 池：按 `(source_id, crop, engine)` 缓存常驻 session。
+///
+/// `Arc` 共享，使后台清理线程也能访问。全局 `Mutex` 只保护 map 本身，实际采集
+/// 耗时较长，因此锁范围仅限取出/放回 session 这两步，取帧过程不持锁。
+static SESSION_POOL: Mutex<Option<Arc<Mutex<HashMap<SessionKey, PooledSession>>>>> =
+    Mutex::new(None);
+
+/// 后台清理线程是否已启动。
+static CLEANER_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// 确保空闲回收线程已启动（进程内只启动一次）。
+///
+/// 回收必须独立于截图调用：运行中的 WGC session 会让 DWM 持续做合成计算，
+/// 即使不再截图也会一直占用 GPU（实测空闲数分钟仍有约 20% 占用）。
+/// 若把回收挂在「下次截图时顺手做」上，不截图就永远不会回收。
+fn ensure_pool_cleaner() {
+    use std::sync::atomic::Ordering;
+
+    if CLEANER_STARTED.swap(true, Ordering::AcqRel) {
+        return; // 已启动
+    }
+
+    std::thread::Builder::new()
+        .name("pinray-pool-cleaner".to_string())
+        .spawn(|| loop {
+            // 检查间隔取超时的一半，保证最迟在超时后半个周期内回收
+            let tick = SESSION_IDLE_TIMEOUT / 2;
+            std::thread::sleep(tick);
+
+            let pool = match SESSION_POOL.lock() {
+                Ok(guard) => guard.clone(),
+                Err(_) => continue, // 锁中毒：跳过本轮，交给下一次调用重建
+            };
+            let Some(entries) = pool else { continue };
+
+            if let Ok(mut map) = entries.lock() {
+                let before = map.len();
+                // drop 被移除的 entry 即调用 session.stop()，释放 GPU 资源
+                let mut released = 0usize;
+                map.retain(|_, pooled| {
+                    let alive = pooled.last_used.elapsed() < SESSION_IDLE_TIMEOUT;
+                    if !alive {
+                        released += 1;
+                    }
+                    alive
+                });
+                if released > 0 {
+                    log::debug!(
+                        "[pinray_capture] released {released} idle session(s), pooled {before} -> {}",
+                        map.len()
+                    );
+                }
+            }
+            // 池本身由 Arc 持有，后台线程不负责停止自身：进程退出时由系统回收
+        })
+        .map(|_| ())
+        .unwrap_or_else(|e| {
+            log::warn!("[pinray_capture] failed to start pool cleaner: {e}");
+            // 启动失败则复位，允许下次截图重试
+            CLEANER_STARTED.store(false, Ordering::Release);
+        });
 }
 
 /// 截取窗口单帧（仅 Windows；pinray 窗口源 ID 为 `window:{hwnd}`）。
@@ -180,11 +392,11 @@ pub fn capture_display_frame(
 /// macOS 下 pinray 窗口捕获输出为显示器尺寸（letterbox 已知问题），不启用。
 #[cfg(target_os = "windows")]
 pub fn capture_window_frame(hwnd_isize: isize) -> Result<DynamicImage, String> {
-    let session = build_session(
+    let mut session = build_session(
         VideoCaptureTarget::Window(SourceId::new(format!("window:{hwnd_isize}"))),
         None,
         PinrayVideoEngine::Wgc,
     )?;
 
-    capture_first_frame(session, true).and_then(frame_to_image)
+    capture_first_frame(&mut session, true).and_then(frame_to_image)
 }
