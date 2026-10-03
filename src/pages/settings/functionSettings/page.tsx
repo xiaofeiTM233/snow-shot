@@ -837,23 +837,19 @@ export const FunctionSettingsPage = () => {
 
 			const htmlVisionModelOptions = [
 				{
-					label: (
-						<IconLabel
-							label={intl.formatMessage({
-								id: "settings.functionSettings.ocrSettings.htmlVisionModel.default",
-							})}
-							tooltipTitle={intl.formatMessage({
-								id: "settings.functionSettings.ocrSettings.htmlVisionModel.default.tip",
-							})}
-						/>
-					),
+					label: intl.formatMessage({
+						id: "settings.functionSettings.ocrSettings.htmlVisionModel.default",
+					}),
+					title: intl.formatMessage({
+						id: "settings.functionSettings.ocrSettings.htmlVisionModel.default.tip",
+					}),
 					value:
 						defaultAppSettingsData[AppSettingsGroup.FunctionOcr]
 							.htmlVisionModel,
 				},
 				customVisionModelList.length > 0
 					? {
-							label: <FormattedMessage id="tools.chat.custom" />,
+							label: intl.formatMessage({ id: "tools.chat.custom" }),
 							options: customVisionModelList.map((model) => ({
 								label: model.config.model_name,
 								value: model.config.model_name,
@@ -862,7 +858,7 @@ export const FunctionSettingsPage = () => {
 					: undefined,
 				officialVisionModelList.length > 0
 					? {
-							label: <FormattedMessage id="tools.chat.official" />,
+							label: intl.formatMessage({ id: "tools.chat.official" }),
 							options: officialVisionModelList.map((model) => ({
 								label: model.config.model_name,
 								value: model.config.model_name,
@@ -1696,21 +1692,21 @@ export const FunctionSettingsPage = () => {
 										layout="vertical"
 										options={[
 											{
-												label: (
-													<FormattedMessage id="settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.disabled" />
-												),
+												label: intl.formatMessage({
+													id: "settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.disabled",
+												}),
 												value: OcrTextAutoWrapMode.Disabled,
 											},
 											{
-												label: (
-													<FormattedMessage id="settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.conservative" />
-												),
+												label: intl.formatMessage({
+													id: "settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.conservative",
+												}),
 												value: OcrTextAutoWrapMode.Conservative,
 											},
 											{
-												label: (
-													<FormattedMessage id="settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.auto" />
-												),
+												label: intl.formatMessage({
+													id: "settings.functionSettings.ocrSettings.ocrTextAutoWrapMode.auto",
+												}),
 												value: OcrTextAutoWrapMode.Auto,
 											},
 										]}
@@ -3150,15 +3146,15 @@ export const FunctionSettingsPage = () => {
 													}
 													options={[
 														{
-															label: (
-																<FormattedMessage id="settings.functionSettings.videoRecordSettings.keyDisplayDirection.horizontal" />
-															),
+															label: intl.formatMessage({
+																id: "settings.functionSettings.videoRecordSettings.keyDisplayDirection.horizontal",
+															}),
 															value: KeyDisplayDirection.Horizontal,
 														},
 														{
-															label: (
-																<FormattedMessage id="settings.functionSettings.videoRecordSettings.keyDisplayDirection.vertical" />
-															),
+															label: intl.formatMessage({
+																id: "settings.functionSettings.videoRecordSettings.keyDisplayDirection.vertical",
+															}),
 															value: KeyDisplayDirection.Vertical,
 														},
 													]}
