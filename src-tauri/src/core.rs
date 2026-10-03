@@ -331,7 +331,10 @@ pub async fn auto_start_enable(app: tauri::AppHandle) -> Result<(), String> {
             },
             Ok(false) => (),
             Err(e) => {
-                log::warn!("[auto_start_enable] Failed to check autostart status: {}", e);
+                log::warn!(
+                    "[auto_start_enable] Failed to check autostart status: {}",
+                    e
+                );
             }
         }
 
@@ -365,7 +368,10 @@ pub async fn auto_start_disable(app: tauri::AppHandle) -> Result<(), String> {
         },
         Ok(false) => (),
         Err(e) => {
-            log::warn!("[auto_start_disable] Failed to check autostart status: {}", e);
+            log::warn!(
+                "[auto_start_disable] Failed to check autostart status: {}",
+                e
+            );
         }
     }
 

@@ -20,6 +20,7 @@ use tokio::sync::Mutex;
 
 use tauri::Manager;
 
+use serde::{Deserialize, Serialize};
 use snow_shot_app_os::ui_automation::UIElements;
 use snow_shot_app_scroll_screenshot_service::scroll_screenshot_capture_service;
 use snow_shot_app_scroll_screenshot_service::scroll_screenshot_image_service;
@@ -33,7 +34,6 @@ use snow_shot_app_services::resize_window_service;
 use snow_shot_app_services::video_record_service;
 use snow_shot_app_shared::EnigoManager;
 use snow_shot_global_state::{CaptureState, ReadClipboardState, WebViewSharedBufferState};
-use serde::{Deserialize, Serialize};
 use snow_shot_plugin_service::plugin_service;
 
 /// 主窗口几何信息（outer size / outer position）。
@@ -126,42 +126,42 @@ fn restore_main_window_geometry(app: &tauri::AppHandle) {
 /// 关闭时删除已保存的几何文件，使下次启动恢复默认。
 #[tauri::command]
 fn set_remember_window_geometry(app: tauri::AppHandle, remember: Option<bool>) {
-	// 前端旧配置/未加载时可能传入 undefined，JSON 序列化后该 key 被丢弃，
-	// 这里回退到默认 true，避免命令因缺少必需参数而报错。
-	let remember = remember.unwrap_or(true);
-	set_remember_window_geometry_enabled(remember);
-	if !remember {
-		if let Ok(dir) = app.path().app_config_dir() {
-			let _ = std::fs::remove_file(dir.join("main-window-geometry.json"));
-		}
-	}
+    // 前端旧配置/未加载时可能传入 undefined，JSON 序列化后该 key 被丢弃，
+    // 这里回退到默认 true，避免命令因缺少必需参数而报错。
+    let remember = remember.unwrap_or(true);
+    set_remember_window_geometry_enabled(remember);
+    if !remember {
+        if let Ok(dir) = app.path().app_config_dir() {
+            let _ = std::fs::remove_file(dir.join("main-window-geometry.json"));
+        }
+    }
 }
 
 /// 恢复主窗口到默认尺寸/位置：
 /// 删除已保存的几何文件，并将窗口重置为配置文件中的默认宽高并居中。
 #[tauri::command]
 fn reset_main_window_geometry(app: tauri::AppHandle) {
-	let Some(window) = app.get_webview_window("main") else {
-		return;
-	};
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
 
-	// 删除已保存的几何信息，使下次启动同样恢复默认
-	if let Ok(dir) = app.path().app_config_dir() {
-		let _ = std::fs::remove_file(dir.join("main-window-geometry.json"));
-	}
+    // 删除已保存的几何信息，使下次启动同样恢复默认
+    if let Ok(dir) = app.path().app_config_dir() {
+        let _ = std::fs::remove_file(dir.join("main-window-geometry.json"));
+    }
 
-	// 从配置读取主窗口默认宽高（写死兜底，防止配置缺失）
-	let (width, height) = app
-		.config()
-		.app
-		.windows
-		.iter()
-		.find(|w| w.label == "main")
-		.map(|w| (w.width as u32, w.height as u32))
-		.unwrap_or((1024, 632));
+    // 从配置读取主窗口默认宽高（写死兜底，防止配置缺失）
+    let (width, height) = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .map(|w| (w.width as u32, w.height as u32))
+        .unwrap_or((1024, 632));
 
-	let _ = window.set_size(tauri::PhysicalSize::new(width, height));
-	let _ = window.center();
+    let _ = window.set_size(tauri::PhysicalSize::new(width, height));
+    let _ = window.center();
 }
 
 /// 上一次选定的截图区域。
@@ -212,9 +212,8 @@ pub fn run() {
     let ocr_instance = Mutex::new(OcrService::new());
     // Arc 包裹：录制启动包含多个阻塞步骤，命令侧需要把状态句柄移入
     // spawn_blocking（要求 'static），State 借用无法满足
-    let video_record_service = Arc::new(Mutex::new(
-        video_record_service::VideoRecordService::new(),
-    ));
+    let video_record_service =
+        Arc::new(Mutex::new(video_record_service::VideoRecordService::new()));
     let hot_load_page_service = Arc::new(hot_load_page_service::HotLoadPageService::new());
     let enigo_instance = Mutex::new(EnigoManager::new());
 
@@ -238,10 +237,10 @@ pub fn run() {
 
     let file_cache_service = Arc::new(file_cache_service::FileCacheService::new());
 
-	let enable_run_log = std::sync::Arc::new(std::sync::atomic::AtomicU8::new(
-		log::LevelFilter::Warn as u8,
-	));
-	let enable_run_log_clone = enable_run_log.clone();
+    let enable_run_log = std::sync::Arc::new(std::sync::atomic::AtomicU8::new(
+        log::LevelFilter::Warn as u8,
+    ));
+    let enable_run_log_clone = enable_run_log.clone();
 
     let plugin_service = Arc::new(plugin_service::PluginService::new());
 
@@ -327,19 +326,20 @@ pub fn run() {
                         return true;
                     }
 
-				#[cfg(not(debug_assertions))]
-				{
-				let level = match enable_run_log.load(std::sync::atomic::Ordering::Relaxed) {
-					0 => log::LevelFilter::Off,
-					1 => log::LevelFilter::Error,
-					2 => log::LevelFilter::Warn,
-					3 => log::LevelFilter::Info,
-					4 => log::LevelFilter::Debug,
-					_ => log::LevelFilter::Trace,
-				};
+                    #[cfg(not(debug_assertions))]
+                    {
+                        let level = match enable_run_log.load(std::sync::atomic::Ordering::Relaxed)
+                        {
+                            0 => log::LevelFilter::Off,
+                            1 => log::LevelFilter::Error,
+                            2 => log::LevelFilter::Warn,
+                            3 => log::LevelFilter::Info,
+                            4 => log::LevelFilter::Debug,
+                            _ => log::LevelFilter::Trace,
+                        };
 
-					return metadata.level() <= level;
-				}
+                        return metadata.level() <= level;
+                    }
                 })
                 .build(),
         )
@@ -383,33 +383,31 @@ pub fn run() {
             // 监听窗口关闭事件，拦截关闭按钮
             let window_clone = main_window.clone();
             let app_handle_for_geo = app.handle().clone();
-            main_window.on_window_event(move |event| {
-                match event {
-                    tauri::WindowEvent::CloseRequested { api, .. } => {
-                        api.prevent_close();
-                        save_main_window_geometry(&app_handle_for_geo);
+            main_window.on_window_event(move |event| match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    api.prevent_close();
+                    save_main_window_geometry(&app_handle_for_geo);
 
-                        #[cfg(target_os = "windows")]
-                        {
-                            if let Err(e) = window_clone.hide() {
-                                log::error!("[setup] hide window error: {:?}", e);
-                            }
+                    #[cfg(target_os = "windows")]
+                    {
+                        if let Err(e) = window_clone.hide() {
+                            log::error!("[setup] hide window error: {:?}", e);
                         }
+                    }
 
-                        #[cfg(target_os = "macos")]
-                        {
-                            if let Err(e) = window_clone.hide() {
-                                log::error!("[setup] hide window error: {:?}", e);
-                            }
+                    #[cfg(target_os = "macos")]
+                    {
+                        if let Err(e) = window_clone.hide() {
+                            log::error!("[setup] hide window error: {:?}", e);
                         }
+                    }
 
-                        window_clone.emit("on-hide-main-window", ()).unwrap();
-                    }
-                    tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
-                        save_main_window_geometry(&app_handle_for_geo);
-                    }
-                    _ => {}
+                    window_clone.emit("on-hide-main-window", ()).unwrap();
                 }
+                tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
+                    save_main_window_geometry(&app_handle_for_geo);
+                }
+                _ => {}
             });
 
             // 如果是调试模式，则显示窗口
@@ -825,7 +823,10 @@ pub fn cleanup_old_logs(app: &tauri::AppHandle) {
     let entries = match std::fs::read_dir(&log_dir) {
         Ok(entries) => entries,
         Err(e) => {
-            log::error!("[cleanup_old_logs] Failed to read log dir {:?}: {e}", log_dir);
+            log::error!(
+                "[cleanup_old_logs] Failed to read log dir {:?}: {e}",
+                log_dir
+            );
             return;
         }
     };
@@ -848,9 +849,7 @@ pub fn cleanup_old_logs(app: &tauri::AppHandle) {
                 .map(|d| d.as_secs())
                 .unwrap_or(0),
             Err(e) => {
-                log::error!(
-                    "[cleanup_old_logs] Failed to read modified time of {file_name}: {e}"
-                );
+                log::error!("[cleanup_old_logs] Failed to read modified time of {file_name}: {e}");
                 continue;
             }
         };
@@ -861,9 +860,7 @@ pub fn cleanup_old_logs(app: &tauri::AppHandle) {
                     log::info!("[cleanup_old_logs] Removed old log: {file_name}");
                 }
                 Err(e) => {
-                    log::error!(
-                        "[cleanup_old_logs] Failed to remove old log {file_name}: {e}"
-                    );
+                    log::error!("[cleanup_old_logs] Failed to remove old log {file_name}: {e}");
                 }
             }
         }
@@ -901,8 +898,5 @@ fn read_log_retention_duration(app: &tauri::AppHandle) -> Option<i64> {
         }
     };
 
-    value
-        .get("logRetentionDuration")
-        .and_then(|v| v.as_i64())
+    value.get("logRetentionDuration").and_then(|v| v.as_i64())
 }
-

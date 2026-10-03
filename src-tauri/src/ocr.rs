@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use tauri::command;
 use tokio::sync::Mutex;
 
-use snow_shot_app_services::ocr_service::OcrService;
 use snow_shot_app_services::ocr_service::OcrDetectResult;
+use snow_shot_app_services::ocr_service::OcrService;
 
 #[command]
 pub async fn ocr_init(
@@ -56,7 +56,9 @@ pub async fn ocr_detect_with_shared_buffer(
 }
 
 #[command]
-pub async fn ocr_detect_online(request: tauri::ipc::Request<'_>) -> Result<OcrDetectResult, String> {
+pub async fn ocr_detect_online(
+    request: tauri::ipc::Request<'_>,
+) -> Result<OcrDetectResult, String> {
     snow_shot_tauri_commands_http_service::ocr::ocr_detect_online(request).await
 }
 

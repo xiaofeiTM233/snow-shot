@@ -33,9 +33,7 @@ fn main() {
     // HRESULT(0x80070490)「找不到元素」），需等待桌面外壳就绪后再启动。
     let args: Vec<String> = std::env::args().collect();
     if args.contains(&"--auto_start".to_string()) {
-        println!(
-            "[main] --auto_start parameter detected, waiting for desktop shell to be ready"
-        );
+        println!("[main] --auto_start parameter detected, waiting for desktop shell to be ready");
         // 等桌面外壳就绪再启动（最多 120s，就绪即返回），避免 WebView2 创建失败。
         #[cfg(target_os = "windows")]
         {
