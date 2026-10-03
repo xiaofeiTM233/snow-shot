@@ -13,7 +13,7 @@ const parseTemplate = (template: string, appName?: string): string => {
 		if (content === "FOCUS_WINDOW_APP_NAME") {
 			return appName ?? "Unknown";
 		}
-		if (content.match(/^[YMDHmsAa\-_:\s/.]+$/)) {
+		if (content.match(/^[YMDHmsSaA\-_:\s/.]+$/)) {
 			return dayjs().format(content);
 		}
 		return match;
@@ -22,7 +22,7 @@ const parseTemplate = (template: string, appName?: string): string => {
 
 /**
  * 生成图片文件名
- * @param format 格式模板，例如 "SnowShot_{YYYY-MM-DD_HH-mm-ss}"
+ * @param format 格式模板，例如 "SnowShot_{YYYY-MM-DD_HH-mm-ss-SSS}"
  * @param appName 可选的窗口应用名称
  * @returns 生成的文件名
  */
