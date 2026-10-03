@@ -327,10 +327,7 @@ export const ScrollScreenshot: React.FC<{
 
 		if (captureResult.type === "no_image") {
 			return needContinue;
-		} else if (
-			captureResult.edge_position === 0 &&
-			captureResult.thumbnail_buffer === undefined
-		) {
+		} else if (captureResult.thumbnail_buffer === undefined) {
 			return needContinue;
 		} else if (captureResult.edge_position === undefined) {
 			showCaptureMissMessage();
