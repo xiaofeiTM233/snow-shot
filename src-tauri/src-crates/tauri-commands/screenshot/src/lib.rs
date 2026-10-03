@@ -2,17 +2,30 @@ use image::DynamicImage;
 use serde::Serialize;
 use snow_shot_app_os::ui_automation::UIElements;
 
-#[cfg(target_os = "windows")]
-use windows::Win32::Foundation::HWND;
 use snow_shot_app_shared::ElementRect;
 use snow_shot_app_utils::monitor_info::{
     CaptureMethod, CaptureOption, ColorFormat, CorrectHdrColorAlgorithm, MonitorList,
 };
 use snow_shot_global_state::WebViewSharedBufferState;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::ipc::Response;
 use tokio::sync::Mutex;
+#[cfg(target_os = "windows")]
+use windows::Win32::Foundation::HWND;
+
+/// 全屏截图的「WGC 抓帧」互斥锁。
+///
+/// `capture_full_screen` 是自由函数（拿不到 `tauri::State`），用静态锁串行化。
+/// 锁的范围**只覆盖建session 与抓帧**：WGC 的 D3D11 设备/帧缓冲在进程内共享
+/// （见 `monitor_info.rs` 中 `MonitorInfoList::capture` 的说明），同时启动多个
+/// session 会互相冲突。实测 33 并发下进程会在 `image::imageops::crop_imm`
+/// 内被系统终止（无 panic、无WER 记录）。
+///
+/// 抓帧之后的裁剪 / PNG 编码 / 落盘是纯 CPU 与磁盘操作，不共享 WGC 资源，
+/// 因此放到锁外并行执行，让快速连按时也能保持吞吐。
+static CAPTURE_FULL_SCREEN_GRAB_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 pub async fn capture_current_monitor(
     #[allow(unused_variables)] window: tauri::Window,
@@ -79,8 +92,9 @@ pub async fn capture_all_monitors(
         )
         .await?;
 
-        let image_buffer = snow_shot_app_utils::encode_image(&image, snow_shot_app_utils::ImageEncoder::Png)
-            .map_err(|e| e.to_string())?;
+        let image_buffer =
+            snow_shot_app_utils::encode_image(&image, snow_shot_app_utils::ImageEncoder::Png)
+                .map_err(|e| e.to_string())?;
 
         Ok(Response::new(image_buffer))
     }
@@ -132,8 +146,9 @@ pub async fn capture_all_monitors(
             // 通过 SharedBuffer 传输的特殊标记
             Ok(Response::new(vec![1]))
         } else {
-            let image_buffer = snow_shot_app_utils::encode_image(&image, snow_shot_app_utils::ImageEncoder::Png)
-                .map_err(|e| e.to_string())?;
+            let image_buffer =
+                snow_shot_app_utils::encode_image(&image, snow_shot_app_utils::ImageEncoder::Png)
+                    .map_err(|e| e.to_string())?;
 
             Ok(Response::new(image_buffer))
         }
@@ -149,7 +164,7 @@ pub fn capture_window_hdr_image(
     use snow_shot_app_utils::monitor_info::MonitorInfo;
     use snow_shot_app_utils::windows_capture_image;
     use windows::Win32::Graphics::Gdi::{
-        GetMonitorInfoW, MonitorFromWindow, MONITORINFOEXW, MONITOR_DEFAULTTONEAREST,
+        GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFOEXW, MonitorFromWindow,
     };
 
     // 获取窗口所属的显示器
@@ -168,11 +183,16 @@ pub fn capture_window_hdr_image(
         },
         szDevice: [0; 32],
     };
-    if !unsafe { GetMonitorInfoW(hmonitor, std::ptr::addr_of_mut!(monitor_info).cast()) }.as_bool() {
+    if !unsafe { GetMonitorInfoW(hmonitor, std::ptr::addr_of_mut!(monitor_info).cast()) }.as_bool()
+    {
         return None;
     }
     let device_name = String::from_utf16_lossy(
-        &monitor_info.szDevice[..monitor_info.szDevice.iter().position(|&c| c == 0).unwrap_or(monitor_info.szDevice.len())],
+        &monitor_info.szDevice[..monitor_info
+            .szDevice
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(monitor_info.szDevice.len())],
     );
 
     let hdr_infos = match get_all_monitors_sdr_info() {
@@ -226,8 +246,7 @@ pub fn capture_window_hdr_image(
 pub async fn capture_focused_window(
     #[allow(unused_variables)] correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
     #[allow(unused_variables)] capture_method: CaptureMethod,
-) -> Result<Response, String>
-{
+) -> Result<Response, String> {
     let image;
 
     #[cfg(target_os = "windows")]
@@ -262,12 +281,14 @@ pub async fn capture_focused_window(
             Some(image) => image,
             None => {
                 // 用原生 HWND 反查 xcap Window，以便调用其 capture_image() 回退。
-                let focused_window = xcap::Window::all()
-                    .unwrap_or_default()
-                    .into_iter()
-                    .find(|w| {
-                        snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd(w) == Some(hwnd)
-                    });
+                let focused_window =
+                    xcap::Window::all()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .find(|w| {
+                            snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd(w)
+                                == Some(hwnd)
+                        });
 
                 match focused_window {
                     Some(window) => match window.capture_image() {
@@ -278,7 +299,9 @@ pub async fn capture_focused_window(
                         }
                     },
                     None => {
-                        log::warn!("[capture_focused_window] Failed to find focused window in xcap list");
+                        log::warn!(
+                            "[capture_focused_window] Failed to find focused window in xcap list"
+                        );
                         fallback_to_monitor()?
                     }
                 }
@@ -339,8 +362,9 @@ pub async fn capture_focused_window(
     }
 
     // 编码图像为 PNG 格式并返回
-    let image_buffer = snow_shot_app_utils::encode_image(&image, snow_shot_app_utils::ImageEncoder::Png)
-        .map_err(|e| e.to_string())?;
+    let image_buffer =
+        snow_shot_app_utils::encode_image(&image, snow_shot_app_utils::ImageEncoder::Png)
+            .map_err(|e| e.to_string())?;
 
     Ok(Response::new(image_buffer))
 }
@@ -366,9 +390,7 @@ pub fn get_focused_window_app_name() -> String {
         let focused_window = xcap::Window::all()
             .unwrap_or_default()
             .into_iter()
-            .find(|w| {
-                snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd(w) == Some(hwnd)
-            });
+            .find(|w| snow_shot_app_utils::sys::windows::hwnd::find_window_hwnd(w) == Some(hwnd));
         focused_window
             .and_then(|w| w.app_name().ok())
             .unwrap_or_default()
@@ -409,7 +431,9 @@ pub async fn init_ui_elements_cache(
 ) -> Result<(), String> {
     let mut ui_elements = ui_elements.lock().await;
 
-    ui_elements.init_cache().map_err(|e| format!("[init_ui_elements_cache] error: {:?}", e))?;
+    ui_elements
+        .init_cache()
+        .map_err(|e| format!("[init_ui_elements_cache] error: {:?}", e))?;
 
     #[cfg(target_os = "windows")]
     if let Some(blacklist) = blacklist {
@@ -674,10 +698,33 @@ pub async fn capture_full_screen(
     correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
     correct_color_filter: bool,
     capture_method: CaptureMethod,
-) -> Result<Response, String>
-{
+) -> Result<Response, String> {
+    capture_full_screen_inner(
+        &app_handle,
+        enable_multiple_monitor,
+        &capture_history_file_path,
+        correct_hdr_color_algorithm,
+        correct_color_filter,
+        capture_method,
+    )
+    .await
+}
+
+/// `capture_full_screen` 的实际实现。
+///
+/// 只对「建 session + 抓帧」加锁（`CAPTURE_FULL_SCREEN_GRAB_LOCK`），锁外的
+/// 裁剪 / 编码 / 落盘交给 `spawn_blocking` 并行执行，这样快速连按不会被整体
+/// 串行化拖慢，同时避免 WGC 并发争用。
+async fn capture_full_screen_inner(
+    app_handle: &tauri::AppHandle,
+    enable_multiple_monitor: bool,
+    capture_history_file_path: &str,
+    correct_hdr_color_algorithm: CorrectHdrColorAlgorithm,
+    correct_color_filter: bool,
+    capture_method: CaptureMethod,
+) -> Result<Response, String> {
     // 激活的显示器
-    let (mouse_x, mouse_y) = snow_shot_app_utils::get_mouse_position(&app_handle)?;
+    let (mouse_x, mouse_y) = snow_shot_app_utils::get_mouse_position(app_handle)?;
     let active_monitor = MonitorList::get_by_region(
         ElementRect {
             min_x: mouse_x,
@@ -689,24 +736,42 @@ pub async fn capture_full_screen(
     );
     // 所有显示器
     let monitor_list = snow_shot_app_utils::get_capture_monitor_list(
-        &app_handle,
+        app_handle,
         None,
         enable_multiple_monitor,
         correct_hdr_color_algorithm == CorrectHdrColorAlgorithm::None,
     )?;
 
-    // 截取所有显示器的截图
-    let all_monitors_image = monitor_list
-        .capture(
-            None,
-            CaptureOption {
-                color_format: ColorFormat::Rgb8,
-                correct_hdr_color_algorithm,
-                correct_color_filter,
-                capture_method,
-            },
-        )
-        .await?;
+    // 截取所有显示器的截图。
+    // 只有「建 session + 抓帧」必须串行：WGC 的 D3D11 设备在进程内共享，
+    // 并发创建 session 会互相争用并把进程压垮。抓到像素后立刻释放锁，
+    // 后续裁剪/编码在锁外并行，见下方 spawn_blocking。
+    log::debug!("[capture_full_screen] stage=capture begin");
+    let all_monitors_image = {
+        let _grab_guard = CAPTURE_FULL_SCREEN_GRAB_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .await;
+        let grabbed = monitor_list
+            .capture(
+                None,
+                CaptureOption {
+                    color_format: ColorFormat::Rgb8,
+                    correct_hdr_color_algorithm,
+                    correct_color_filter,
+                    capture_method,
+                },
+            )
+            .await;
+        // 锁在此 drop，下一次抓帧可以立即开始
+        grabbed?
+    };
+    log::debug!(
+        "[capture_full_screen] stage=capture ok combined={}x{}",
+        all_monitors_image.width(),
+        all_monitors_image.height()
+    );
+
     // 从合并图中裁剪出激活显示器所在区域（使用 image crate 安全裁剪 API）。
     // 单显示器时激活显示器即合并图本身，裁剪结果与整图一致。
     let all_monitors_bounding_box = monitor_list.get_monitors_bounding_box();
@@ -718,6 +783,12 @@ pub async fn capture_full_screen(
         max_x: active_monitor_rect.max_x - all_monitors_bounding_box.min_x,
         max_y: active_monitor_rect.max_y - all_monitors_bounding_box.min_y,
     };
+    log::debug!(
+        "[capture_full_screen] stage=bbox all={:?} active={:?} crop={:?}",
+        all_monitors_bounding_box,
+        active_monitor_rect,
+        active_monitor_crop_region
+    );
 
     let active_monitor_crop_region_x = active_monitor_crop_region.min_x as usize;
     let active_monitor_crop_region_y = active_monitor_crop_region.min_y as usize;
@@ -733,35 +804,83 @@ pub async fn capture_full_screen(
         ));
     }
 
-    // crop_imm 返回的是 4 通道 RgbaImage，直接包成 DynamicImage 编码。
-    // 该 4 通道路径与区域/窗口截图一致（已验证正常），可规避花屏。
-    let active_monitor_image = image::DynamicImage::ImageRgba8(image::imageops::crop_imm(
-        &all_monitors_image,
-        active_monitor_crop_region_x as u32,
-        active_monitor_crop_region_y as u32,
-        active_monitor_crop_region_width as u32,
-        active_monitor_crop_region_height as u32,
-    )
-    .to_image());
-
-    // 编码图像为 PNG 格式
-    let image_buffer = snow_shot_app_utils::encode_image(
-        &active_monitor_image,
-        snow_shot_app_utils::ImageEncoder::Png,
-    )
-    .map_err(|e| e.to_string())?;
-
-    // 写入到截图历史
-    let capture_history_file_path = PathBuf::from(capture_history_file_path);
-    match all_monitors_image.save(&capture_history_file_path) {
-        Ok(_) => (),
-        Err(e) => {
-            return Err(format!(
-                "[capture_full_screen] failed to save capture history image: {}",
-                e
-            ));
-        }
+    // 越界/非法坐标直接返回错误：i32 as usize 对负数会回绕成巨大值，
+    // 而 release 下 overflow-checks 关闭，此类错误不会 panic 只会静默产生错误坐标。
+    let (combined_width, combined_height) =
+        image::GenericImageView::dimensions(&all_monitors_image);
+    if active_monitor_crop_region_x as u64 + active_monitor_crop_region_width as u64
+        > combined_width as u64
+        || active_monitor_crop_region_y as u64 + active_monitor_crop_region_height as u64
+            > combined_height as u64
+    {
+        return Err(format!(
+            "[capture_full_screen] crop region out of bounds: x={} y={} w={} h={} combined={}x{}",
+            active_monitor_crop_region_x,
+            active_monitor_crop_region_y,
+            active_monitor_crop_region_width,
+            active_monitor_crop_region_height,
+            combined_width,
+            combined_height
+        ));
     }
+
+    // 裁剪 + 编码 + 落盘是纯 CPU/磁盘工作，不共享 WGC 资源，放到阻塞线程池并行执行。
+    // 1920x1080 的 PNG 编码约 150-250ms，是单次全屏截图的主要耗时；串行化它会让
+    // 快速连按的响应时间线性叠加。spawn_blocking 让 tokio worker 立即空闲，
+    // 下一个请求可以马上进入 WGC 抓帧阶段（那里仍有串行锁，但耗时短得多）。
+    let capture_history_path = PathBuf::from(capture_history_file_path);
+    let image_buffer = tokio::task::spawn_blocking(move || {
+        log::debug!(
+            "[capture_full_screen] stage=crop begin x={} y={} w={} h={}",
+            active_monitor_crop_region_x,
+            active_monitor_crop_region_y,
+            active_monitor_crop_region_width,
+            active_monitor_crop_region_height
+        );
+        // crop_imm 返回的是 4 通道 RgbaImage，直接包成 DynamicImage 编码。
+        // 该 4 通道路径与区域/窗口截图一致（已验证正常），可规避花屏。
+        let active_monitor_image = image::DynamicImage::ImageRgba8(
+            image::imageops::crop_imm(
+                &all_monitors_image,
+                active_monitor_crop_region_x as u32,
+                active_monitor_crop_region_y as u32,
+                active_monitor_crop_region_width as u32,
+                active_monitor_crop_region_height as u32,
+            )
+            .to_image(),
+        );
+        log::debug!(
+            "[capture_full_screen] stage=crop ok cropped={}x{}",
+            active_monitor_image.width(),
+            active_monitor_image.height()
+        );
+
+        log::debug!("[capture_full_screen] stage=encode begin");
+        let image_buffer = snow_shot_app_utils::encode_image(
+            &active_monitor_image,
+            snow_shot_app_utils::ImageEncoder::Png,
+        )
+        .map_err(|e| e.to_string())?;
+        log::debug!(
+            "[capture_full_screen] stage=encode ok bytes={}",
+            image_buffer.len()
+        );
+
+        // 写入到截图历史
+        match all_monitors_image.save(&capture_history_path) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(format!(
+                    "[capture_full_screen] failed to save capture history image: {}",
+                    e
+                ));
+            }
+        }
+
+        Ok(image_buffer)
+    })
+    .await
+    .map_err(|e| format!("[capture_full_screen] blocking task failed: {e}"))??;
 
     Ok(Response::new(image_buffer))
 }
