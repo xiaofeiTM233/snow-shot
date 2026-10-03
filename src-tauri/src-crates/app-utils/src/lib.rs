@@ -470,6 +470,32 @@ pub fn overlay_image(
     );
 }
 
+/// 打开剪贴板，失败时做有限次退避重试。
+///
+/// `Clipboard::new()` 内部只调用一次 `OpenClipboard`，任何进程短暂独占剪贴板都会
+/// 立刻返回 ERROR_ACCESS_DENIED(5)，原实现直接 unwrap 会导致复制图片时整个线程 panic。
+/// 该库自带的 `new_attempts` 仅用 `Sleep(0)` 让出时间片、不做等待，对毫秒级争用无效，
+/// 因此这里自行做退避重试。重试总等待上限约 310ms，仍失败则把错误返回调用方。
+#[cfg(target_os = "windows")]
+async fn open_clipboard_with_retry() -> clipboard_win::SysResult<clipboard_win::Clipboard> {
+    use clipboard_win::Clipboard;
+
+    const MAX_ATTEMPTS: u32 = 5;
+    const MAX_DELAY: std::time::Duration = std::time::Duration::from_millis(200);
+    let mut delay = std::time::Duration::from_millis(10);
+
+    for attempt in 1..=MAX_ATTEMPTS {
+        match Clipboard::new() {
+            Ok(clip) => return Ok(clip),
+            Err(e) if attempt == MAX_ATTEMPTS => return Err(e),
+            Err(_) => tokio::time::sleep(delay).await,
+        }
+        delay = delay.saturating_mul(2).min(MAX_DELAY);
+    }
+
+    unreachable!("open_clipboard_with_retry returns within MAX_ATTEMPTS")
+}
+
 #[cfg(target_os = "windows")]
 pub async fn write_bitmap_image_to_clipboard_core(
     rgba_image: &[u8],
@@ -547,7 +573,12 @@ pub async fn write_bitmap_image_to_clipboard_core(
             });
         });
 
-        let _clip = clipboard_win::Clipboard::new().unwrap();
+        let _clip = open_clipboard_with_retry().await.map_err(|e| {
+            format!(
+                "[write_bitmap_image_to_clipboard] Failed to open clipboard: {}",
+                e
+            )
+        })?;
 
         formats::RawData(formats::CF_DIB)
             .write_clipboard(&dib_data)
@@ -593,9 +624,13 @@ pub async fn write_bitmap_image_to_clipboard(
         // 解码出的像素可能是 RGB8（如全屏截图生成的 Rgb8 PNG），但 DIB 写入函数
         // 始终按 RGBA（4 字节/像素）解析，直接透传会导致逐行错位花屏。
         // 因此统一转成 RGBA8 再交给 DIB 写入。
-        let dynamic_image = match image::DynamicImage::from_decoder(
-            image::codecs::png::PngDecoder::new(std::io::Cursor::new(image_data.clone())).unwrap(),
-        ) {
+        // from_decoder 会消耗掉 decoder，这里需要重新构造一个；构造失败同样按错误返回，
+        // 避免 unwrap 把无法构造解码器的输入变成 panic。
+        let decoder = image::codecs::png::PngDecoder::new(std::io::Cursor::new(image_data.clone()))
+            .map_err(|_| {
+                String::from("[write_bitmap_image_to_clipboard] Failed to create PNG decoder")
+            })?;
+        let dynamic_image = match image::DynamicImage::from_decoder(decoder) {
             Ok(img) => img,
             Err(_) => {
                 return Err(String::from(
@@ -632,24 +667,30 @@ pub async fn write_bitmap_image_to_clipboard_with_shared_buffer(
         }
     };
 
-    // 最后 8 个字节是 image_width 和 image_height
-    let image_width = u32::from_le_bytes(
-        image_data[image_data.len() - 8..image_data.len() - 4]
-            .try_into()
-            .unwrap(),
-    );
-    let image_height = u32::from_le_bytes(
-        image_data[image_data.len() - 4..image_data.len()]
-            .try_into()
-            .unwrap(),
-    );
+    // 最后 8 个字节是 image_width 和 image_height。长度不足时直接返回错误：
+    // 原实现直接做 image_data[len - 8..] 切片，缓冲区过短会下溢/越界 panic。
+    const DIMENSION_BYTES: usize = 8;
+    if image_data.len() < DIMENSION_BYTES {
+        return Err(format!(
+            "[write_bitmap_image_to_clipboard_with_shared_buffer] Shared buffer too small: {} bytes, need at least {}",
+            image_data.len(),
+            DIMENSION_BYTES
+        ));
+    }
+    let (pixel_data, dimension_bytes) = image_data.split_at(image_data.len() - DIMENSION_BYTES);
+    let image_width = u32::from_le_bytes(dimension_bytes[..4].try_into().map_err(|_| {
+        String::from(
+            "[write_bitmap_image_to_clipboard_with_shared_buffer] Failed to parse image width",
+        )
+    })?);
+    let image_height = u32::from_le_bytes(dimension_bytes[4..].try_into().map_err(|_| {
+        String::from(
+            "[write_bitmap_image_to_clipboard_with_shared_buffer] Failed to parse image height",
+        )
+    })?);
 
-    write_bitmap_image_to_clipboard_core(
-        &image_data[..image_data.len() - 8],
-        image_width as usize,
-        image_height as usize,
-    )
-    .await?;
+    write_bitmap_image_to_clipboard_core(pixel_data, image_width as usize, image_height as usize)
+        .await?;
 
     Ok(())
 }
