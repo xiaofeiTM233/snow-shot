@@ -568,10 +568,15 @@ impl MonitorInfo {
                     let crop = crop_area
                         .map(|area| self.get_monitor_crop_region(area))
                         .and_then(crop_region_to_pinray_rect);
+                    // 传入选框前的显示器尺寸：pinray 复用的常驻 session 在 start 时就固定了
+                    // frame pool 尺寸，改变分辨率后旧 session 会返回过期尺寸，
+                    // 由 capture_display_frame 校验后丢弃重建。
                     match super::pinray_capture::capture_display_frame(
                         format!("display:{device_name}"),
                         crop,
                         engine,
+                        self.monitor.width().ok(),
+                        self.monitor.height().ok(),
                     ) {
                         Ok(image) => {
                             if is_black_image(&image, 0.99) {
