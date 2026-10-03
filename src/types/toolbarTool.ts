@@ -95,3 +95,20 @@ export type ToolbarToolHiddenMap = Partial<Record<ToolbarToolKey, boolean>>;
 export type ToolbarGroupsMap = Partial<
 	Record<ToolbarToolKey, ToolbarToolKey[]>
 >;
+
+/** 工具栏序列中的显式分隔符 token */
+export const TOOLBAR_ITEM_SEPARATOR = "separator";
+/** 工具栏序列中的显式换行 token（新建一行） */
+export const TOOLBAR_ITEM_LINE_BREAK = "lineBreak";
+
+/** 工具栏排序序列元素：工具键或布局 token */
+export type ToolbarItem =
+	| ToolbarToolKey
+	| typeof TOOLBAR_ITEM_SEPARATOR
+	| typeof TOOLBAR_ITEM_LINE_BREAK;
+
+export const isToolbarLayoutToken = (
+	value: unknown,
+): value is typeof TOOLBAR_ITEM_SEPARATOR | typeof TOOLBAR_ITEM_LINE_BREAK => {
+	return value === TOOLBAR_ITEM_SEPARATOR || value === TOOLBAR_ITEM_LINE_BREAK;
+};

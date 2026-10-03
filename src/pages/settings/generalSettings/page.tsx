@@ -24,7 +24,7 @@ import type { AggregationColor } from "antd/es/color-picker/color";
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { ContentWrap } from "@/components/contentWrap";
-import { GroupTitle, SubGroupTitle } from "@/components/groupTitle";
+import { GroupTitle } from "@/components/groupTitle";
 import { IconLabel } from "@/components/iconLable";
 import { DarkModeIcon, LanguageIcon } from "@/components/icons";
 import { PathInput } from "@/components/pathInput";
@@ -43,7 +43,6 @@ import {
 	ColorPickerShowMode,
 	TrayIconDefaultIcon,
 } from "@/types/appSettings";
-import { ToolbarId } from "@/types/toolbarTool";
 
 const { Option } = Select;
 
@@ -704,20 +703,7 @@ export const GeneralSettingsPage = () => {
 				<FormattedMessage id="settings.toolbarSettings" />
 			</GroupTitle>
 
-			<SubGroupTitle>
-				<FormattedMessage id="settings.toolbarSettings.mainToolbar" />
-			</SubGroupTitle>
-			<ToolbarCustomizer toolbarId={ToolbarId.Main} />
-
-			<SubGroupTitle>
-				<FormattedMessage id="settings.toolbarSettings.fullScreenDrawToolbar" />
-			</SubGroupTitle>
-			<ToolbarCustomizer toolbarId={ToolbarId.FullScreen} />
-
-			<SubGroupTitle>
-				<FormattedMessage id="settings.toolbarSettings.fixedContentToolbar" />
-			</SubGroupTitle>
-			<ToolbarCustomizer toolbarId={ToolbarId.FixedContent} />
+			<ToolbarCustomizer />
 
 			<Divider />
 

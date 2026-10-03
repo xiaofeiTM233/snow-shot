@@ -39,8 +39,12 @@ import {
 } from "@/components/icons";
 import { DrawState } from "@/types/draw";
 import {
+	isToolbarLayoutToken,
+	TOOLBAR_ITEM_LINE_BREAK,
+	TOOLBAR_ITEM_SEPARATOR,
 	type ToolbarGroupsMap,
 	ToolbarId,
+	type ToolbarItem,
 	ToolbarToolKey,
 } from "@/types/toolbarTool";
 
@@ -429,6 +433,52 @@ export const parseToolbarToolKeyList = (
 		if (isToolbarToolKey(item) && !result.includes(item)) {
 			result.push(item);
 		}
+	}
+	return result;
+};
+
+/**
+ * 校验并去重工具栏序列（工具键 + token）：
+ * 工具键去重；换行不出现在行首、连续换行合并；分隔符不出现在行首、不与换行相邻、连续分隔符合并；清理行尾孤立 token。
+ */
+export const parseToolbarItemList = (
+	value: unknown,
+	fallback: ToolbarItem[],
+): ToolbarItem[] => {
+	if (!Array.isArray(value)) {
+		return fallback;
+	}
+
+	const result: ToolbarItem[] = [];
+	const seenTools = new Set<ToolbarToolKey>();
+	for (const item of value) {
+		if (isToolbarToolKey(item)) {
+			if (!seenTools.has(item)) {
+				seenTools.add(item);
+				result.push(item);
+			}
+			continue;
+		}
+		if (item === TOOLBAR_ITEM_LINE_BREAK) {
+			const last = result[result.length - 1];
+			if (result.length > 0 && last !== TOOLBAR_ITEM_LINE_BREAK) {
+				result.push(item);
+			}
+			continue;
+		}
+		if (item === TOOLBAR_ITEM_SEPARATOR) {
+			const last = result[result.length - 1];
+			if (
+				result.length > 0 &&
+				last !== TOOLBAR_ITEM_SEPARATOR &&
+				last !== TOOLBAR_ITEM_LINE_BREAK
+			) {
+				result.push(item);
+			}
+		}
+	}
+	while (result.length > 0 && isToolbarLayoutToken(result[result.length - 1])) {
+		result.pop();
 	}
 	return result;
 };

@@ -77,7 +77,7 @@ export const settings = {
 	"settings.toolbarSettings.fixedContentToolbar":
 		"Sticker Toolbar Customization",
 	"settings.toolbarCustomizer.tip":
-		"Drag icons to reorder. Drop onto the center of another icon to merge them into a group; drop beside it to insert. Hover a group to open its member panel — drag members out or rearrange them. Drop icons into the tray below to hide them. Hidden tools still work via hotkeys.",
+		"Drag icons to reorder. Drop onto the center of another icon to merge them into a group (groups are shown as dashed containers; drag members out or move them across groups). Drag a separator or a row break from Layout Elements to insert a divider or start a new row. Drop icons into the tray below to hide them. Hidden tools still work via hotkeys.",
 	"settings.toolbarCustomizer.visibleTools": "Visible Tools",
 	"settings.toolbarCustomizer.hiddenTools": "Hidden",
 	"settings.toolbarCustomizer.hiddenToolsEmpty": "No hidden tools",
@@ -86,6 +86,14 @@ export const settings = {
 	"settings.toolbarCustomizer.reset": "Reset to Default",
 	"settings.toolbarCustomizer.pluginNotReady":
 		"Plugin is not ready; this tool is hidden on the toolbar for now",
+	"settings.toolbarCustomizer.elements": "Layout Elements",
+	"settings.toolbarCustomizer.separator": "Separator",
+	"settings.toolbarCustomizer.lineBreak": "New Row",
+	"settings.toolbarCustomizer.paletteHint":
+		"Drag into the toolbar where needed; hover an inserted element to delete it",
+	"settings.toolbarCustomizer.mergeHint": "Release to group",
+	"settings.toolbarCustomizer.stats":
+		"{slots} slots · {groups} groups · {rows} rows",
 	"settings.enableQrcodeScan": "Enable QR Code Scan",
 	"settings.findChildrenElements": "Find Window Child Elements",
 	"settings.performanceMode": "Performance Mode",
@@ -315,7 +323,7 @@ export const settings = {
 	"settings.functionSettings.screenshotSettings.saveFileDialog":
 		"Save File Dialog",
 	"settings.functionSettings.screenshotSettings.saveFileDialog.tip":
-		"When enabled, clicking \"Save to File\" opens a dialog to adjust the file name, save path, image format and size; when disabled, the system dialog is used",
+		'When enabled, clicking "Save to File" opens a dialog to adjust the file name, save path, image format and size; when disabled, the system dialog is used',
 	"settings.functionSettings.outputSettings": "Output Settings",
 	"settings.functionSettings.outputSettings.variables": "Supported Variables",
 	"settings.functionSettings.outputSettings.variables.focusedWindowAppName":

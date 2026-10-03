@@ -9,7 +9,11 @@ import type {
 } from "./core/commonKeyEvent";
 import type { DrawState } from "./draw";
 import type { TranslationDomain, TranslationType } from "./servies/translation";
-import type { ToolbarGroupsMap, ToolbarToolKey } from "./toolbarTool";
+import type {
+	ToolbarGroupsMap,
+	ToolbarItem,
+	ToolbarToolKey,
+} from "./toolbarTool";
 import type { ImageFormat } from "./utils/file";
 
 export enum HistoryValidDuration {
@@ -577,20 +581,20 @@ export type AppSettingsData = {
 		colorPickerCenterAuxiliaryLineColor: string;
 		/** 禁用动画 */
 		disableAnimation: boolean;
-		/** 主工具栏工具顺序（组合占一个槽位，键为 head） */
-		toolbarToolOrder: ToolbarToolKey[];
+		/** 主工具栏工具顺序（组合占一个槽位，键为 head；可含分隔符/换行 token） */
+		toolbarToolOrder: ToolbarItem[];
 		/** 主工具栏组合（head → 成员） */
 		toolbarGroups: ToolbarGroupsMap;
 		/** 主工具栏隐藏工具 */
 		toolbarHiddenTools: ToolbarToolKey[];
 		/** 全屏工具栏工具顺序 */
-		fullScreenToolbarToolOrder: ToolbarToolKey[];
+		fullScreenToolbarToolOrder: ToolbarItem[];
 		/** 全屏工具栏组合 */
 		fullScreenToolbarGroups: ToolbarGroupsMap;
 		/** 全屏工具栏隐藏工具 */
 		fullScreenToolbarHiddenTools: ToolbarToolKey[];
 		/** 贴图工具栏工具顺序 */
-		fixedContentToolbarToolOrder: ToolbarToolKey[];
+		fixedContentToolbarToolOrder: ToolbarItem[];
 		/** 贴图工具栏组合 */
 		fixedContentToolbarGroups: ToolbarGroupsMap;
 		/** 贴图工具栏隐藏工具 */

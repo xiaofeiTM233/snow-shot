@@ -78,7 +78,7 @@ export const FullScreenDrawToolbar: React.FC<{
 		useStateRef(false);
 	const [mouseThroughHotkey, setMouseThroughHotkey] = useState("");
 
-	const { orderedKeys, hiddenSet, groupsMap } = useToolbarLayout(
+	const { orderedItems, hiddenSet, groupsMap } = useToolbarLayout(
 		ToolbarId.FullScreen,
 	);
 	const [toolbarLastUsedTool, setToolbarLastUsedTool, toolbarLastUsedToolRef] =
@@ -677,9 +677,9 @@ export const FullScreenDrawToolbar: React.FC<{
 	return (
 		<div className="full-screen-draw-toolbar-container">
 			<div className="full-screen-draw-toolbar">
-				<Flex align="center" gap={token.paddingXS}>
+				<Flex align="center" gap={token.paddingXS} wrap="wrap">
 					{buildToolbarContent(
-						orderedKeys,
+						orderedItems,
 						hiddenSet,
 						renderToolbarTool,
 						token.paddingXS,

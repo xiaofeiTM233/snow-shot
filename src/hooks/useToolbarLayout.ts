@@ -4,17 +4,23 @@ import {
 	DEFAULT_TOOLBAR_GROUPS,
 	DEFAULT_TOOLBAR_TOOL_ORDER,
 	getToolbarAvailableKeys,
+	isToolbarToolKey,
 	normalizeToolbarGroupsMap,
+	parseToolbarItemList,
 } from "@/constants/toolbarTools";
 import { AppSettingsPublisher } from "@/contexts/appSettingsActionContext";
 import { type AppSettingsData, AppSettingsGroup } from "@/types/appSettings";
-import type { ToolbarGroupsMap, ToolbarToolKey } from "@/types/toolbarTool";
-import { ToolbarId } from "@/types/toolbarTool";
+import {
+	type ToolbarGroupsMap,
+	ToolbarId,
+	type ToolbarItem,
+	type ToolbarToolKey,
+} from "@/types/toolbarTool";
 import { useStateSubscriber } from "./useStateSubscriber";
 
 export type ToolbarLayout = {
-	/** 排序后的顶层槽位键（已按设置补全；组合占一个槽位，键为 head） */
-	orderedKeys: ToolbarToolKey[];
+	/** 排序后的序列（工具键 + 分隔符/换行 token；组合占一个槽位，键为 head） */
+	orderedItems: ToolbarItem[];
 	/** 隐藏的工具键集合 */
 	hiddenSet: Set<ToolbarToolKey>;
 	/** 组合成员表（head → 成员键，已过滤隐藏与本槽位重复项） */
@@ -50,24 +56,23 @@ export const resolveToolbarLayout = (
 	screenshotSettings: ScreenshotSettings,
 ): ToolbarLayout => {
 	const defaultOrder = DEFAULT_TOOLBAR_TOOL_ORDER[toolbarId];
-	const defaultOrderSet = new Set(defaultOrder);
 	const availableKeys = getToolbarAvailableKeys(toolbarId);
 
-	const savedOrder = screenshotSettings[
+	const savedItems = screenshotSettings[
 		TOOLBAR_ORDER_SETTINGS_KEY[toolbarId]
-	] as ToolbarToolKey[] | undefined;
-	const orderedKeys: ToolbarToolKey[] = [];
+	] as ToolbarItem[] | undefined;
+	const orderedItems = parseToolbarItemList(savedItems, []);
 	const seenKeys = new Set<ToolbarToolKey>();
-	for (const key of savedOrder ?? []) {
-		if (defaultOrderSet.has(key) && !seenKeys.has(key)) {
-			seenKeys.add(key);
-			orderedKeys.push(key);
+	for (const item of orderedItems) {
+		if (isToolbarToolKey(item)) {
+			seenKeys.add(item);
 		}
 	}
 	// 设置中缺失的工具按默认顺序追加到末尾，保证未来新增工具的向前兼容
 	for (const key of defaultOrder) {
 		if (!seenKeys.has(key)) {
-			orderedKeys.push(key);
+			orderedItems.push(key);
+			seenKeys.add(key);
 		}
 	}
 
@@ -81,7 +86,8 @@ export const resolveToolbarLayout = (
 		}
 	}
 
-	const orderSet = new Set(orderedKeys);
+	// 出现在顺序中的键是独立槽位，不能同时是其他组合的成员
+	const orderSet = new Set(orderedItems.filter(isToolbarToolKey));
 	const groups: ToolbarGroupsMap = {};
 	const savedGroups = normalizeToolbarGroupsMap(
 		screenshotSettings[TOOLBAR_GROUPS_SETTINGS_KEY[toolbarId]],
@@ -90,7 +96,6 @@ export const resolveToolbarLayout = (
 	);
 	for (const [head, members] of Object.entries(savedGroups)) {
 		const headKey = head as ToolbarToolKey;
-		// 出现在顺序中的键是独立槽位，不能同时是其他组合的成员
 		const filteredMembers = (members ?? []).filter(
 			(member) => !orderSet.has(member),
 		);
@@ -99,7 +104,7 @@ export const resolveToolbarLayout = (
 		}
 	}
 
-	return { orderedKeys, hiddenSet, groupsMap: groups };
+	return { orderedItems, hiddenSet, groupsMap: groups };
 };
 
 /**

@@ -175,7 +175,7 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 	const [enableSaveToCloud, setEnableSaveToCloud] = useState(false);
 	const [enableScrollScreenshot, setEnableScrollScreenshot] = useState(false);
 	const [shortcutCanleTip, setShortcutCanleTip] = useState(false);
-	const { orderedKeys, hiddenSet, groupsMap } = useToolbarLayout(
+	const { orderedItems, hiddenSet, groupsMap } = useToolbarLayout(
 		ToolbarId.Main,
 	);
 	const [toolbarLastUsedTool, setToolbarLastUsedTool, toolbarLastUsedToolRef] =
@@ -1313,7 +1313,7 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 
 	const renderToolbarContent = () => {
 		return buildToolbarContent(
-			orderedKeys,
+			orderedItems,
 			hiddenSet,
 			renderToolbarTool,
 			token.paddingXS,
@@ -1341,6 +1341,7 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 						<Flex
 							align="center"
 							gap={token.paddingXS}
+							wrap="wrap"
 							className="draw-toolbar-content"
 						>
 							<DragButton actionRef={dragButtonActionRef} />

@@ -28,6 +28,7 @@ import {
 	getToolbarAvailableKeys,
 	LEGACY_HIDDEN_TOOL_LIST_MAP,
 	normalizeToolbarGroupsMap,
+	parseToolbarItemList,
 	parseToolbarLastUsedToolMap,
 	parseToolbarToolKeyList,
 } from "@/constants/toolbarTools";
@@ -529,7 +530,7 @@ const AppSettingsContextProviderCore: React.FC<{
 							? newSettings.colorPickerCenterAuxiliaryLineColor
 							: (prevSettings?.colorPickerCenterAuxiliaryLineColor ??
 								"#00000000"),
-					toolbarToolOrder: parseToolbarToolKeyList(
+					toolbarToolOrder: parseToolbarItemList(
 						newSettings?.toolbarToolOrder,
 						prevSettings?.toolbarToolOrder ??
 							defaultAppSettingsData[group].toolbarToolOrder,
@@ -545,7 +546,7 @@ const AppSettingsContextProviderCore: React.FC<{
 						prevSettings?.toolbarHiddenTools ??
 							defaultAppSettingsData[group].toolbarHiddenTools,
 					),
-					fullScreenToolbarToolOrder: parseToolbarToolKeyList(
+					fullScreenToolbarToolOrder: parseToolbarItemList(
 						newSettings?.fullScreenToolbarToolOrder,
 						prevSettings?.fullScreenToolbarToolOrder ??
 							defaultAppSettingsData[group].fullScreenToolbarToolOrder,
@@ -561,7 +562,7 @@ const AppSettingsContextProviderCore: React.FC<{
 						prevSettings?.fullScreenToolbarHiddenTools ??
 							defaultAppSettingsData[group].fullScreenToolbarHiddenTools,
 					),
-					fixedContentToolbarToolOrder: parseToolbarToolKeyList(
+					fixedContentToolbarToolOrder: parseToolbarItemList(
 						newSettings?.fixedContentToolbarToolOrder,
 						prevSettings?.fixedContentToolbarToolOrder ??
 							defaultAppSettingsData[group].fixedContentToolbarToolOrder,
@@ -1492,16 +1493,16 @@ const AppSettingsContextProviderCore: React.FC<{
 					captureBackend:
 						typeof newSettings?.captureBackend === "string"
 							? // 旧值 "pinray" 归一化为 "pinray-wgc"（引擎行为一致）
-								(newSettings.captureBackend === VideoCaptureBackend.Pinray
-									? VideoCaptureBackend.PinrayWgc
-									: newSettings.captureBackend)
+								newSettings.captureBackend === VideoCaptureBackend.Pinray
+								? VideoCaptureBackend.PinrayWgc
+								: newSettings.captureBackend
 							: (prevSettings?.captureBackend ??
 								defaultAppSettingsData[group].captureBackend),
 					captureCursor:
-							typeof newSettings?.captureCursor === "boolean"
-								? newSettings.captureCursor
-								: (prevSettings?.captureCursor ??
-									defaultAppSettingsData[group].captureCursor),
+						typeof newSettings?.captureCursor === "boolean"
+							? newSettings.captureCursor
+							: (prevSettings?.captureCursor ??
+								defaultAppSettingsData[group].captureCursor),
 					videoFormat:
 						typeof newSettings?.videoFormat === "string"
 							? newSettings.videoFormat
@@ -1606,9 +1607,9 @@ const AppSettingsContextProviderCore: React.FC<{
 						newSettings?.captureMethod != null &&
 						Object.values(CaptureMethod).includes(newSettings.captureMethod)
 							? // 旧值 "Pinray" 归一化为 "Pinray-WGC"（引擎行为一致）
-								(newSettings.captureMethod === CaptureMethod.Pinray
-									? CaptureMethod.PinrayWgc
-									: newSettings.captureMethod)
+								newSettings.captureMethod === CaptureMethod.Pinray
+								? CaptureMethod.PinrayWgc
+								: newSettings.captureMethod
 							: (prevSettings?.captureMethod ??
 								defaultAppSettingsData[group].captureMethod),
 					hdrColorCorrection:

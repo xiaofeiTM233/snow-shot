@@ -73,7 +73,7 @@ export const settings = {
 	"settings.toolbarSettings.fullScreenDrawToolbar": "全螢幕繪製工具欄自訂",
 	"settings.toolbarSettings.fixedContentToolbar": "貼圖工具欄自訂",
 	"settings.toolbarCustomizer.tip":
-		"拖曳圖示調整順序；拖到另一個圖示中心可合併為組合（懸停組合在上方彈出成員面板，成員可拖出或排序）；拖到下方托盤即隱藏。隱藏的工具仍可透過熱鍵使用。",
+		"拖曳圖示調整順序；拖到另一個圖示中心可合併為組合（組合以虛線容器顯示，成員可拖出或跨組合移動）；從「佈局元素」拖入分隔符與換行可插入分隔線或新增一行；拖到下方托盤即隱藏。隱藏的工具仍可透過熱鍵使用。",
 	"settings.toolbarCustomizer.visibleTools": "顯示中的工具",
 	"settings.toolbarCustomizer.hiddenTools": "已隱藏",
 	"settings.toolbarCustomizer.hiddenToolsEmpty": "沒有隱藏的工具",
@@ -82,6 +82,14 @@ export const settings = {
 	"settings.toolbarCustomizer.reset": "恢復預設",
 	"settings.toolbarCustomizer.pluginNotReady":
 		"外掛未就緒，該工具暫不會顯示在工具列",
+	"settings.toolbarCustomizer.elements": "佈局元素",
+	"settings.toolbarCustomizer.separator": "分隔符",
+	"settings.toolbarCustomizer.lineBreak": "新增一行",
+	"settings.toolbarCustomizer.paletteHint":
+		"拖到工具列中需要的位置，懸停已插入的元素可刪除",
+	"settings.toolbarCustomizer.mergeHint": "鬆開合併為組合",
+	"settings.toolbarCustomizer.stats":
+		"{slots} 個槽位 · {groups} 個組合 · {rows} 行",
 	"settings.enableQrcodeScan": "啟用 QR Code 辨識",
 	"settings.findChildrenElements": "偵測視窗子元素",
 	"settings.performanceMode": "效能優先",

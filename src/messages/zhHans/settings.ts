@@ -73,7 +73,7 @@ export const settings = {
 	"settings.toolbarSettings.fullScreenDrawToolbar": "全屏绘制工具栏自定义",
 	"settings.toolbarSettings.fixedContentToolbar": "贴图工具栏自定义",
 	"settings.toolbarCustomizer.tip":
-		"拖动图标调整顺序；拖到另一个图标中心可合并为组合（悬停组合在上方弹出成员面板，成员可拖出或排序）；拖到下方托盘即隐藏。隐藏的工具仍可通过热键使用。",
+		"拖动图标调整顺序；拖到另一个图标中心可合并为组合（组合以虚线容器显示，成员可拖出或跨组合移动）；从「布局元素」拖入分隔符与换行可插入分隔线或新建一行；拖到下方托盘即隐藏。隐藏的工具仍可通过热键使用。",
 	"settings.toolbarCustomizer.visibleTools": "显示中的工具",
 	"settings.toolbarCustomizer.hiddenTools": "已隐藏",
 	"settings.toolbarCustomizer.hiddenToolsEmpty": "没有隐藏的工具",
@@ -82,6 +82,14 @@ export const settings = {
 	"settings.toolbarCustomizer.reset": "恢复默认",
 	"settings.toolbarCustomizer.pluginNotReady":
 		"插件未就绪，该工具暂不会显示在工具栏",
+	"settings.toolbarCustomizer.elements": "布局元素",
+	"settings.toolbarCustomizer.separator": "分隔符",
+	"settings.toolbarCustomizer.lineBreak": "新建一行",
+	"settings.toolbarCustomizer.paletteHint":
+		"拖到工具栏中需要的位置，悬停已插入的元素可删除",
+	"settings.toolbarCustomizer.mergeHint": "松开合并为组合",
+	"settings.toolbarCustomizer.stats":
+		"{slots} 个槽位 · {groups} 个组合 · {rows} 行",
 	"settings.enableQrcodeScan": "启用二维码识别",
 	"settings.findChildrenElements": "查找窗口子元素",
 	"settings.performanceMode": "性能优先",

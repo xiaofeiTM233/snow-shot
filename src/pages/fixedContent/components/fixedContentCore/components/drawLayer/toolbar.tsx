@@ -93,7 +93,7 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 		useStateRef(false);
 	const [switchDrawHotKey, setSwitchDrawHotKey] = useState("");
 
-	const { orderedKeys, hiddenSet, groupsMap } = useToolbarLayout(
+	const { orderedItems, hiddenSet, groupsMap } = useToolbarLayout(
 		ToolbarId.FixedContent,
 	);
 	const [toolbarLastUsedTool, setToolbarLastUsedTool, toolbarLastUsedToolRef] =
@@ -911,7 +911,7 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 	return (
 		<div className="fixed-content-draw-toolbar-container">
 			<div className="fixed-content-draw-toolbar" ref={toolbarElementRef}>
-				<Flex align="center" gap={token.paddingXS}>
+				<Flex align="center" gap={token.paddingXS} wrap="wrap">
 					<div
 						className="drag-button"
 						title={dragTitle}
@@ -936,7 +936,7 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 					/>
 
 					{buildToolbarContent(
-						orderedKeys,
+						orderedItems,
 						hiddenSet,
 						renderToolbarTool,
 						token.paddingXS,
