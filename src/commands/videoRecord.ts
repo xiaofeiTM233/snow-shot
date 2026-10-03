@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
 	GifFormat,
-	RecordPixelFormat,
 	VideoCaptureBackend,
 	VideoFormat,
 } from "@/types/appSettings";
@@ -24,7 +23,6 @@ export const videoRecordStart = async (
 	videoMaxWidth: number,
 	videoMaxHeight: number,
 	captureBackend?: VideoCaptureBackend,
-	pixelFormat?: RecordPixelFormat,
 	captureCursor?: boolean,
 ) => {
 	const result = await invoke("video_record_start", {
@@ -43,9 +41,8 @@ export const videoRecordStart = async (
 		encoderPreset,
 		videoMaxWidth,
 		videoMaxHeight,
-		captureBackend,
-		pixelFormat,
-		captureCursor,
+captureBackend,
+	captureCursor,
 	});
 	return result;
 };

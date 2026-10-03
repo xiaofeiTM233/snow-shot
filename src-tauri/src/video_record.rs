@@ -5,7 +5,7 @@ use tokio::sync::Mutex;
 
 use tauri::command;
 
-use snow_shot_app_services::video_record_capture::{RecordPixelFormat, VideoCaptureBackend};
+use snow_shot_app_services::video_record_capture::VideoCaptureBackend;
 use snow_shot_app_services::video_record_service::VideoFormat;
 use snow_shot_app_services::video_record_service::VideoRecordService;
 
@@ -56,10 +56,8 @@ pub async fn video_record_start(
     encoder_preset: String,
     video_max_width: i32,
     video_max_height: i32,
-    // 视频采集后端（缺省 pinray；旧前端调用自动兼容）
+    // 视频采集后端（缺省 pinray-wgc；旧前端的 "pinray" 自动兼容为 pinray-wgc）
     capture_backend: Option<VideoCaptureBackend>,
-    // 采集像素格式（仅 pinray 后端生效，缺省 bgra）
-    pixel_format: Option<RecordPixelFormat>,
     // 是否把鼠标指针合成进画面（缺省不录）
     capture_cursor: Option<bool>,
 ) -> Result<(), String> {
@@ -87,7 +85,6 @@ pub async fn video_record_start(
         video_max_width,
         video_max_height,
         capture_backend.unwrap_or_default(),
-        pixel_format.unwrap_or_default(),
         capture_cursor.unwrap_or(false),
     ) {
         Ok(_) => {

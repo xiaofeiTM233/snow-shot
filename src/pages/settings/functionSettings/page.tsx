@@ -81,10 +81,8 @@ import {
 	OcrModel,
 	OcrTextAutoWrapMode,
 	type OnlineOcrModelConfig,
-	RecordPixelFormat,
 	TranslationServiceType,
 	TrayIconClickAction,
-	VideoCaptureBackend,
 	VideoFormat,
 	VideoMaxSize,
 } from "@/types/appSettings";
@@ -2793,50 +2791,6 @@ export const FunctionSettingsPage = () => {
 						submitter={false}
 						layout="horizontal"
 					>
-						<Row gutter={token.marginLG}>
-							<Col span={12}>
-								<ProFormSelect
-									name="captureBackend"
-									layout="horizontal"
-									label={
-										<FormattedMessage id="settings.functionSettings.videoRecordSettings.captureBackend" />
-									}
-									options={[
-										{
-											label: intl.formatMessage({
-												id: "settings.functionSettings.videoRecordSettings.captureBackend.pinray",
-											}),
-											value: VideoCaptureBackend.Pinray,
-										},
-										{
-											label: intl.formatMessage({
-												id: "settings.functionSettings.videoRecordSettings.captureBackend.legacy",
-											}),
-											value: VideoCaptureBackend.Legacy,
-										},
-									]}
-								/>
-							</Col>
-							<Col span={12}>
-								<ProFormSelect
-									name="pixelFormat"
-									layout="horizontal"
-									label={
-										<FormattedMessage id="settings.functionSettings.videoRecordSettings.pixelFormat" />
-									}
-									options={[
-										{
-											label: "BGRA",
-											value: RecordPixelFormat.Bgra,
-										},
-										{
-											label: "RGBA",
-											value: RecordPixelFormat.Rgba,
-										},
-									]}
-								/>
-							</Col>
-						</Row>
 						<Row gutter={token.marginLG}>
 							<Col span={12}>
 								<ProFormSelect

@@ -65,6 +65,7 @@ import { getButtonIconColorByState } from "@/pages/draw/components/drawToolbar/e
 import {
 	type AppSettingsData,
 	AppSettingsGroup,
+	VideoCaptureBackend,
 	VideoFormat,
 	VideoMaxSize,
 } from "@/types/appSettings";
@@ -220,6 +221,8 @@ export const VideoRecordToolbarPage: React.FC = () => {
 	const [enableMicrophone, setEnableMicrophone] = useState(false);
 	const [enableSystemAudio, setEnableSystemAudio] = useState(false);
 	const [captureCursor, setCaptureCursor] = useState(false);
+	// pinray DXGI 引擎不合成鼠标指针，指针开关不可用
+	const [captureCursorDisabled, setCaptureCursorDisabled] = useState(false);
 	const durationRef = useRef(0);
 
 	const durationTimer = useRef<NodeJS.Timeout | null>(null);
@@ -279,8 +282,15 @@ export const VideoRecordToolbarPage: React.FC = () => {
 			setEnableSystemAudio(
 				appSettings[AppSettingsGroup.FunctionVideoRecord].enableSystemAudio,
 			);
+			const captureCursorDisabled =
+				appSettings[AppSettingsGroup.FunctionVideoRecord].captureBackend ===
+				VideoCaptureBackend.PinrayDxgi;
+			setCaptureCursorDisabled(captureCursorDisabled);
+			// DXGI 引擎不合成指针，开关禁用期间按关闭状态展示
 			setCaptureCursor(
-				appSettings[AppSettingsGroup.FunctionVideoRecord].captureCursor,
+				captureCursorDisabled
+					? false
+					: appSettings[AppSettingsGroup.FunctionVideoRecord].captureCursor,
 			);
 			setSettingLoading(false);
 
@@ -383,8 +393,10 @@ export const VideoRecordToolbarPage: React.FC = () => {
 			videoMaxWidth,
 			videoMaxHeight,
 			appSettings[AppSettingsGroup.FunctionVideoRecord].captureBackend,
-			appSettings[AppSettingsGroup.FunctionVideoRecord].pixelFormat,
-			appSettings[AppSettingsGroup.FunctionVideoRecord].captureCursor,
+			// DXGI 引擎不合成指针，强制按关闭传递
+			appSettings[AppSettingsGroup.FunctionVideoRecord].captureCursor &&
+				appSettings[AppSettingsGroup.FunctionVideoRecord].captureBackend !==
+					VideoCaptureBackend.PinrayDxgi,
 		)
 			.then(() => {
 				setVideoRecordState(VideoRecordState.Recording);
@@ -666,7 +678,11 @@ export const VideoRecordToolbarPage: React.FC = () => {
 						/>
 
 						<Button
+							disabled={captureCursorDisabled}
 							onClick={() => {
+								if (captureCursorDisabled) {
+									return;
+								}
 								updateAppSettings(
 									AppSettingsGroup.FunctionVideoRecord,
 									{
@@ -688,7 +704,11 @@ export const VideoRecordToolbarPage: React.FC = () => {
 									}}
 								/>
 							}
-							title={intl.formatMessage({ id: "videoRecord.captureCursor" })}
+							title={intl.formatMessage({
+								id: captureCursorDisabled
+									? "videoRecord.captureCursor.dxgiUnsupported"
+									: "videoRecord.captureCursor",
+							})}
 							type={"text"}
 							key="capture-cursor"
 						/>

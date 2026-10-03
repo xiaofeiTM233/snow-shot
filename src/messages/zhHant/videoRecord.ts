@@ -6,6 +6,8 @@ export const videoRecord = {
 	"videoRecord.microphone": "麥克風",
 	"videoRecord.systemAudio": "系統音訊",
 	"videoRecord.captureCursor": "錄製滑鼠指標",
+	"videoRecord.captureCursor.dxgiUnsupported":
+		"pinray DXGI 引擎不支援錄製滑鼠指標",
 	"videoRecord.close": "關閉",
 	"videoRecord.copy": "複製影片檔",
 	"videoRecord.copyGif": "複製 GIF 檔",

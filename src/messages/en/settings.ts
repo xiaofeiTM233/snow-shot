@@ -396,14 +396,6 @@ export const settings = {
 		"Faster preset consumes less CPU but produces larger files",
 	"settings.functionSettings.videoRecordSettings.hwaccel":
 		"Enable Hardware Acceleration",
-	"settings.functionSettings.videoRecordSettings.captureBackend":
-		"Video Capture Backend",
-	"settings.functionSettings.videoRecordSettings.captureBackend.pinray":
-		"pinray (Recommended)",
-	"settings.functionSettings.videoRecordSettings.captureBackend.legacy":
-		"Legacy (gdigrab/avfoundation)",
-	"settings.functionSettings.videoRecordSettings.pixelFormat":
-		"Capture Pixel Format (pinray only)",
 	"settings.functionSettings.videoRecordSettings.enableSystemAudio":
 		"Capture System Audio",
 	"settings.functionSettings.videoRecordSettings.saveDirectory":
@@ -656,6 +648,14 @@ export const settings = {
 	"settings.functionSettings.chatSettings.testPrompt":
 		'Test prompt: "Say "Hello, world!""',
 	"settings.systemSettings.screenshotSettings": "Screenshot Settings",
+	"settings.systemSettings.videoRecordSettings": "Video Recording Settings",
+	"settings.systemSettings.videoRecordSettings.captureBackend":
+		"Video Capture Backend",
+	"settings.systemSettings.videoRecordSettings.captureBackend.pinrayWgc":
+		"pinray WGC (Recommended)",
+	"settings.systemSettings.videoRecordSettings.captureBackend.pinrayDxgi":
+		"pinray DXGI (no cursor overlay)",
+	"settings.systemSettings.videoRecordSettings.captureBackend.legacy": "FFmpeg",
 	"settings.systemSettings.screenshotSettings.tryGetElementByFocus":
 		"Window Element Selection Enhancement",
 	"settings.systemSettings.screenshotSettings.tryGetElementByFocus.tip":
@@ -706,8 +706,10 @@ export const settings = {
 	"settings.systemSettings.screenshotSettings.captureMethod.auto": "Auto",
 	"settings.systemSettings.screenshotSettings.captureMethod.wgc": "WGC",
 	"settings.systemSettings.screenshotSettings.captureMethod.xcap": "xcap",
-	"settings.systemSettings.screenshotSettings.captureMethod.pinray":
-		"pinray",
+	"settings.systemSettings.screenshotSettings.captureMethod.pinrayWgc":
+		"pinray (WGC)",
+	"settings.systemSettings.screenshotSettings.captureMethod.pinrayDxgi":
+		"pinray (DXGI)",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection":
 		"HDR Color Correction",
 	"settings.systemSettings.screenshotSettings.hdrColorCorrection.linear":

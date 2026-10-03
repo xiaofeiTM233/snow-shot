@@ -39,43 +39,47 @@ use pinray::{
 };
 use serde::{Deserialize, Serialize};
 
-/// 录屏像素格式（用户可选）
-#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum RecordPixelFormat {
-    /// pinray 原生输出，零转换（推荐）
-    #[default]
-    Bgra,
-    /// CPU swizzle 转换为 RGBA
-    Rgba,
-}
-
-impl RecordPixelFormat {
-    fn pinray_pixel_format(&self) -> PixelFormat {
-        match self {
-            RecordPixelFormat::Bgra => PixelFormat::Bgra8888,
-            RecordPixelFormat::Rgba => PixelFormat::Rgba8888,
-        }
-    }
-
-    /// ffmpeg rawvideo 输入的 pix_fmt 名
-    pub fn ffmpeg_pix_fmt(&self) -> &'static str {
-        match self {
-            RecordPixelFormat::Bgra => "bgra",
-            RecordPixelFormat::Rgba => "rgba",
-        }
-    }
-}
+/// ffmpeg rawvideo 输入声明的 pix_fmt，与 `PixelFormat::Rgba8888` 严格对应。
+///
+/// 采集像素格式固定 RGBA，不再提供 BGRA 选项：截图 SharedBuffer、OCR、剪贴板、
+/// 多屏合成、颜色矩阵、图像编码全链路都按 RGBA 字节序实现，BGRA 会让这些消费点
+/// 静默出错（红蓝互换 / alpha 取错字节）；统一 RGBA 后全进程只有一种字节序约定。
+pub const FFMPEG_PIX_FMT: &str = "rgba";
 
 /// 录屏视频采集后端（用户可选）
 #[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
 pub enum VideoCaptureBackend {
-    /// pinray 原生采集（默认；Windows WGC / macOS ScreenCaptureKit）
+    /// pinray WGC 引擎（默认；Windows WGC / macOS ScreenCaptureKit）。
+    /// alias "pinray" 兼容旧前端调用与旧配置
+    #[serde(rename = "pinray-wgc", alias = "pinray")]
     #[default]
-    Pinray,
+    PinrayWgc,
+    /// pinray DXGI 引擎（Windows 独有；仅显示器采集，桌面变化时出帧，
+    /// 不合成鼠标指针——capture_cursor 在该引擎下无效）
+    #[serde(rename = "pinray-dxgi")]
+    PinrayDxgi,
     /// 传统采集（Windows gdigrab / macOS avfoundation，走 ffmpeg 原生输入）
+    #[serde(rename = "legacy")]
     Legacy,
+}
+
+/// pinray Windows 视频引擎（macOS 固定 ScreenCaptureKit，忽略）
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PinrayEngine {
+    /// Windows Graphics Capture：持续出帧，支持指针合成
+    Wgc,
+    /// DXGI Desktop Duplication：仅显示器，桌面变化时出帧，不合成指针
+    Dxgi,
+}
+
+impl VideoCaptureBackend {
+    /// pinray 后端对应的 Windows 视频引擎（Legacy 不会走到 pinray 路径）
+    pub fn pinray_engine(&self) -> PinrayEngine {
+        match self {
+            VideoCaptureBackend::PinrayDxgi => PinrayEngine::Dxgi,
+            _ => PinrayEngine::Wgc,
+        }
+    }
 }
 
 /// 系统声音元信息（mux 时确定 raw PCM 解码参数）
@@ -114,8 +118,9 @@ pub struct PinrayFeedParams {
     /// 相对显示器原点的裁剪区域（物理像素，宽高已偶数化）；None 表示全屏
     pub crop: Option<Rect>,
     pub frame_rate: u32,
-    pub pixel_format: RecordPixelFormat,
-    /// 是否把鼠标指针合成进画面
+    /// Windows 视频引擎（WGC/DXGI），macOS 忽略
+    pub engine: PinrayEngine,
+    /// 是否把鼠标指针合成进画面（DXGI 引擎不支持指针合成，该设置无效）
     pub capture_cursor: bool,
     pub enable_system_audio: bool,
     /// 本片段系统声音 PCM 输出文件
@@ -317,7 +322,7 @@ impl PinrayFeed {
     ) {
         let mut builder = CaptureSession::builder()
             .video_target(VideoCaptureTarget::Display(SourceId::new(params.source_id.clone())))
-            .pixel_format(params.pixel_format.pinray_pixel_format())
+            .pixel_format(PixelFormat::Rgba8888)
             .crop_rect(params.crop)
             // pinray 0.2.5 起 Windows 后端（WGC/DXGI）会在源头按该帧率节流，避免为
             // 编码器消费不到的帧做 GPU→CPU 拷贝；节流只是上限：桌面静止时仍不出帧，
@@ -332,11 +337,23 @@ impl PinrayFeed {
 
         #[cfg(target_os = "windows")]
         {
-            builder = builder.backend_preference(BackendPreference::WindowsWgc);
+            builder = builder.backend_preference(match params.engine {
+                PinrayEngine::Wgc => BackendPreference::WindowsWgc,
+                PinrayEngine::Dxgi => BackendPreference::WindowsDxgi,
+            });
         }
         #[cfg(target_os = "macos")]
         {
             builder = builder.backend_preference(BackendPreference::MacScreenCaptureKit);
+        }
+
+        // DXGI 桌面复制不合成指针，capture_cursor 在该引擎下无效（前端已禁用开关，
+        // 此处仅作防御性记录，便于从日志排查"开了指针却没录上"的问题）
+        #[cfg(target_os = "windows")]
+        if params.engine == PinrayEngine::Dxgi && params.capture_cursor {
+            log::warn!(
+                "[PinrayFeed] capture_cursor is ignored with the DXGI engine (cursor not embedded)"
+            );
         }
 
         if params.enable_system_audio {
@@ -353,8 +370,8 @@ impl PinrayFeed {
             }
         };
 
-        // pinray 要求 bug 报告附带实际选中的后端；Windows 下用于确认走的是 WGC
-        // （frame_rate 节流 + 指针开关才生效）而不是 DXGI（不合成指针）。
+        // pinray 要求 bug 报告附带实际选中的后端；Windows 下用于确认走的是
+        // WGC（指针合成生效）还是 DXGI（不合成指针，仅桌面变化时出帧）。
         let backend = session.backend_info();
         log::info!(
             "[PinrayFeed] backend: {:?} (audio: {}, zero_copy: {}), notes: {}",

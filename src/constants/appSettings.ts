@@ -21,7 +21,6 @@ import {
 	OcrDetectAfterAction,
 	OcrModel,
 	OcrTextAutoWrapMode,
-	RecordPixelFormat,
 	RenderBackend,
 	RunLogLevel,
 	TrayIconClickAction,
@@ -340,8 +339,7 @@ Priority order (highest to lowest):
 		keyDisplayMergeDuration: 256,
 		keyDisplayDirection: KeyDisplayDirection.Vertical,
 		enableSystemAudio: false,
-		captureBackend: VideoCaptureBackend.Pinray,
-		pixelFormat: RecordPixelFormat.Bgra,
+		captureBackend: VideoCaptureBackend.PinrayWgc,
 	},
 	[AppSettingsGroup.SystemScreenshot]: {
 		ocrHotStart: true,
