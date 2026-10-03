@@ -63,21 +63,30 @@ pub fn get_target_monitor() -> Result<(i32, i32, Monitor), String> {
             ));
         }
     };
-    let monitor = Monitor::from_point(mouse_x, mouse_y).unwrap_or_else(|_| {
-        // 在 Wayland 中，获取不到鼠标位置，选用第一个显示器作为位置
+    let monitor = match Monitor::from_point(mouse_x, mouse_y) {
+        Ok(monitor) => monitor,
+        Err(_) => {
+            // 在 Wayland 中，获取不到鼠标位置，选用第一个显示器作为位置
 
-        log::warn!("[get_target_monitor] No monitor found, using first monitor");
+            log::warn!("[get_target_monitor] No monitor found, using first monitor");
 
-        let monitor_list = xcap::Monitor::all().expect("[get_target_monitor] No monitor found");
-        let first_monitor = monitor_list
-            .first()
-            .expect("[get_target_monitor] No monitor found");
+            // 显示器枚举可能瞬时失败或返回空列表（原实现在此 unwrap/expect，
+            // 枚举失败会直接 panic），这里按错误返回，交给调用方处理。
+            let monitor_list = xcap::Monitor::all()
+                .map_err(|e| format!("[get_target_monitor] Failed to enumerate monitors: {}", e))?;
+            let first_monitor = monitor_list
+                .first()
+                .cloned()
+                .ok_or_else(|| String::from("[get_target_monitor] No monitor found"))?;
 
-        mouse_x = first_monitor.x().unwrap_or(0) + first_monitor.width().unwrap_or(0) as i32 / 2;
-        mouse_y = first_monitor.y().unwrap_or(0) + first_monitor.height().unwrap_or(0) as i32 / 2;
+            mouse_x =
+                first_monitor.x().unwrap_or(0) + first_monitor.width().unwrap_or(0) as i32 / 2;
+            mouse_y =
+                first_monitor.y().unwrap_or(0) + first_monitor.height().unwrap_or(0) as i32 / 2;
 
-        first_monitor.clone()
-    });
+            first_monitor
+        }
+    };
 
     Ok((mouse_x, mouse_y, monitor))
 }
@@ -724,7 +733,13 @@ pub fn get_request_string_header(
         }
     };
     match BASE64_STANDARD.decode(base64_header) {
-        Ok(header) => Ok(String::from_utf8(header).unwrap()),
+        // base64 解码结果是任意字节，不保证是合法 UTF-8，原实现直接 unwrap 会 panic。
+        Ok(header) => String::from_utf8(header).map_err(|_| {
+            format!(
+                "[get_request_string_header] Header is not valid utf-8: {}",
+                header_name
+            )
+        }),
         Err(_) => Err(format!(
             "[get_request_string_header] Invalid header: {}",
             header_name
@@ -799,10 +814,10 @@ pub async fn set_exclude_from_capture(
             )
         };
 
-        if result.is_err() {
+        if let Err(e) = result {
             return Err(format!(
                 "[set_exclude_from_capture] Failed to set window display affinity: {}",
-                result.err().unwrap()
+                e
             ));
         }
 
