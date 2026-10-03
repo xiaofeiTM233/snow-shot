@@ -77,8 +77,6 @@ export const settings = {
 	"settings.toolbarCustomizer.visibleTools": "显示中的工具",
 	"settings.toolbarCustomizer.hiddenTools": "已隐藏",
 	"settings.toolbarCustomizer.hiddenToolsEmpty": "没有隐藏的工具",
-	"settings.toolbarCustomizer.show": "恢复显示",
-	"settings.toolbarCustomizer.hide": "隐藏",
 	"settings.toolbarCustomizer.reset": "恢复默认",
 	"settings.toolbarCustomizer.pluginNotReady":
 		"插件未就绪，该工具暂不会显示在工具栏",

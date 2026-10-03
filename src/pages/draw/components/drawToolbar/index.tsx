@@ -1339,13 +1339,18 @@ const DrawToolbarCore: React.FC<DrawToolbarProps> = ({
 						ref={drawToolbarRef}
 					>
 						<Flex
-							align="center"
+							vertical
 							gap={token.paddingXS}
-							wrap="wrap"
 							className="draw-toolbar-content"
 						>
-							<DragButton actionRef={dragButtonActionRef} />
-							{renderToolbarContent()}
+							{renderToolbarContent().map(({ key, items }) => (
+								<Flex key={key} align="center" gap={token.paddingXS}>
+									{key === "row-0" ? (
+										<DragButton actionRef={dragButtonActionRef} />
+									) : null}
+									{items}
+								</Flex>
+							))}
 						</Flex>
 					</div>
 				</div>

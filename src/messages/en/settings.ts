@@ -81,8 +81,6 @@ export const settings = {
 	"settings.toolbarCustomizer.visibleTools": "Visible Tools",
 	"settings.toolbarCustomizer.hiddenTools": "Hidden",
 	"settings.toolbarCustomizer.hiddenToolsEmpty": "No hidden tools",
-	"settings.toolbarCustomizer.show": "Show",
-	"settings.toolbarCustomizer.hide": "Hide",
 	"settings.toolbarCustomizer.reset": "Reset to Default",
 	"settings.toolbarCustomizer.pluginNotReady":
 		"Plugin is not ready; this tool is hidden on the toolbar for now",

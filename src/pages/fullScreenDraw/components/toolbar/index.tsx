@@ -677,7 +677,7 @@ export const FullScreenDrawToolbar: React.FC<{
 	return (
 		<div className="full-screen-draw-toolbar-container">
 			<div className="full-screen-draw-toolbar">
-				<Flex align="center" gap={token.paddingXS} wrap="wrap">
+				<Flex vertical gap={token.paddingXS}>
 					{buildToolbarContent(
 						orderedItems,
 						hiddenSet,
@@ -685,10 +685,15 @@ export const FullScreenDrawToolbar: React.FC<{
 						token.paddingXS,
 						groupsMap,
 						renderGroup,
-					)}
-
-					{/* 撤销/重做仅用于注册快捷键，不显示 */}
-					<HistoryControls hidden={true} disable={false} />
+					).map(({ key, items }) => (
+						<Flex key={key} align="center" gap={token.paddingXS}>
+							{items}
+							{/* 撤销/重做仅用于注册快捷键，不显示 */}
+							{key === "row-0" ? (
+								<HistoryControls hidden={true} disable={false} />
+							) : null}
+						</Flex>
+					))}
 				</Flex>
 			</div>
 

@@ -911,30 +911,7 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 	return (
 		<div className="fixed-content-draw-toolbar-container">
 			<div className="fixed-content-draw-toolbar" ref={toolbarElementRef}>
-				<Flex align="center" gap={token.paddingXS} wrap="wrap">
-					<div
-						className="drag-button"
-						title={dragTitle}
-						onMouseDown={handleMouseDown}
-					>
-						<HolderOutlined />
-					</div>
-
-					{/* 拖动窗口按钮是窗口锚点，固定在头部，不参与排序与显隐 */}
-					<Button
-						{...toolButtonProps}
-						icon={
-							<DragWindowIcon
-								style={{
-									fontSize: "1.15em",
-								}}
-							/>
-						}
-						type={getButtonTypeByState(false)}
-						title={dragWindowButtonTitle}
-						onMouseDown={startFreeDragAction}
-					/>
-
+				<Flex vertical gap={token.paddingXS}>
 					{buildToolbarContent(
 						orderedItems,
 						hiddenSet,
@@ -942,7 +919,37 @@ export const FixedContentCoreDrawToolbar: React.FC<{
 						token.paddingXS,
 						groupsMap,
 						renderGroup,
-					)}
+					).map(({ key, items }) => (
+						<Flex key={key} align="center" gap={token.paddingXS}>
+							{key === "row-0" ? (
+								<>
+									<div
+										className="drag-button"
+										title={dragTitle}
+										onMouseDown={handleMouseDown}
+									>
+										<HolderOutlined />
+									</div>
+
+									{/* 拖动窗口按钮是窗口锚点，固定在头部，不参与排序与显隐 */}
+									<Button
+										{...toolButtonProps}
+										icon={
+											<DragWindowIcon
+												style={{
+													fontSize: "1.15em",
+												}}
+											/>
+										}
+										type={getButtonTypeByState(false)}
+										title={dragWindowButtonTitle}
+										onMouseDown={startFreeDragAction}
+									/>
+								</>
+							) : null}
+							{items}
+						</Flex>
+					))}
 				</Flex>
 
 				<BlurTool />

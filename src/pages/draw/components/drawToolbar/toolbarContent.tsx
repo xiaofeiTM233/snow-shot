@@ -12,9 +12,12 @@ import {
 } from "@/types/toolbarTool";
 
 /**
- * 按顺序渲染工具栏内容：
+ * 按顺序构建工具栏内容，返回行数组：
+ * - 无显式换行时返回单行（调用点渲染为单行 flex，与旧版布局一致）；
+ * - 显式换行切分行，每行由调用点渲染为独立的不换行 flex 行容器
+ *   （工具栏是 absolute shrink-to-fit 容器，flex-wrap 会使宽度塌缩到最宽单项导致竖排，
+ *   因此多行必须按行切分渲染，每行宽度独立收缩）；
  * - 相邻可见工具的分组变化时自动插入分隔线；显式分隔符/换行两侧不再插入自动分隔线；
- * - 显式分隔符渲染为分隔线，显式换行渲染为强制断行元素（父容器需开启 flex wrap）；
  * - 用户配置隐藏的工具保持挂载，仅通过 display:none 隐藏，快捷键仍然可用；
  * - renderTool 返回 null 的工具（运行时条件不满足）不渲染；
  * - groupsMap 中有成员的工具通过 renderGroup 渲染为组合（Popover）。
@@ -29,18 +32,27 @@ export const buildToolbarContent = (
 		headKey: ToolbarToolKey,
 		members: ToolbarToolKey[],
 	) => React.ReactNode,
-): React.ReactNode[] => {
-	const items: React.ReactNode[] = [];
+): { key: string; items: React.ReactNode[] }[] => {
+	const rows: { key: string; items: React.ReactNode[] }[] = [];
+	let currentRow: React.ReactNode[] = [];
 	let lastVisibleGroup: ToolbarToolGroup | undefined;
 	/** 最近渲染的元素是否为显式分隔符/换行（此时抑制自动分隔线） */
 	let afterExplicitSplit = false;
 
+	/** 结束当前行（空行丢弃：行首换行无效） */
+	const endRow = () => {
+		if (currentRow.length > 0) {
+			rows.push({ key: `row-${rows.length}`, items: currentRow });
+			currentRow = [];
+		}
+	};
+
 	for (const item of orderedItems) {
 		if (item === TOOLBAR_ITEM_SEPARATOR) {
-			items.push(
+			currentRow.push(
 				<div
 					className="draw-toolbar-splitter"
-					key={`separator-${items.length}`}
+					key={`separator-${rows.length}-${currentRow.length}`}
 				/>,
 			);
 			lastVisibleGroup = undefined;
@@ -48,13 +60,7 @@ export const buildToolbarContent = (
 			continue;
 		}
 		if (item === TOOLBAR_ITEM_LINE_BREAK) {
-			items.push(
-				<div
-					className="draw-toolbar-line-break"
-					key={`line-break-${items.length}`}
-					style={{ flexBasis: "100%", height: 0 }}
-				/>,
-			);
+			endRow();
 			lastVisibleGroup = undefined;
 			afterExplicitSplit = true;
 			continue;
@@ -81,15 +87,18 @@ export const buildToolbarContent = (
 				lastVisibleGroup !== definition.group &&
 				!afterExplicitSplit
 			) {
-				items.push(
-					<div className="draw-toolbar-splitter" key={`splitter-${key}`} />,
+				currentRow.push(
+					<div
+						className="draw-toolbar-splitter"
+						key={`splitter-${rows.length}-${key}`}
+					/>,
 				);
 			}
 			lastVisibleGroup = definition.group;
 		}
 		afterExplicitSplit = false;
 
-		items.push(
+		currentRow.push(
 			<div
 				key={key}
 				className="draw-toolbar-tool-slot"
@@ -103,6 +112,7 @@ export const buildToolbarContent = (
 			</div>,
 		);
 	}
+	endRow();
 
-	return items;
+	return rows.length > 0 ? rows : [{ key: "row-0", items: [] }];
 };

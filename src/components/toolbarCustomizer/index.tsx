@@ -1,8 +1,6 @@
 import {
 	CloseOutlined,
 	EnterOutlined,
-	EyeInvisibleOutlined,
-	EyeOutlined,
 	LineOutlined,
 	RestOutlined,
 } from "@ant-design/icons";
@@ -27,7 +25,7 @@ import {
 	sortableKeyboardCoordinates,
 	useSortable,
 } from "@dnd-kit/sortable";
-import { Button, Tabs, Tooltip, theme } from "antd";
+import { Button, Tabs, theme } from "antd";
 import type React from "react";
 import {
 	Fragment,
@@ -38,6 +36,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { FormattedMessage, useIntl } from "react-intl";
 import {
 	PLUGIN_ID_FFMPEG,
@@ -274,10 +273,7 @@ const ToolButtonChip: React.FC<{
 	dimmed?: boolean;
 	/** 合并目标高亮：蓝色虚线环 */
 	mergeTarget?: boolean;
-	/** 悬停时显示的眼睛按钮动作 */
-	eyeAction?: "hide" | "show";
-	onEyeClick?: () => void;
-}> = ({ dragId, icon, title, dimmed, mergeTarget, eyeAction, onEyeClick }) => {
+}> = ({ dragId, icon, title, dimmed, mergeTarget }) => {
 	const { token } = theme.useToken();
 	const { attributes, listeners, setNodeRef, isDragging } = useSortable({
 		id: dragId,
@@ -300,50 +296,6 @@ const ToolButtonChip: React.FC<{
 			}}
 		>
 			<Button icon={icon} title={title} type="text" />
-			{eyeAction && (
-				<Tooltip
-					title={
-						<FormattedMessage
-							id={
-								eyeAction === "hide"
-									? "settings.toolbarCustomizer.hide"
-									: "settings.toolbarCustomizer.show"
-							}
-						/>
-					}
-				>
-					<Button
-						size="small"
-						type="primary"
-						shape="circle"
-						style={{
-							position: "absolute",
-							top: -6,
-							right: -6,
-							width: 18,
-							height: 18,
-							minWidth: 18,
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-						}}
-						icon={
-							eyeAction === "hide" ? (
-								<EyeInvisibleOutlined style={{ fontSize: 11 }} />
-							) : (
-								<EyeOutlined style={{ fontSize: 11 }} />
-							)
-						}
-						onPointerDown={(event) => {
-							event.stopPropagation();
-						}}
-						onClick={(event) => {
-							event.stopPropagation();
-							onEyeClick?.();
-						}}
-					/>
-				</Tooltip>
-			)}
 		</div>
 	);
 };
@@ -779,34 +731,6 @@ const ToolbarCustomizerPane: React.FC<{ toolbarId: ToolbarId }> = ({
 			return undefined;
 		},
 		[],
-	);
-
-	const hideKey = useCallback(
-		(key: ToolbarToolKey) => {
-			const { slots: stateSlots, hiddenKeys: stateHiddenKeys } =
-				latestStateRef.current;
-			if (stateHiddenKeys.includes(key)) {
-				return;
-			}
-			const nextHiddenKeys = [...stateHiddenKeys, key];
-			setHiddenKeys(nextHiddenKeys);
-			persist(stateSlots, nextHiddenKeys);
-		},
-		[persist],
-	);
-
-	const restoreKey = useCallback(
-		(key: ToolbarToolKey) => {
-			const { slots: stateSlots, hiddenKeys: stateHiddenKeys } =
-				latestStateRef.current;
-			if (!stateHiddenKeys.includes(key)) {
-				return;
-			}
-			const nextHiddenKeys = stateHiddenKeys.filter((k) => k !== key);
-			setHiddenKeys(nextHiddenKeys);
-			persist(stateSlots, nextHiddenKeys);
-		},
-		[persist],
 	);
 
 	const deleteToken = useCallback(
@@ -1250,7 +1174,6 @@ const ToolbarCustomizerPane: React.FC<{ toolbarId: ToolbarId }> = ({
 			if (!definition) {
 				return null;
 			}
-			const hidden = hiddenKeys.includes(slot.key);
 			const title = intl.formatMessage({ id: definition.i18nId });
 			const grouped = slot.members.length > 0;
 
@@ -1263,8 +1186,6 @@ const ToolbarCustomizerPane: React.FC<{ toolbarId: ToolbarId }> = ({
 					mergeTarget={
 						activeDragId !== null && mergeTargetId === toolChipId(slot.key)
 					}
-					eyeAction={hidden ? "show" : "hide"}
-					onEyeClick={() => (hidden ? restoreKey(slot.key) : hideKey(slot.key))}
 				/>
 			);
 
@@ -1315,10 +1236,6 @@ const ToolbarCustomizerPane: React.FC<{ toolbarId: ToolbarId }> = ({
 										id: memberDefinition.i18nId,
 									})}
 									dimmed={!isPluginReady(memberKey) || memberHidden}
-									eyeAction={memberHidden ? "show" : "hide"}
-									onEyeClick={() =>
-										memberHidden ? restoreKey(memberKey) : hideKey(memberKey)
-									}
 								/>
 							);
 						})}
@@ -1330,11 +1247,9 @@ const ToolbarCustomizerPane: React.FC<{ toolbarId: ToolbarId }> = ({
 			activeDragId,
 			deleteToken,
 			hiddenKeys,
-			hideKey,
 			intl,
 			isPluginReady,
 			mergeTargetId,
-			restoreKey,
 			token,
 		],
 	);
@@ -1353,12 +1268,10 @@ const ToolbarCustomizerPane: React.FC<{ toolbarId: ToolbarId }> = ({
 					icon={definition.icon}
 					title={intl.formatMessage({ id: definition.i18nId })}
 					dimmed={!isPluginReady(key)}
-					eyeAction="show"
-					onEyeClick={() => restoreKey(key)}
 				/>
 			);
 		},
-		[isPluginReady, intl, restoreKey],
+		[isPluginReady, intl],
 	);
 
 	/** 拖拽跟随预览 */
@@ -1626,7 +1539,12 @@ const ToolbarCustomizerPane: React.FC<{ toolbarId: ToolbarId }> = ({
 				</SortableContext>
 
 				<DragOverlay style={{ pointerEvents: "none" }}>
-					{renderDragOverlay()}
+					{/* portal 到 body：DragOverlay 用 position:fixed 定位，
+					    祖先链上的 transform/zoom 会劫持 fixed 包含块导致预览与指针错位 */}
+					{createPortal(
+						<div className="toolbar-editor-overlay">{renderDragOverlay()}</div>,
+						document.body,
+					)}
 				</DragOverlay>
 			</DndContext>
 
@@ -1635,6 +1553,15 @@ const ToolbarCustomizerPane: React.FC<{ toolbarId: ToolbarId }> = ({
 					padding-inline: 10px;
 				}
 				.toolbar-editor :global(.ant-btn-icon) {
+					font-size: 22px;
+					display: flex;
+					align-items: center;
+				}
+				/* 拖拽预览 portal 到 body，不命中 .toolbar-editor 作用域，单独补齐同款按钮样式 */
+				:global(.toolbar-editor-overlay) :global(.ant-btn) {
+					padding-inline: 10px;
+				}
+				:global(.toolbar-editor-overlay) :global(.ant-btn-icon) {
 					font-size: 22px;
 					display: flex;
 					align-items: center;
