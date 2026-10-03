@@ -88,8 +88,7 @@ export const defaultAppSettingsData: AppSettingsData = {
 		fullScreenToolbarGroups: DEFAULT_TOOLBAR_GROUPS[ToolbarId.FullScreen],
 		fullScreenToolbarHiddenTools: [],
 		fixedContentToolbarToolOrder: [],
-		fixedContentToolbarGroups:
-			DEFAULT_TOOLBAR_GROUPS[ToolbarId.FixedContent],
+		fixedContentToolbarGroups: DEFAULT_TOOLBAR_GROUPS[ToolbarId.FixedContent],
 		fixedContentToolbarHiddenTools: [],
 	},
 	[AppSettingsGroup.FixedContent]: {
@@ -306,13 +305,13 @@ Priority order (highest to lowest):
 		showStickerRestoreDefaultSize: false,
 	},
 	[AppSettingsGroup.FunctionOutput]: {
-		manualSaveFileNameFormat: `SnowShot_{{YYYY-MM-DD_HH-mm-ss}}`,
-		autoSaveFileNameFormat: `SnowShot_{{YYYY-MM-DD_HH-mm-ss}}`,
-		fastSaveFileNameFormat: `SnowShot_{{YYYY-MM-DD_HH-mm-ss}}`,
-		focusedWindowFileNameFormat: `${FOCUS_WINDOW_APP_NAME_ENV_VARIABLE}/SnowShot_{{YYYY-MM-DD_HH-mm-ss}}`,
-		fullScreenFileNameFormat: `SnowShot_{{YYYY-MM-DD_HH-mm-ss}}`,
-		videoRecordFileNameFormat: `SnowShot_Video_{{YYYY-MM-DD_HH-mm-ss}}`,
-		uploadToCloudSaveUrlFormat: `SnowShot_{{YYYY-MM-DD_HH-mm-ss}}`,
+		manualSaveFileNameFormat: `SnowShot_{{YYYY-MM-DD_HH-mm-ss-SSS}}`,
+		autoSaveFileNameFormat: `SnowShot_{{YYYY-MM-DD_HH-mm-ss-SSS}}`,
+		fastSaveFileNameFormat: `SnowShot_{{YYYY-MM-DD_HH-mm-ss-SSS}}`,
+		focusedWindowFileNameFormat: `${FOCUS_WINDOW_APP_NAME_ENV_VARIABLE}/SnowShot_{{YYYY-MM-DD_HH-mm-ss-SSS}}`,
+		fullScreenFileNameFormat: `SnowShot_{{YYYY-MM-DD_HH-mm-ss-SSS}}`,
+		videoRecordFileNameFormat: `SnowShot_Video_{{YYYY-MM-DD_HH-mm-ss-SSS}}`,
+		uploadToCloudSaveUrlFormat: `SnowShot_{{YYYY-MM-DD_HH-mm-ss-SSS}}`,
 	},
 	[AppSettingsGroup.FunctionFullScreenDraw]: {
 		defaultTool: DrawState.Select,

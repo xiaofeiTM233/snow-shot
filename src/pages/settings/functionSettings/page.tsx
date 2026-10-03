@@ -3310,7 +3310,7 @@ export const FunctionSettingsPage = () => {
 							</Col>
 							<Col span={12}>
 								<FormattedMessage id="settings.functionSettings.outputSettings.variables.date" />
-								<code>{"{{YYYY-MM-DD_HH-mm-ss}}"}</code>
+								<code>{"{{YYYY-MM-DD_HH-mm-ss-SSS}}"}</code>
 							</Col>
 							<Col span={12}>
 								<FormattedMessage id="settings.functionSettings.outputSettings.variables.focusedWindowAppName" />
