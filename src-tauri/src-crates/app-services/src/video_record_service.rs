@@ -1,7 +1,6 @@
 use ffmpeg_sidecar::{child::FfmpegChild, command::FfmpegCommand, event::FfmpegEvent};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-#[cfg(target_os = "windows")]
 use snow_shot_app_utils::monitor_info::MonitorInfo;
 #[cfg(target_os = "macos")]
 use snow_shot_app_utils::monitor_info::MonitorList;
