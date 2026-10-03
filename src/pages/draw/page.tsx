@@ -1666,11 +1666,6 @@ const DrawPageCore: React.FC<{
 	const initWaitExecuteScreenshotTimerRef = useRef<NodeJS.Timeout | undefined>(
 		undefined,
 	);
-	// 全屏截图进行中标记。
-	// capture-full-screen 分支不经过 capturing/drawPageState 状态机（它绕过了两者），
-	// 连按会并发启动多个 WGC session 与大图分配，实测导致进程在 crop 阶段被系统终止。
-	// Rust 侧已有 CAPTURE_FULL_SCREEN_LOCK 兜底，这里再做一层节流，减少无效排队。
-	const fullScreenCapturingRef = useRef(false);
 
 	useEffect(() => {
 		// 监听截图命令
@@ -1703,38 +1698,16 @@ const DrawPageCore: React.FC<{
 			}
 
 			if (payload.type === ScreenshotType.CaptureFullScreen) {
-				// 全屏截图不走 drawPageState 状态机，这里自己做节流：
-				// 已有全屏采集在跑时直接忽略新请求，避免并发 WGC session 与大图分配
-				// 把进程压垮（Rust 侧 CAPTURE_FULL_SCREEN_LOCK 是第二道防线）。
-				if (fullScreenCapturingRef.current) {
-					appDebug(
-						"[DIAG] draw: capture-full-screen ignored, already in progress",
-					);
-					return;
-				}
-				fullScreenCapturingRef.current = true;
 				// 不能裸调用：captureFullScreenAction 返回的 Promise 若 reject
 				// （如 save_file 无权限），无人 await/catch 会导致整条链静默失败，
 				// 表现为只有快门声、既无文件也无日志。
-				// 也不能用 ?. 链式调用：ref 为空时 ?. 短路返回 undefined，
-				// 后续 .catch 会访问 undefined 而抛错，finally 也不会执行，
-				// 导致 fullScreenCapturingRef 永久卡在 true、全屏截图再也无法触发。
-				const captureFullScreenPromise =
-					captureHistoryActionRef.current?.captureFullScreen();
-				if (!captureFullScreenPromise) {
-					fullScreenCapturingRef.current = false;
-					appError(
-						"[DrawPageCore] captureFullScreen failed, action ref is empty",
-					);
-					return;
-				}
-				captureFullScreenPromise
-					.catch((error) => {
-						appError("[DrawPageCore] captureFullScreen unhandled error", error);
-					})
-					.finally(() => {
-						fullScreenCapturingRef.current = false;
-					});
+				// 并发由 Rust 侧 CAPTURE_FULL_SCREEN_LOCK 串行化：全屏截图不经过
+				// capturing / drawPageState 状态机（它在 capturing 判断之后直接
+				// return），连按会并发创建 WGC session，实测 33 并发下进程在
+				// crop 阶段被系统终止。此处不再做前端节流，保证每次按键都出图。
+				captureHistoryActionRef.current?.captureFullScreen().catch((error) => {
+					appError("[DrawPageCore] captureFullScreen unhandled error", error);
+				});
 				return;
 			}
 
