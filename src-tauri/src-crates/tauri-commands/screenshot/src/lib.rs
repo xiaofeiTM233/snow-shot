@@ -696,6 +696,7 @@ pub async fn capture_full_screen(
     )?;
 
     // 截取所有显示器的截图
+    log::debug!("[capture_full_screen] stage=capture begin");
     let all_monitors_image = monitor_list
         .capture(
             None,
@@ -707,6 +708,12 @@ pub async fn capture_full_screen(
             },
         )
         .await?;
+    log::debug!(
+        "[capture_full_screen] stage=capture ok combined={}x{}",
+        all_monitors_image.width(),
+        all_monitors_image.height()
+    );
+
     // 从合并图中裁剪出激活显示器所在区域（使用 image crate 安全裁剪 API）。
     // 单显示器时激活显示器即合并图本身，裁剪结果与整图一致。
     let all_monitors_bounding_box = monitor_list.get_monitors_bounding_box();
@@ -718,6 +725,12 @@ pub async fn capture_full_screen(
         max_x: active_monitor_rect.max_x - all_monitors_bounding_box.min_x,
         max_y: active_monitor_rect.max_y - all_monitors_bounding_box.min_y,
     };
+    log::debug!(
+        "[capture_full_screen] stage=bbox all={:?} active={:?} crop={:?}",
+        all_monitors_bounding_box,
+        active_monitor_rect,
+        active_monitor_crop_region
+    );
 
     let active_monitor_crop_region_x = active_monitor_crop_region.min_x as usize;
     let active_monitor_crop_region_y = active_monitor_crop_region.min_y as usize;
@@ -733,6 +746,32 @@ pub async fn capture_full_screen(
         ));
     }
 
+    // 越界/非法坐标直接返回错误：i32 as usize 对负数会回绕成巨大值，
+    // 而 release 下 overflow-checks 关闭，此类错误不会 panic 只会静默产生错误坐标。
+    let (combined_width, combined_height) = image::GenericImageView::dimensions(&all_monitors_image);
+    if active_monitor_crop_region_x as u64 + active_monitor_crop_region_width as u64
+        > combined_width as u64
+        || active_monitor_crop_region_y as u64 + active_monitor_crop_region_height as u64
+            > combined_height as u64
+    {
+        return Err(format!(
+            "[capture_full_screen] crop region out of bounds: x={} y={} w={} h={} combined={}x{}",
+            active_monitor_crop_region_x,
+            active_monitor_crop_region_y,
+            active_monitor_crop_region_width,
+            active_monitor_crop_region_height,
+            combined_width,
+            combined_height
+        ));
+    }
+
+    log::debug!(
+        "[capture_full_screen] stage=crop begin x={} y={} w={} h={}",
+        active_monitor_crop_region_x,
+        active_monitor_crop_region_y,
+        active_monitor_crop_region_width,
+        active_monitor_crop_region_height
+    );
     // crop_imm 返回的是 4 通道 RgbaImage，直接包成 DynamicImage 编码。
     // 该 4 通道路径与区域/窗口截图一致（已验证正常），可规避花屏。
     let active_monitor_image = image::DynamicImage::ImageRgba8(image::imageops::crop_imm(
@@ -743,13 +782,23 @@ pub async fn capture_full_screen(
         active_monitor_crop_region_height as u32,
     )
     .to_image());
+    log::debug!(
+        "[capture_full_screen] stage=crop ok cropped={}x{}",
+        active_monitor_image.width(),
+        active_monitor_image.height()
+    );
 
     // 编码图像为 PNG 格式
+    log::debug!("[capture_full_screen] stage=encode begin");
     let image_buffer = snow_shot_app_utils::encode_image(
         &active_monitor_image,
         snow_shot_app_utils::ImageEncoder::Png,
     )
     .map_err(|e| e.to_string())?;
+    log::debug!(
+        "[capture_full_screen] stage=encode ok bytes={}",
+        image_buffer.len()
+    );
 
     // 写入到截图历史
     let capture_history_file_path = PathBuf::from(capture_history_file_path);
