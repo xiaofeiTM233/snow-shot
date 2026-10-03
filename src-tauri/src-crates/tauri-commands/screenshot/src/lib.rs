@@ -15,17 +15,17 @@ use tokio::sync::Mutex;
 #[cfg(target_os = "windows")]
 use windows::Win32::Foundation::HWND;
 
-/// 全屏截图的进程级互斥锁。
+/// 全屏截图的「WGC 抓帧」互斥锁。
 ///
 /// `capture_full_screen` 是自由函数（拿不到 `tauri::State`），用静态锁串行化。
-/// 必须串行化的原因：每次调用会启动独立的 pinray WGC session，而 WGC 的
-/// D3D11 设备/帧缓冲在进程内共享；同时还会各自持有一份 1920x1080 的 RGB
-/// 合并图，并在 crop 时再转成 RGBA。并发执行时实测会导致进程在
-/// `image::imageops::crop_imm` 内被系统终止（无 panic、无 WER 记录）：
-/// 33 个并发请求下第 31 个 crop 未完成即崩溃。
+/// 锁的范围**只覆盖建session 与抓帧**：WGC 的 D3D11 设备/帧缓冲在进程内共享
+/// （见 `monitor_info.rs` 中 `MonitorInfoList::capture` 的说明），同时启动多个
+/// session 会互相冲突。实测 33 并发下进程会在 `image::imageops::crop_imm`
+/// 内被系统终止（无 panic、无WER 记录）。
 ///
-/// 锁只保护全屏截图这条路径，不影响区域截图。
-static CAPTURE_FULL_SCREEN_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+/// 抓帧之后的裁剪 / PNG 编码 / 落盘是纯 CPU 与磁盘操作，不共享 WGC 资源，
+/// 因此放到锁外并行执行，让快速连按时也能保持吞吐。
+static CAPTURE_FULL_SCREEN_GRAB_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 pub async fn capture_current_monitor(
     #[allow(unused_variables)] window: tauri::Window,
@@ -699,15 +699,7 @@ pub async fn capture_full_screen(
     correct_color_filter: bool,
     capture_method: CaptureMethod,
 ) -> Result<Response, String> {
-    // 串行化整个全屏截图：WGC session 与大图内存都是进程内共享资源，
-    // 并发执行会导致进程在 crop 阶段被系统终止（实测 33 并发下第 31 个崩）。
-    // 前端 capture-full-screen 分支绕过了 capturing 状态机，这里是最后一道防线。
-    let guard = CAPTURE_FULL_SCREEN_LOCK
-        .get_or_init(|| Mutex::new(()))
-        .lock()
-        .await;
-
-    let result = capture_full_screen_inner(
+    capture_full_screen_inner(
         &app_handle,
         enable_multiple_monitor,
         &capture_history_file_path,
@@ -715,13 +707,14 @@ pub async fn capture_full_screen(
         correct_color_filter,
         capture_method,
     )
-    .await;
-
-    drop(guard);
-    result
+    .await
 }
 
-/// `capture_full_screen` 的实际实现，调用方需已持有 `CAPTURE_FULL_SCREEN_LOCK`。
+/// `capture_full_screen` 的实际实现。
+///
+/// 只对「建 session + 抓帧」加锁（`CAPTURE_FULL_SCREEN_GRAB_LOCK`），锁外的
+/// 裁剪 / 编码 / 落盘交给 `spawn_blocking` 并行执行，这样快速连按不会被整体
+/// 串行化拖慢，同时避免 WGC 并发争用。
 async fn capture_full_screen_inner(
     app_handle: &tauri::AppHandle,
     enable_multiple_monitor: bool,
@@ -749,19 +742,30 @@ async fn capture_full_screen_inner(
         correct_hdr_color_algorithm == CorrectHdrColorAlgorithm::None,
     )?;
 
-    // 截取所有显示器的截图
+    // 截取所有显示器的截图。
+    // 只有「建 session + 抓帧」必须串行：WGC 的 D3D11 设备在进程内共享，
+    // 并发创建 session 会互相争用并把进程压垮。抓到像素后立刻释放锁，
+    // 后续裁剪/编码在锁外并行，见下方 spawn_blocking。
     log::debug!("[capture_full_screen] stage=capture begin");
-    let all_monitors_image = monitor_list
-        .capture(
-            None,
-            CaptureOption {
-                color_format: ColorFormat::Rgb8,
-                correct_hdr_color_algorithm,
-                correct_color_filter,
-                capture_method,
-            },
-        )
-        .await?;
+    let all_monitors_image = {
+        let _grab_guard = CAPTURE_FULL_SCREEN_GRAB_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .await;
+        let grabbed = monitor_list
+            .capture(
+                None,
+                CaptureOption {
+                    color_format: ColorFormat::Rgb8,
+                    correct_hdr_color_algorithm,
+                    correct_color_filter,
+                    capture_method,
+                },
+            )
+            .await;
+        // 锁在此 drop，下一次抓帧可以立即开始
+        grabbed?
+    };
     log::debug!(
         "[capture_full_screen] stage=capture ok combined={}x{}",
         all_monitors_image.width(),
@@ -820,54 +824,63 @@ async fn capture_full_screen_inner(
         ));
     }
 
-    log::debug!(
-        "[capture_full_screen] stage=crop begin x={} y={} w={} h={}",
-        active_monitor_crop_region_x,
-        active_monitor_crop_region_y,
-        active_monitor_crop_region_width,
-        active_monitor_crop_region_height
-    );
-    // crop_imm 返回的是 4 通道 RgbaImage，直接包成 DynamicImage 编码。
-    // 该 4 通道路径与区域/窗口截图一致（已验证正常），可规避花屏。
-    let active_monitor_image = image::DynamicImage::ImageRgba8(
-        image::imageops::crop_imm(
-            &all_monitors_image,
-            active_monitor_crop_region_x as u32,
-            active_monitor_crop_region_y as u32,
-            active_monitor_crop_region_width as u32,
-            active_monitor_crop_region_height as u32,
-        )
-        .to_image(),
-    );
-    log::debug!(
-        "[capture_full_screen] stage=crop ok cropped={}x{}",
-        active_monitor_image.width(),
-        active_monitor_image.height()
-    );
-
-    // 编码图像为 PNG 格式
-    log::debug!("[capture_full_screen] stage=encode begin");
-    let image_buffer = snow_shot_app_utils::encode_image(
-        &active_monitor_image,
-        snow_shot_app_utils::ImageEncoder::Png,
-    )
-    .map_err(|e| e.to_string())?;
-    log::debug!(
-        "[capture_full_screen] stage=encode ok bytes={}",
-        image_buffer.len()
-    );
-
-    // 写入到截图历史
+    // 裁剪 + 编码 + 落盘是纯 CPU/磁盘工作，不共享 WGC 资源，放到阻塞线程池并行执行。
+    // 1920x1080 的 PNG 编码约 150-250ms，是单次全屏截图的主要耗时；串行化它会让
+    // 快速连按的响应时间线性叠加。spawn_blocking 让 tokio worker 立即空闲，
+    // 下一个请求可以马上进入 WGC 抓帧阶段（那里仍有串行锁，但耗时短得多）。
     let capture_history_path = PathBuf::from(capture_history_file_path);
-    match all_monitors_image.save(&capture_history_path) {
-        Ok(_) => (),
-        Err(e) => {
-            return Err(format!(
-                "[capture_full_screen] failed to save capture history image: {}",
-                e
-            ));
+    let image_buffer = tokio::task::spawn_blocking(move || {
+        log::debug!(
+            "[capture_full_screen] stage=crop begin x={} y={} w={} h={}",
+            active_monitor_crop_region_x,
+            active_monitor_crop_region_y,
+            active_monitor_crop_region_width,
+            active_monitor_crop_region_height
+        );
+        // crop_imm 返回的是 4 通道 RgbaImage，直接包成 DynamicImage 编码。
+        // 该 4 通道路径与区域/窗口截图一致（已验证正常），可规避花屏。
+        let active_monitor_image = image::DynamicImage::ImageRgba8(
+            image::imageops::crop_imm(
+                &all_monitors_image,
+                active_monitor_crop_region_x as u32,
+                active_monitor_crop_region_y as u32,
+                active_monitor_crop_region_width as u32,
+                active_monitor_crop_region_height as u32,
+            )
+            .to_image(),
+        );
+        log::debug!(
+            "[capture_full_screen] stage=crop ok cropped={}x{}",
+            active_monitor_image.width(),
+            active_monitor_image.height()
+        );
+
+        log::debug!("[capture_full_screen] stage=encode begin");
+        let image_buffer = snow_shot_app_utils::encode_image(
+            &active_monitor_image,
+            snow_shot_app_utils::ImageEncoder::Png,
+        )
+        .map_err(|e| e.to_string())?;
+        log::debug!(
+            "[capture_full_screen] stage=encode ok bytes={}",
+            image_buffer.len()
+        );
+
+        // 写入到截图历史
+        match all_monitors_image.save(&capture_history_path) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(format!(
+                    "[capture_full_screen] failed to save capture history image: {}",
+                    e
+                ));
+            }
         }
-    }
+
+        Ok(image_buffer)
+    })
+    .await
+    .map_err(|e| format!("[capture_full_screen] blocking task failed: {e}"))??;
 
     Ok(Response::new(image_buffer))
 }
