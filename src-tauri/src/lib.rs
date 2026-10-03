@@ -347,6 +347,12 @@ pub fn run() {
             // 尽早记录启动信息，便于从日志中确认每次启动的软件/构建/系统环境
             log_app_startup_info(app.handle());
 
+            // release profile 配置了 panic = "abort"，panic 会直接终止进程、
+            // 不经过 panic hook，导致崩溃时日志里完全看不到原因（实测过：日志在
+            // 最后一条业务日志处戛然而止）。这里补一个 hook，把 panic 位置与回溯
+            // 落盘，作为崩溃排查的唯一线索。file 写入是同步的，abort 前可完成。
+            install_panic_logger(app.handle());
+
             let main_window = app
                 .get_webview_window("main")
                 .expect("[lib::setup] no main window");
@@ -733,6 +739,55 @@ fn month_lengths(year: i64) -> [i64; 12] {
         30,
         31,
     ]
+}
+
+/// 安装 panic hook，把 panic 位置与回溯写入独立崩溃日志文件。
+///
+/// release profile 使用 `panic = "abort"`，进程被 abort 时不会 unwind，
+/// 日志里看不到任何 panic 信息，排查崩溃只能靠复现。这里在 abort 生效前
+/// 把 panic payload、位置和 backtrace 同步写到 `crash-<pid>.log`，
+/// 作为崩溃定位的唯一线索。写文件不做任何 unwrap/abort，失败则静默跳过。
+fn install_panic_logger(app: &tauri::AppHandle) {
+    let crash_file = match app.path().app_log_dir() {
+        Ok(dir) => dir.join(format!("crash-{}.log", std::process::id())),
+        Err(e) => {
+            log::error!("[install_panic_logger] Failed to get app_log_dir: {e}");
+            return;
+        }
+    };
+
+    std::panic::set_hook(Box::new(move |panic_info| {
+        let payload = match panic_info.payload().downcast_ref::<&str>() {
+            Some(s) => (*s).to_string(),
+            None => match panic_info.payload().downcast_ref::<String>() {
+                Some(s) => s.clone(),
+                None => "<non-string panic payload>".to_string(),
+            },
+        };
+        let location = match panic_info.location() {
+            Some(loc) => format!("{}:{}:{}", loc.file(), loc.line(), loc.column()),
+            None => "<unknown location>".to_string(),
+        };
+        let backtrace = std::backtrace::Backtrace::force_capture().to_string();
+
+        let report = format!(
+            "=== snow-shot crash report ===\npayload: {payload}\nlocation: {location}\nthread: {:?}\nbacktrace:\n{backtrace}\n",
+            std::thread::current().name()
+        );
+
+        // 先走 log 通道（若日志级别允许能同时进主日志），再落独立文件。
+        log::error!("[crash] panic at {location}: {payload}\nbacktrace:\n{backtrace}");
+
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&crash_file)
+        {
+            let _ = f.write_all(report.as_bytes());
+            let _ = f.flush();
+        }
+    }));
 }
 
 /// 根据日志保留时长设置清理过期的日志文件。
