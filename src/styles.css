@@ -50,9 +50,63 @@ body {
     align-items: center;
 }
 
+/*
+ * 修复 macOS WKWebView 下图标不显示的问题：
+ * 项目内的图标 SVG 均通过 width="1em" height="1em" 属性声明尺寸，
+ * WKWebView（Safari 26 系列 SVG 引擎重构后）对 SVG 属性中的 em 相对单位
+ * 解析异常，导致图标被渲染为 0 尺寸（工具栏框架正常但图标消失）。
+ * SVG 的 width/height 作为 presentation attribute 参与级联且优先级最低，
+ * 此处用 CSS 显式声明尺寸，走各引擎一致的 CSS 布局路径，行为跨平台一致。
+ */
+.anticon > svg {
+    width: 1em;
+    height: 1em;
+}
+
 .draw-core-layer .excalidraw .Island.App-toolbar {
     opacity: 0;
     display: none !important;
+}
+
+/*
+ * 修复 macOS WKWebView 下画板（excalidraw）图标不显示的问题：
+ * excalidraw 通过 CSS 在 svg 元素上设置 rem 尺寸（硬编码 1rem 或经
+ * --lg-icon-size/--default-icon-size 变量），而 WKWebView 的 SVG 引擎
+ * 不支持几何属性上的 rem 单位（rem 属于 WebKit 官方公告中 Safari 26.1
+ * SVG 引擎"首次支持"的重构范围），导致图标渲染为 0 尺寸。
+ * 此处按 1rem = 16px 用 px 重定义变量并覆盖硬编码规则，各引擎渲染一致。
+ */
+.draw-core-layer .excalidraw {
+    --default-icon-size: 16px; /* 1rem */
+    --lg-icon-size: 16px; /* 1rem */
+}
+
+@media screen and (min-device-width: 1921px) {
+    .draw-core-layer .excalidraw {
+        --default-icon-size: 20px; /* 1.25rem */
+        --lg-icon-size: 20px; /* 1.25rem */
+    }
+}
+
+.draw-core-layer .excalidraw .dropdown-menu-item svg,
+.draw-core-layer .excalidraw .dropdown-menu-item-bare svg {
+    width: 16px; /* 1rem */
+    height: 16px;
+}
+
+.draw-core-layer .excalidraw .color-picker__button-outline svg {
+    width: 20px; /* 1.25rem */
+    height: 20px;
+}
+
+.draw-core-layer .excalidraw .Modal__close svg {
+    width: 24px; /* 1.5rem */
+    height: 24px;
+}
+
+.draw-core-layer .excalidraw .UnlockPopup svg {
+    width: 20px; /* 1.25rem */
+    height: 20px;
 }
 
 .draw-core-layer .excalidraw .selected-shape-actions fieldset {
