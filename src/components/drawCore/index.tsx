@@ -952,6 +952,25 @@ const DrawCoreComponent: React.FC<{
                             font-size: var(--default-icon-size);
                         }
 
+                        /*
+                         * excalidraw 传入的图标由其 createIcon 生成，不带 width/height 属性，
+                         * 尺寸完全依赖 CSS。若不显式声明，Chromium 会按 viewBox 内在比例兜底渲染，
+                         * 而 WKWebView（macOS）会将无尺寸的 svg 渲染为 0 尺寸导致图标不可见。
+                         * 1em 基于容器自身的 font-size（--default-icon-size），随断点自适应。
+                         */
+                        .draw-core-layer
+                            :global(
+                                .excalidraw
+                                    .radio-button-icon
+                                    svg,
+                                .excalidraw
+                                    .subtool-radio-button-icon
+                                    svg
+                            ) {
+                            width: 1em;
+                            height: 1em;
+                        }
+
                         .draw-core-layer :global(.excalidraw .ant-radio-button-wrapper) {
                             padding-inline: ${0}px;
                         }
