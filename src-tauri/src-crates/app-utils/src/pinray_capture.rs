@@ -32,6 +32,12 @@ const FIRST_FRAME_WAIT: Duration = Duration::from_millis(300);
 /// 首帧截止时间
 const FIRST_FRAME_DEADLINE: Duration = Duration::from_secs(3);
 
+/// 排空复用 session 积压帧时的最大读取次数。
+///
+/// pinray 的 WGC 后端把帧推入有界 channel（`queue_depth`，默认 2），
+/// 数次读取内必然排空；留出余量以覆盖夹带的 Gap 事件。
+const DRAIN_MAX_EVENTS: usize = 16;
+
 struct CapturedFrame {
     width: u32,
     height: u32,
@@ -109,14 +115,17 @@ fn build_session(
 /// DXGI 桌面复制仅在桌面变化时出帧，静态桌面可能等不到第二帧，因此不丢弃
 /// 首帧（其 MPO 缺失属驱动级行为，等待也无法解决）。
 ///
-/// 复用的 session 不再丢弃首帧：首帧丢弃只针对冷启动，会话已在运行说明 DWM
-/// 早已完成 MPO 重定向，此时丢帧反而会多等一个合成周期。
+/// 复用路径不在此丢弃首帧：调用方（`capture_first_frame`）已通过
+/// `drain_pending_frames` 排空积压的旧帧，此处取到的即为新帧；
+/// 且会话已在运行说明 DWM 早已完成 MPO 重定向，丢帧反而会多等一个合成周期。
 fn capture_first_frame(
     session: &mut CaptureSession,
     drop_first_frame: bool,
 ) -> Result<CapturedFrame, String> {
     if session.is_running() {
-        // 复用路径：session 已在运行，直接取下一帧
+        // 复用路径：session 持续运行，必须先排空 channel 中积压的旧帧，再取新帧。
+        // 详见 drain_pending_frames 的说明。
+        drain_pending_frames(session);
         return capture_next_frame(session, None);
     }
 
@@ -125,6 +134,34 @@ fn capture_first_frame(
     }
 
     capture_next_frame(session, Some(drop_first_frame))
+}
+
+/// 非阻塞排空已运行 session 中积压的旧帧。
+///
+/// pinray 的 WGC 后端是 push 模型：`FrameArrived` 回调（线程池线程）把帧推入有界
+/// channel，`next_event` 只是从 channel 取帧；channel 满后新帧被丢弃，因此队列中
+/// 积压的帧会一直保留到被消费。
+///
+/// 本项目把 session 留在池中复用（不再 `stop()`），归还后回调仍在持续推帧而无人
+/// 消费，channel 中积压的是**上一次截图前后的画面**——桌面静止时其内容与上一次
+/// 截图完全相同，复用时直接读取就会"截取到上一次的图片"。
+/// 这里以零超时非阻塞地把已就绪的帧与 Gap 事件全部消费掉，之后
+/// `capture_next_frame` 等待的是排空之后由合成器新产生的帧，内容即为当前画面。
+fn drain_pending_frames(session: &mut CaptureSession) {
+    let mut drained = 0usize;
+    for _ in 0..DRAIN_MAX_EVENTS {
+        match session.next_event(Some(Duration::ZERO)) {
+            // 旧帧、Gap 事件一并丢弃
+            Ok(_) => drained += 1,
+            // Timeout 表示 channel 已空，排空完成
+            Err(_) => break,
+        }
+    }
+
+    // 排到旧帧说明复用时确实存在过期画面（间隔越短越容易命中）
+    if drained > 0 {
+        log::debug!("[pinray_capture] drained {drained} stale event(s) from reused session");
+    }
 }
 
 /// 在已运行的 session 上取一帧；`drop_first_frame` 为 `Some(true)` 时跳过冷启动首帧。
