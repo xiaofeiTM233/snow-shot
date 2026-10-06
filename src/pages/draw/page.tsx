@@ -285,6 +285,12 @@ const DrawPageCore: React.FC<{
 		[getScreenshotType, setCaptureEvent],
 	);
 	const capturingRef = useRef(false);
+	// 截图图像是否已渲染就绪。
+	// excuteScreenshot 会先显示窗口（内部 resizeCanvas 重置渲染纹理）再异步采集/渲染图像，
+	// 这段时间内 worker 内没有任何纹理；此时若响应保存/复制操作，会导出空容器得到全透明黑屏图
+	// （saveCaptureHistory 报 invalid imageBuffer），并连锁触发 finishCapture 导致本次截图中止。
+	// readyCapture 完成后置 true，作为保存/复制类操作的前置条件。
+	const captureImageReadyRef = useRef(false);
 	const circleCursorRef = useRef<HTMLDivElement>(null);
 
 	const { history } = useContext(HistoryContext);
@@ -546,6 +552,8 @@ const DrawPageCore: React.FC<{
 			}
 
 			drawPageStateRef.current = DrawPageState.WaitRelease;
+			// 收尾阶段图像引用即将被清空，禁止再响应保存/复制
+			captureImageReadyRef.current = false;
 			releasePage();
 
 			if (clearScrollScreenshot) {
@@ -734,6 +742,8 @@ const DrawPageCore: React.FC<{
 			}
 
 			capturingRef.current = true;
+			// 图像尚未渲染，此刻保存/复制会拿到空容器
+			captureImageReadyRef.current = false;
 			setCaptureStateAction(true);
 			drawToolbarActionRef.current?.setEnable(false);
 
@@ -876,6 +886,8 @@ const DrawPageCore: React.FC<{
 					layerOnExecuteScreenshotPromise,
 				]);
 				appDebug("[DIAG] excuteScreenshot: readyCapture done");
+			// 图像已渲染进 worker，此后才允许保存/复制
+			captureImageReadyRef.current = true;
 			} catch (error) {
 				appDebug("[DIAG] excuteScreenshot: readyCapture error", error);
 				// 无论如何先把 capturing 状态复位，避免一次异常导致后续所有截图静默失效
@@ -1140,6 +1152,14 @@ const DrawPageCore: React.FC<{
 				!imageLayerActionRef.current ||
 				!drawLayerActionRef.current
 			) {
+				return;
+			}
+
+			// 图像尚未渲染完成时保存会得到全透明黑屏图，直接忽略本次操作
+			if (!captureImageReadyRef.current) {
+				appDebug(
+					"[DrawPageCore] onSave ignored: capture image not ready yet",
+				);
 				return;
 			}
 
@@ -1584,6 +1604,14 @@ const DrawPageCore: React.FC<{
 				return;
 			}
 
+			// 图像尚未渲染完成时复制会得到全透明黑屏图，直接忽略本次操作
+			if (!captureImageReadyRef.current) {
+				appDebug(
+					"[DrawPageCore] onCopyToClipboard ignored: capture image not ready yet",
+				);
+				return;
+			}
+
 			if (
 				!getAppSettings()[AppSettingsGroup.SystemScreenshot]
 					.historySaveEditResult
@@ -1665,6 +1693,53 @@ const DrawPageCore: React.FC<{
 	// 渲染画布尚未初始化（DrawPageState.Init）时收到的截图请求，等画布就绪后再执行
 	const initWaitExecuteScreenshotTimerRef = useRef<NodeJS.Timeout | undefined>(
 		undefined,
+	);
+
+	// 上一次截图收尾（写入截图历史、释放窗口）期间挂起的新截图请求。
+	// finishCapture 内部会先把状态置为 WaitRelease 再 await onCaptureFinish（内含
+	// saveCaptureHistory 异步导出图像），此刻渲染纹理尚未复位、导出尚未完成，
+	// 若直接启动新截图，resizeCanvas 会重置纹理，与保存流程并发导致导出全透明黑屏图
+	// 并报 invalid imageBuffer，随后本次截图还会被 captureEvent changed 中止。
+	const waitReleaseTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
+	// 等待上一次截图收尾（capturing 复位）完成后，复用当前窗口执行挂起的截图
+	const deferExecuteScreenshotUntilReleaseDone = useCallback(
+		(
+			type: ScreenshotType,
+			params: { windowId?: string; captureHistoryId?: string },
+		) => {
+			if (waitReleaseTimerRef.current) {
+				clearInterval(waitReleaseTimerRef.current);
+			}
+
+			let count = 0;
+			waitReleaseTimerRef.current = setInterval(() => {
+				count += 1;
+				// finishCapture 收尾完成标志：capturing 已复位
+				if (!capturingRef.current) {
+					clearInterval(waitReleaseTimerRef.current);
+					waitReleaseTimerRef.current = undefined;
+
+					// 收尾期间页面可能已进入释放流程，此时交给 release 分支的重试逻辑处理
+					if (drawPageStateRef.current !== DrawPageState.WaitRelease) {
+						return;
+					}
+
+					drawPageStateRef.current = DrawPageState.Active;
+					excuteScreenshot(type, params);
+					return;
+				}
+
+				// 兜底：收尾异常时不要无限等待
+				if (count > 100) {
+					clearInterval(waitReleaseTimerRef.current);
+					waitReleaseTimerRef.current = undefined;
+					appError(
+						"[DrawPageCore] wait previous capture finish timeout, drop deferred screenshot",
+					);
+				}
+			}, 128);
+		},
+		[excuteScreenshot],
 	);
 
 	useEffect(() => {
@@ -1766,8 +1841,14 @@ const DrawPageCore: React.FC<{
 			}
 
 			if (drawPageStateRef.current === DrawPageState.WaitRelease) {
-				// 重置为激活状态
-				drawPageStateRef.current = DrawPageState.Active;
+				// 上一次截图仍在收尾（写入截图历史 + 释放窗口）。此处不能直接把状态改回 Active：
+				// 那样会绕过 excuteScreenshot 内的防重入检查，使新截图的 resizeCanvas（重置渲染纹理）
+				// 与 saveCaptureHistory 的图像导出并发，保存出全透明黑屏图并报 invalid imageBuffer。
+				// 改为取消窗口释放计划，等收尾完成后复用当前窗口执行本次请求。
+				appDebug("[DIAG] draw: wait-release in progress, defer execute-screenshot");
+				releasePage.cancel();
+				deferExecuteScreenshotUntilReleaseDone(payload.type, payload);
+				return;
 			}
 
 			excuteScreenshot(payload.type, payload);
@@ -1798,8 +1879,19 @@ const DrawPageCore: React.FC<{
 			removeListener(listenerId);
 			removeListener(finishListenerId);
 			removeListener(releaseListenerId);
+			if (waitReleaseTimerRef.current) {
+				clearInterval(waitReleaseTimerRef.current);
+				waitReleaseTimerRef.current = undefined;
+			}
 		};
-	}, [addListener, excuteScreenshot, removeListener, finishCapture]);
+	}, [
+		addListener,
+		excuteScreenshot,
+		removeListener,
+		finishCapture,
+		releasePage,
+		deferExecuteScreenshotUntilReleaseDone,
+	]);
 
 	// 默认隐藏
 	useEffect(() => {
