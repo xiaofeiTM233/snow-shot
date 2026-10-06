@@ -89,6 +89,7 @@ import { appDebug, appError, appWarn, appInfo } from "@/utils/log";
 import { MousePosition } from "@/utils/mousePosition";
 import { ScreenshotType } from "@/utils/types";
 import { setWindowRect, showWindow as showCurrentWindow } from "@/utils/window";
+import { drainWebViewSharedBuffer } from "@/utils/webview";
 import { zIndexs } from "@/utils/zIndex";
 import {
 	type FixedContentActionType,
@@ -664,6 +665,12 @@ const DrawPageCore: React.FC<{
 				});
 			}
 
+			// 采集前先排空可能滞留在事件队列中的旧帧事件：
+			// 上一帧的 sharedbufferreceived 若在上一次等待超时后才被派发，会被本次注册的
+			// 监听器捕获，导致截取到上一次的画面（pinray 侧采集统计正常，故障在前端事件匹配）。
+			// 排空只消费已入队的事件，不会影响本次采集产生的新帧。
+			await drainWebViewSharedBuffer("screenshot");
+
 			const imageBufferFromSharedBufferPromise = getImageBufferFromSharedBuffer(
 				"screenshot",
 				true,
@@ -912,10 +919,6 @@ const DrawPageCore: React.FC<{
 			readyCapture,
 			setCaptureStateAction,
 			setCaptureLoading,
-			resetCaptureStep,
-			resetDrawState,
-			resetScreenshotType,
-			hideWindow,
 		],
 	);
 
@@ -1015,7 +1018,7 @@ const DrawPageCore: React.FC<{
 				source,
 			);
 		},
-		[getAppSettings, updateAppSettings, getScreenshotType],
+		[getAppSettings, getScreenshotType],
 	);
 
 	const onSave = useCallback(
